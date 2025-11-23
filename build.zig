@@ -93,6 +93,23 @@ pub fn build(b: *std.Build) void {
     ananke_mod.addImport("http", http_mod);
     ananke_mod.addImport("claude", claude_mod);
 
+    // Build static library for FFI integration with Rust Maze
+    const lib = b.addLibrary(.{
+        .name = "ananke",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/ffi/zig_ffi.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    b.installArtifact(lib);
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
