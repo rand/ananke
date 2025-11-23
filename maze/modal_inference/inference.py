@@ -248,9 +248,7 @@ def health():
 
 @app.function(
     image=vllm_image,
-    gpu=GPU_CONFIG,
-    timeout=600,
-    scaledown_window=60,
+    timeout=10,
 )
 @modal.fastapi_endpoint(method="POST")
 def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -281,95 +279,10 @@ def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {...}
     }
     """
-    # Initialize the LLM within this function's container
-    from vllm import LLM, SamplingParams
-
-    model_name = "meta-llama/Llama-3.1-8B-Instruct"
-
-    start_time = time.time()
-
-    # Parse request
-    request_obj = GenerationRequest.from_dict(request)
-
-    # Initialize vLLM (cached by Modal across requests)
-    llm = LLM(
-        model=model_name,
-        tensor_parallel_size=1,
-        gpu_memory_utilization=0.95,
-        max_model_len=8192,
-        trust_remote_code=True,
-        guided_decoding_backend="llguidance",
-    )
-
-    tokenizer = llm.get_tokenizer()
-
-    # Build prompt
-    full_prompt = request_obj.prompt
-    if request_obj.context:
-        full_prompt = f"{request_obj.context}\n\n{request_obj.prompt}"
-
-    # Configure sampling
-    sampling_params = SamplingParams(
-        max_tokens=request_obj.max_tokens,
-        temperature=request_obj.temperature,
-        top_p=request_obj.top_p,
-        top_k=request_obj.top_k,
-        stop=request_obj.stop_sequences or [],
-    )
-
-    # Apply constraints
-    constraint_satisfied = True
-    if request_obj.constraints:
-        constraint_spec = ConstraintSpec(**request_obj.constraints)
-        llguidance_constraint = constraint_spec.to_llguidance()
-
-        if llguidance_constraint:
-            constraint_type = llguidance_constraint["type"]
-
-            if constraint_type == "json":
-                sampling_params.guided_json = llguidance_constraint["schema"]
-            elif constraint_type == "grammar":
-                sampling_params.guided_grammar = llguidance_constraint["grammar"]
-            elif constraint_type == "regex":
-                sampling_params.guided_regex = llguidance_constraint["patterns"][0]
-
-    # Generate
-    try:
-        outputs = llm.generate([full_prompt], sampling_params)
-        output = outputs[0]
-
-        generated_text = output.outputs[0].text
-        tokens_generated = len(output.outputs[0].token_ids)
-        finish_reason = output.outputs[0].finish_reason
-    except Exception as e:
-        return asdict(GenerationResponse(
-            generated_text="",
-            tokens_generated=0,
-            generation_time_ms=0,
-            constraint_satisfied=False,
-            model_name=model_name,
-            finish_reason="error",
-            metadata={"error": str(e)},
-        ))
-
-    end_time = time.time()
-    generation_time_ms = int((end_time - start_time) * 1000)
-
-    response = GenerationResponse(
-        generated_text=generated_text,
-        tokens_generated=tokens_generated,
-        generation_time_ms=generation_time_ms,
-        constraint_satisfied=constraint_satisfied,
-        model_name=model_name,
-        finish_reason=finish_reason,
-        metadata={
-            "prompt_tokens": len(tokenizer.encode(full_prompt)),
-            "temperature": request_obj.temperature,
-            "top_p": request_obj.top_p,
-        },
-    )
-
-    return asdict(response)
+    # Use the class-based method which properly caches the model
+    # Modal handles the lifecycle and caching automatically
+    llm = AnankeLLM()
+    return llm.generate.remote(request)
 
 
 # Local development helper

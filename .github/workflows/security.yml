@@ -1,0 +1,476 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly security scans (Mondays at 4 AM UTC)
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  rust-security:
+    name: Rust Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-security-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-security-
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: |
+          cd maze
+          cargo audit --json > ../rust-audit-results.json || true
+          cargo audit
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check dependencies with cargo-deny
+        run: |
+          cd maze
+          # Create deny.toml if it doesn't exist
+          if [ ! -f deny.toml ]; then
+            cat > deny.toml <<'EOF'
+          [advisories]
+          vulnerability = "deny"
+          unmaintained = "warn"
+          unsound = "warn"
+          yanked = "warn"
+          notice = "warn"
+
+          [licenses]
+          unlicensed = "deny"
+          allow = [
+              "MIT",
+              "Apache-2.0",
+              "BSD-2-Clause",
+              "BSD-3-Clause",
+              "ISC",
+              "Unicode-DFS-2016",
+          ]
+          deny = [
+              "GPL-2.0",
+              "GPL-3.0",
+              "AGPL-3.0",
+          ]
+          copyleft = "warn"
+
+          [bans]
+          multiple-versions = "warn"
+          wildcards = "warn"
+          highlight = "all"
+
+          [sources]
+          unknown-registry = "warn"
+          unknown-git = "warn"
+          EOF
+          fi
+          cargo deny check
+
+      - name: Check for known vulnerable dependencies
+        run: |
+          cd maze
+          echo "## Dependency Vulnerabilities" > ../rust-security-report.md
+          cargo audit 2>&1 | tee -a ../rust-security-report.md
+
+      - name: Upload Rust security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-security-report
+          path: rust-security-report.md
+          retention-days: 90
+
+  zig-security:
+    name: Zig Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: '0.15.2'
+
+      - name: Scan for hardcoded secrets
+        run: |
+          echo "## Zig Code Security Scan" > zig-security-report.md
+          echo "" >> zig-security-report.md
+          echo "### Hardcoded Secrets Check" >> zig-security-report.md
+          echo "" >> zig-security-report.md
+
+          # Check for potential secrets
+          SECRET_PATTERNS=(
+            "password\s*=\s*['\"].*['\"]"
+            "api[_-]?key\s*=\s*['\"].*['\"]"
+            "secret\s*=\s*['\"].*['\"]"
+            "token\s*=\s*['\"].*['\"]"
+            "private[_-]?key\s*=\s*['\"].*['\"]"
+            "aws[_-]?access[_-]?key"
+            "AKIA[0-9A-Z]{16}"
+          )
+
+          found_issues=0
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            results=$(grep -rn -E "$pattern" src/ 2>/dev/null | grep -v "test\|example\|// " || true)
+            if [ ! -z "$results" ]; then
+              echo "⚠️ Found potential secret pattern: \`$pattern\`" >> zig-security-report.md
+              echo "\`\`\`" >> zig-security-report.md
+              echo "$results" >> zig-security-report.md
+              echo "\`\`\`" >> zig-security-report.md
+              echo "" >> zig-security-report.md
+              found_issues=$((found_issues + 1))
+            fi
+          done
+
+          if [ $found_issues -eq 0 ]; then
+            echo "✅ No hardcoded secrets detected" >> zig-security-report.md
+          else
+            echo "::warning::Found $found_issues potential secret patterns in Zig code"
+          fi
+
+      - name: Check for unsafe practices
+        run: |
+          echo "" >> zig-security-report.md
+          echo "### Unsafe Code Patterns" >> zig-security-report.md
+          echo "" >> zig-security-report.md
+
+          # Check for potentially unsafe patterns
+          UNSAFE_PATTERNS=(
+            "@ptrCast"
+            "@intCast.*unchecked"
+            "@bitCast"
+            "unreachable"
+            "@memcpy.*unchecked"
+          )
+
+          found_unsafe=0
+          for pattern in "${UNSAFE_PATTERNS[@]}"; do
+            results=$(grep -rn -E "$pattern" src/ 2>/dev/null || true)
+            count=$(echo "$results" | grep -c . || true)
+            if [ $count -gt 0 ]; then
+              echo "- Found $count uses of \`$pattern\`" >> zig-security-report.md
+              found_unsafe=$((found_unsafe + count))
+            fi
+          done
+
+          if [ $found_unsafe -eq 0 ]; then
+            echo "✅ No potentially unsafe patterns detected" >> zig-security-report.md
+          else
+            echo "ℹ️ Found $found_unsafe uses of potentially unsafe patterns (review recommended)" >> zig-security-report.md
+          fi
+
+      - name: Check dependency sources
+        run: |
+          echo "" >> zig-security-report.md
+          echo "### Dependency Audit" >> zig-security-report.md
+          echo "" >> zig-security-report.md
+
+          if [ -f build.zig.zon ]; then
+            echo "Dependencies from build.zig.zon:" >> zig-security-report.md
+            echo "\`\`\`" >> zig-security-report.md
+            cat build.zig.zon >> zig-security-report.md
+            echo "\`\`\`" >> zig-security-report.md
+
+            # Check for http:// URLs (should use https://)
+            http_deps=$(grep -n "http://" build.zig.zon || true)
+            if [ ! -z "$http_deps" ]; then
+              echo "" >> zig-security-report.md
+              echo "⚠️ Found insecure HTTP URLs in dependencies:" >> zig-security-report.md
+              echo "\`\`\`" >> zig-security-report.md
+              echo "$http_deps" >> zig-security-report.md
+              echo "\`\`\`" >> zig-security-report.md
+              echo "::warning::Insecure HTTP URLs found in build.zig.zon"
+            else
+              echo "" >> zig-security-report.md
+              echo "✅ All dependency URLs use HTTPS" >> zig-security-report.md
+            fi
+          else
+            echo "No build.zig.zon found" >> zig-security-report.md
+          fi
+
+      - name: Upload Zig security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zig-security-report
+          path: zig-security-report.md
+          retention-days: 90
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        run: |
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.1/gitleaks_8.18.1_linux_x64.tar.gz
+          tar -xzf gitleaks_8.18.1_linux_x64.tar.gz
+          chmod +x gitleaks
+
+      - name: Run Gitleaks
+        run: |
+          ./gitleaks detect --source . --report-format json --report-path gitleaks-report.json --verbose || true
+          ./gitleaks detect --source . --report-format sarif --report-path gitleaks-report.sarif --verbose || true
+
+          # Generate human-readable report
+          if [ -f gitleaks-report.json ]; then
+            echo "# Secret Scanning Results" > secret-scan-report.md
+            echo "" >> secret-scan-report.md
+
+            leak_count=$(jq length gitleaks-report.json)
+            if [ "$leak_count" -gt 0 ]; then
+              echo "⚠️ Found $leak_count potential secrets!" >> secret-scan-report.md
+              echo "" >> secret-scan-report.md
+              echo "\`\`\`json" >> secret-scan-report.md
+              jq . gitleaks-report.json >> secret-scan-report.md
+              echo "\`\`\`" >> secret-scan-report.md
+              echo "::error::Gitleaks found $leak_count potential secrets"
+              exit 1
+            else
+              echo "✅ No secrets detected" >> secret-scan-report.md
+            fi
+          else
+            echo "✅ No secrets detected" > secret-scan-report.md
+          fi
+
+      - name: Upload secret scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secret-scan-report
+          path: secret-scan-report.md
+          retention-days: 90
+
+      - name: Upload Gitleaks SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks-report.sarif
+        continue-on-error: true
+
+  license-compliance:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Install cargo-license
+        run: cargo install cargo-license
+
+      - name: Check Rust licenses
+        run: |
+          cd maze
+          echo "# License Compliance Report" > ../license-report.md
+          echo "" >> ../license-report.md
+          echo "## Rust Dependencies" >> ../license-report.md
+          echo "" >> ../license-report.md
+          echo "\`\`\`" >> ../license-report.md
+          cargo license --all-features >> ../license-report.md
+          echo "\`\`\`" >> ../license-report.md
+
+          # Check for GPL licenses
+          gpl_deps=$(cargo license --all-features | grep -i "GPL" || true)
+          if [ ! -z "$gpl_deps" ]; then
+            echo "" >> ../license-report.md
+            echo "⚠️ Found GPL-licensed dependencies:" >> ../license-report.md
+            echo "\`\`\`" >> ../license-report.md
+            echo "$gpl_deps" >> ../license-report.md
+            echo "\`\`\`" >> ../license-report.md
+            echo "::warning::GPL-licensed dependencies detected"
+          fi
+
+      - name: Check project license
+        run: |
+          echo "" >> license-report.md
+          echo "## Project License" >> license-report.md
+          echo "" >> license-report.md
+          if [ -f LICENSE ]; then
+            echo "✅ LICENSE file present" >> license-report.md
+            echo "" >> license-report.md
+            echo "\`\`\`" >> license-report.md
+            head -n 5 LICENSE >> license-report.md
+            echo "\`\`\`" >> license-report.md
+          else
+            echo "⚠️ No LICENSE file found" >> license-report.md
+            echo "::warning::No LICENSE file found in repository"
+          fi
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: license-report.md
+          retention-days: 90
+
+  security-summary:
+    name: Security Summary
+    needs: [rust-security, zig-security, secret-scanning, license-compliance]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+
+      - name: Generate summary
+        run: |
+          echo "# 🔒 Security Audit Summary" > SECURITY_SUMMARY.md
+          echo "" >> SECURITY_SUMMARY.md
+          echo "**Date**: $(date -u)" >> SECURITY_SUMMARY.md
+          echo "**Commit**: ${{ github.sha }}" >> SECURITY_SUMMARY.md
+          echo "**Trigger**: ${{ github.event_name }}" >> SECURITY_SUMMARY.md
+          echo "" >> SECURITY_SUMMARY.md
+          echo "---" >> SECURITY_SUMMARY.md
+          echo "" >> SECURITY_SUMMARY.md
+
+          # Rust security
+          if [ -f rust-security-report/rust-security-report.md ]; then
+            echo "## Rust Security" >> SECURITY_SUMMARY.md
+            cat rust-security-report/rust-security-report.md >> SECURITY_SUMMARY.md
+            echo "" >> SECURITY_SUMMARY.md
+          fi
+
+          # Zig security
+          if [ -f zig-security-report/zig-security-report.md ]; then
+            cat zig-security-report/zig-security-report.md >> SECURITY_SUMMARY.md
+            echo "" >> SECURITY_SUMMARY.md
+          fi
+
+          # Secret scanning
+          if [ -f secret-scan-report/secret-scan-report.md ]; then
+            echo "## Secret Scanning" >> SECURITY_SUMMARY.md
+            cat secret-scan-report/secret-scan-report.md >> SECURITY_SUMMARY.md
+            echo "" >> SECURITY_SUMMARY.md
+          fi
+
+          # License compliance
+          if [ -f license-report/license-report.md ]; then
+            cat license-report/license-report.md >> SECURITY_SUMMARY.md
+            echo "" >> SECURITY_SUMMARY.md
+          fi
+
+          echo "---" >> SECURITY_SUMMARY.md
+          echo "" >> SECURITY_SUMMARY.md
+          echo "## Recommendations" >> SECURITY_SUMMARY.md
+          echo "" >> SECURITY_SUMMARY.md
+          echo "1. Review all security warnings" >> SECURITY_SUMMARY.md
+          echo "2. Update vulnerable dependencies" >> SECURITY_SUMMARY.md
+          echo "3. Ensure secrets are never committed" >> SECURITY_SUMMARY.md
+          echo "4. Verify license compatibility" >> SECURITY_SUMMARY.md
+          echo "5. Document security decisions" >> SECURITY_SUMMARY.md
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: SECURITY_SUMMARY.md
+          retention-days: 90
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('SECURITY_SUMMARY.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+        continue-on-error: true
