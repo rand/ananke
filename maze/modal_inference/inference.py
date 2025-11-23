@@ -31,6 +31,22 @@ app = modal.App("ananke-inference")
 # GPU configuration (use string format per Modal 1.0 API)
 GPU_CONFIG = "A100-80GB"  # 80GB for 32B model, use "A100-40GB" for smaller models
 
+# Environment-based configuration for cost control (from maze pattern)
+MODAL_MODE = os.getenv("MODAL_MODE", "dev").lower()
+
+if MODAL_MODE == "demo":
+    SCALEDOWN_WINDOW = 600  # 10 min for presentations
+    print("🎬 DEMO MODE: 10 min scaledown, A100-80GB GPU")
+elif MODAL_MODE == "prod":
+    SCALEDOWN_WINDOW = 300  # 5 min balanced
+    print("🚀 PROD MODE: 5 min scaledown, A100-80GB GPU")
+else:
+    # Dev mode: aggressive scaledown for cost savings
+    SCALEDOWN_WINDOW = 120  # 2 min aggressive
+    print("💻 DEV MODE: 2 min scaledown, A100-80GB GPU ($4/hr)")
+
+print(f"Scaledown: {SCALEDOWN_WINDOW}s")
+
 # Pinned versions for reproducibility (matches working maze example)
 VLLM_VERSION = "0.11.0"
 TRANSFORMERS_VERSION = "4.55.2"
@@ -146,7 +162,7 @@ class GenerationResponse:
     image=vllm_image,
     gpu=GPU_CONFIG,
     timeout=3600,  # 1 hour timeout (needed for first-time model download ~15min + generation)
-    scaledown_window=120,  # Scale to zero after 2min idle
+    scaledown_window=SCALEDOWN_WINDOW,  # Environment-based cost control (dev/demo/prod)
     allow_concurrent_inputs=10,  # Handle multiple requests per container
     volumes={
         # Cache HuggingFace model weights for faster cold starts (matches working maze example)
