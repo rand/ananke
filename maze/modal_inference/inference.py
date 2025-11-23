@@ -41,33 +41,16 @@ vllm_image = (
         add_python="3.12"
     )
     .pip_install(
-        # Core vLLM stack (torch version comes from vLLM dependency)
-        "vllm==0.11.0",  # Stable version with llguidance support (requires torch==2.8.0)
-        "transformers==4.55.2",  # Required by vLLM 0.11.0
-        "tokenizers>=0.21.1",
+        # Core vLLM (let it pull its own dependencies: torch, xformers, transformers, etc.)
+        "vllm==0.11.0",
 
-        # Structured output backends
+        # llguidance for constraint enforcement
         "llguidance>=0.7.11,<0.8.0",  # CRITICAL: vLLM 0.11.0 requires <0.8.0
-        "xgrammar==0.1.25",
-        "lm-format-enforcer==0.11.3",
-        "outlines_core==0.2.11",
 
         # FastAPI and serving
         "fastapi[standard]>=0.115.0",
-        "pydantic>=2.12.0",
-        "openai>=1.99.1",
-
-        # Performance and scaling
-        "ray[cgraph]>=2.48.0",
-        "numba==0.61.2",
-
-        # GPU acceleration
-        "xformers==0.0.33.post1",
-        "flashinfer-python==0.5.2",
-
-        # Utilities
-        "tiktoken>=0.6.0",
-        "sentencepiece",
+        "huggingface-hub>=0.20.0",
+        "hf-transfer",
     )
     .env({
         "HF_HUB_ENABLE_HF_TRANSFER": "1",  # Faster model downloads
