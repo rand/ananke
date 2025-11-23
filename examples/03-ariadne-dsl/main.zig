@@ -28,7 +28,7 @@ pub fn main() !void {
     // Initialize Ariadne compiler
     std.debug.print("=== Compiling Ariadne to ConstraintIR ===\n\n", .{});
 
-    var ariadne_compiler = try ananke.Ariadne.init(allocator);
+    var ariadne_compiler = try ananke.ariadne.AriadneCompiler.init(allocator);
     defer ariadne_compiler.deinit();
 
     std.debug.print("Note: Ariadne parser is not yet implemented.\n", .{});

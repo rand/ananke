@@ -19,7 +19,7 @@ pub fn main() !void {
     // First: Extract WITHOUT Claude (static analysis only)
     std.debug.print("=== Phase 1: Static Analysis (No LLM) ===\n\n", .{});
 
-    var clew_static = try ananke.Clew.init(allocator);
+    var clew_static = try ananke.clew.Clew.init(allocator);
     defer clew_static.deinit();
 
     const static_constraints = try clew_static.extractFromCode(source_code, "python");
@@ -54,7 +54,7 @@ pub fn main() !void {
         std.debug.print("Claude API key found - semantic analysis enabled\n\n", .{});
 
         // Initialize Clew with Claude client
-        var clew_semantic = try ananke.Clew.init(allocator);
+        var clew_semantic = try ananke.clew.Clew.init(allocator);
         defer clew_semantic.deinit();
 
         // TODO: In a real implementation, this would make Claude API calls

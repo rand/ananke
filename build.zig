@@ -246,7 +246,6 @@ pub fn build(b: *std.Build) void {
     //
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
-}
 
     // ============================================================================
     // Performance Benchmarks
@@ -332,3 +331,4 @@ pub fn build(b: *std.Build) void {
     const rust_bench_step = b.step("bench-rust", "Run Rust Maze benchmarks");
     rust_bench_step.dependOn(&cargo_bench.step);
     bench_all_step.dependOn(rust_bench_step);
+}
