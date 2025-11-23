@@ -18,6 +18,56 @@ Ananke enforces constraints at the **token level** during code generation, ensur
 
 ---
 
+## Quickstart (10 minutes)
+
+Get started with constraint extraction and analysis in 10 minutes:
+
+```bash
+# Clone and build
+git clone https://github.com/ananke-ai/ananke.git
+cd ananke
+zig build
+
+# Run your first constraint extraction
+cd examples/01-simple-extraction
+zig build run
+
+# Output: Extracted constraints from TypeScript code
+# - Function signatures, types, security patterns
+# - All under 100ms, no external services needed
+```
+
+**Want more?** See the [complete quickstart guide](QUICKSTART.md) for:
+- Semantic analysis with Claude
+- Combining multiple constraint sources
+- Understanding the full pipeline
+- Troubleshooting tips
+
+### 5-Minute Quick Tour
+
+**Extract constraints from code** (no external services needed):
+```bash
+cd examples/01-simple-extraction && zig build run
+# Finds: function signatures, types, security patterns
+```
+
+**Add semantic analysis** (optional, requires Claude API):
+```bash
+export ANTHROPIC_API_KEY='your-key'
+cd examples/02-claude-analysis && zig build run
+# Finds: business rules, implicit constraints, intent
+```
+
+**Combine all approaches** (production-ready pattern):
+```bash
+cd examples/05-mixed-mode && zig build run
+# Merges: extracted + JSON config + Ariadne DSL
+```
+
+**Read more**: [QUICKSTART.md](QUICKSTART.md) | [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+
+---
+
 ## Overview
 
 Ananke is a two-layer system for intelligent, constrained code generation:
