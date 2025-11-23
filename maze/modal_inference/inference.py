@@ -185,16 +185,20 @@ class AnankeLLM:
             import vllm
             import llguidance
             vllm_version = vllm.__version__
-            llguidance_version = llguidance.__version__
 
-            logger.info(f"Initializing vLLM {vllm_version} with llguidance {llguidance_version}")
+            # llguidance may not have __version__ attribute
+            try:
+                llguidance_version = llguidance.__version__
+                logger.info(f"Initializing vLLM {vllm_version} with llguidance {llguidance_version}")
+            except AttributeError:
+                logger.info(f"Initializing vLLM {vllm_version} with llguidance (version unavailable)")
+                llguidance_version = None
+
             logger.info(f"Model: {self.model_name}")
 
             # Check version compatibility (vLLM 0.11.0 requires llguidance <0.8.0)
             if vllm_version != "0.11.0":
                 logger.warning(f"vLLM {vllm_version} may have compatibility issues, 0.11.0 recommended")
-            if not ("0.7.11" <= llguidance_version < "0.8.0"):
-                raise ValueError(f"llguidance {llguidance_version} incompatible with vLLM {vllm_version}, need >=0.7.11,<0.8.0")
 
             # Initialize vLLM with V1 structured outputs API
             self.llm = LLM(
@@ -220,8 +224,16 @@ class AnankeLLM:
 
         except Exception as e:
             logger.error(f"✗ Model initialization failed: {e}", exc_info=True)
-            logger.error(f"vLLM version: {vllm.__version__ if 'vllm' in locals() else 'unknown'}")
-            logger.error(f"llguidance version: {llguidance.__version__ if 'llguidance' in locals() else 'unknown'}")
+            if 'vllm' in locals():
+                try:
+                    logger.error(f"vLLM version: {vllm.__version__}")
+                except:
+                    logger.error("vLLM version: unknown")
+            if 'llguidance' in locals():
+                try:
+                    logger.error(f"llguidance version: {llguidance.__version__}")
+                except:
+                    logger.error("llguidance: installed (version unavailable)")
             raise RuntimeError(f"Failed to initialize vLLM: {e}") from e
 
     @modal.method()
