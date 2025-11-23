@@ -25,6 +25,20 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
+    // Tree-sitter support disabled pending Zig 0.15.x compatibility in upstream
+    // TODO: Re-enable once z-tree-sitter fixes enum literal names
+    // const zts = b.dependency("zts", .{
+    //     .target = target,
+    //     .optimize = optimize,
+    //     .typescript = true,
+    //     .python = true,
+    //     .javascript = true,
+    //     .rust = true,
+    //     .go = true,
+    //     .java = true,
+    //     .zig = true,
+    // });
+
     // Core Ananke modules
     // Note: We need to create modules first, then add imports after
 
@@ -54,6 +68,8 @@ pub fn build(b: *std.Build) void {
     clew_mod.addImport("ananke", ananke_mod);
     clew_mod.addImport("http", http_mod);
     clew_mod.addImport("claude", claude_mod);
+    // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
+    // clew_mod.addImport("zts", zts.module("zts"));
 
     // Braid: Constraint compilation engine
     const braid_mod = b.addModule("braid", .{
