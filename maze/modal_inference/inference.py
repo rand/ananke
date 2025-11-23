@@ -41,9 +41,8 @@ vllm_image = (
         add_python="3.12"
     )
     .pip_install(
-        # Core vLLM stack
-        "vllm==0.11.0",  # Stable version with llguidance support
-        "torch==2.9.0",
+        # Core vLLM stack (torch version comes from vLLM dependency)
+        "vllm==0.11.0",  # Stable version with llguidance support (requires torch==2.8.0)
         "transformers==4.55.2",  # Required by vLLM 0.11.0
         "tokenizers>=0.21.1",
 
