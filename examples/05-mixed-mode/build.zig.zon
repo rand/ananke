@@ -1,6 +1,7 @@
 .{
-    .name = "mixed-mode-example",
+    .name = .mixed_mode_example,
     .version = "0.1.0",
+    .fingerprint = 0xc3c0e41f7fefc9b8,
     .dependencies = .{
         .ananke = .{
             .path = "../..",

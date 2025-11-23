@@ -41,7 +41,7 @@ fn createTestConstraint(allocator: std.mem.Allocator, index: usize) !Constraint 
         .severity = if (index % 2 == 0) .err else .warning,
         .name = name,
         .description = description,
-        .source = .{ .static_analysis = .{ .tool = "test", .rule_id = "TEST001" }},
+        .source = .{ .static_analysis = {} },
         .confidence = 0.9,
     };
 }
@@ -56,9 +56,9 @@ fn benchmarkCompilation(
     defer braid.deinit();
 
     // Create test constraints
-    var constraints = try allocator.alloc(Constraint, constraint_count);
+    const constraints = try allocator.alloc(Constraint, constraint_count);
     defer allocator.free(constraints);
-    
+
     for (constraints, 0..) |*c, i| {
         c.* = try createTestConstraint(allocator, i);
     }
@@ -110,9 +110,9 @@ fn benchmarkConflictDetection(
     var braid = try Braid.init(allocator);
     defer braid.deinit();
 
-    var constraints = try allocator.alloc(Constraint, constraint_count);
+    const constraints = try allocator.alloc(Constraint, constraint_count);
     defer allocator.free(constraints);
-    
+
     for (constraints, 0..) |*c, i| {
         c.* = try createTestConstraint(allocator, i);
     }
@@ -147,9 +147,9 @@ fn benchmarkIRCompilation(
     var braid = try Braid.init(allocator);
     defer braid.deinit();
 
-    var constraints = try allocator.alloc(Constraint, constraint_count);
+    const constraints = try allocator.alloc(Constraint, constraint_count);
     defer allocator.free(constraints);
-    
+
     for (constraints, 0..) |*c, i| {
         c.* = try createTestConstraint(allocator, i);
     }
