@@ -83,7 +83,7 @@ jobs:
           echo "" >> benchmark-results.md
 
       - name: Upload Zig benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: zig-benchmark-results
           path: benchmark-results.md
@@ -148,7 +148,7 @@ jobs:
           echo "\`\`\`" >> rust-benchmark-results.md
 
       - name: Upload Rust benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rust-benchmark-results
           path: rust-benchmark-results.md
@@ -208,7 +208,7 @@ jobs:
           echo "*Note: Detailed regression analysis coming in future updates*" >> comparison.md
 
       - name: Upload comparison
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-comparison
           path: comparison.md
@@ -258,7 +258,7 @@ jobs:
 
       - name: Upload benchmark history
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-history-${{ github.sha }}
           path: benchmark-history/
@@ -314,7 +314,7 @@ jobs:
           echo "*Automated regression detection coming soon*" >> BENCHMARK_REPORT.md
 
       - name: Upload final report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-report
           path: BENCHMARK_REPORT.md

@@ -242,7 +242,7 @@ jobs:
           tar -xf artifact.tar -C preview
 
       - name: Upload preview
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: docs-preview-pr-${{ github.event.pull_request.number }}
           path: preview/

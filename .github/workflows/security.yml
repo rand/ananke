@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload Rust security report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rust-security-report
           path: rust-security-report.md
@@ -221,7 +221,7 @@ jobs:
 
       - name: Upload Zig security report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: zig-security-report
           path: zig-security-report.md
@@ -319,7 +319,7 @@ jobs:
 
       - name: Upload secret scan report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: secret-scan-report
           path: secret-scan-report.md
@@ -389,7 +389,7 @@ jobs:
 
       - name: Upload license report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: license-report
           path: license-report.md
@@ -453,7 +453,7 @@ jobs:
           echo "5. Document security decisions" >> SECURITY_SUMMARY.md
 
       - name: Upload security summary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: security-summary
           path: SECURITY_SUMMARY.md

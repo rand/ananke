@@ -70,7 +70,7 @@ jobs:
 
       - name: Upload build artifacts
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ananke-${{ runner.os }}-${{ matrix.zig-version }}
           path: |
@@ -179,7 +179,7 @@ jobs:
           zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseSafe
 
       - name: Upload cross-compiled artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ananke-${{ matrix.target }}
           path: zig-out/bin/*
