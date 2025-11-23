@@ -1,0 +1,174 @@
+name: Maze Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'maze/**'
+      - '.github/workflows/maze-tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'maze/**'
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          profile: minimal
+          override: true
+          components: rustfmt, clippy
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: maze/target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Check formatting
+        run: cd maze && cargo fmt --all -- --check
+      
+      - name: Run clippy
+        run: cd maze && cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Build
+        run: cd maze && cargo build --verbose
+      
+      - name: Run unit tests
+        run: cd maze && cargo test --lib --verbose
+      
+      - name: Run integration tests
+        run: cd maze && cargo test --tests --verbose
+      
+      - name: Run doc tests
+        run: cd maze && cargo test --doc --verbose
+      
+      - name: Run all tests with logging
+        run: cd maze && RUST_LOG=debug cargo test --all --verbose -- --nocapture
+        continue-on-error: true
+      
+      - name: Generate test report
+        if: always()
+        run: |
+          cd maze
+          echo "# Test Results for ${{ matrix.os }}" > test-results.md
+          echo "" >> test-results.md
+          echo "## Test Summary" >> test-results.md
+          cargo test --all 2>&1 | grep "test result:" >> test-results.md || true
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: maze/test-results.md
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      
+      - name: Install tarpaulin
+        run: cargo install cargo-tarpaulin
+      
+      - name: Generate coverage
+        run: cd maze && cargo tarpaulin --out Xml --output-dir coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: maze/coverage/cobertura.xml
+          flags: maze
+          name: maze-coverage
+
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      
+      - name: Run benchmarks
+        run: cd maze && cargo bench --no-run
+        continue-on-error: true
+      
+      - name: Comment benchmark results
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'Benchmark build completed. Run `cargo bench` locally for detailed results.'
+            })
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+      
+      - name: Run cargo audit
+        run: |
+          cargo install cargo-audit
+          cd maze && cargo audit
+        continue-on-error: true

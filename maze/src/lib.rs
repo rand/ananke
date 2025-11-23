@@ -25,6 +25,7 @@
 //!         constraints_ir: vec![/* ConstraintIR from Zig */],
 //!         max_tokens: 2048,
 //!         temperature: 0.7,
+//!         context: None,
 //!     };
 //!
 //!     let result = orchestrator.generate(request).await?;
