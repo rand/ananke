@@ -1,6 +1,7 @@
 .{
-    .name = "claude-analysis-example",
+    .name = .claude_analysis_example,
     .version = "0.1.0",
+    .fingerprint = 0x49242bbc050eaa5b,
     .dependencies = .{
         .ananke = .{
             .path = "../..",

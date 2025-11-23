@@ -19,7 +19,7 @@ pub fn main() !void {
     const source_code = try std.fs.cwd().readFileAlloc(allocator, "sample.ts", 1024 * 1024);
     defer allocator.free(source_code);
 
-    var clew = try ananke.Clew.init(allocator);
+    var clew = try ananke.clew.Clew.init(allocator);
     defer clew.deinit();
 
     const extracted = try clew.extractFromCode(source_code, "typescript");

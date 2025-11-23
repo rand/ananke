@@ -180,7 +180,7 @@ pub const Braid = struct {
     }
 
     fn detectConflicts(self: *Braid, graph: *ConstraintGraph) ![]Conflict {
-        var conflicts = std.ArrayList(Conflict).init(self.allocator);
+        var conflicts = std.ArrayList(Conflict){};
 
         // Optimized conflict detection: O(n log n) instead of O(n²)
         // Strategy: Group constraints by kind first, then only check within groups
@@ -191,7 +191,7 @@ pub const Braid = struct {
         defer {
             var iter = by_kind.iterator();
             while (iter.next()) |entry| {
-                entry.value_ptr.deinit();
+                entry.value_ptr.deinit(self.allocator);
             }
             by_kind.deinit();
         }
@@ -201,9 +201,9 @@ pub const Braid = struct {
             const kind = node.constraint.kind;
             const entry = try by_kind.getOrPut(kind);
             if (!entry.found_existing) {
-                entry.value_ptr.* = std.ArrayList(usize).init(self.allocator);
+                entry.value_ptr.* = std.ArrayList(usize){};
             }
-            try entry.value_ptr.append(i);
+            try entry.value_ptr.append(self.allocator, i);
         }
 
         // Check conflicts only within same kind: O(m²) where m << n for each kind
@@ -220,7 +220,7 @@ pub const Braid = struct {
                     const node_b = graph.nodes.items[idx_b];
 
                     if (self.constraintsConflict(node_a.constraint, node_b.constraint)) {
-                        try conflicts.append(.{
+                        try conflicts.append(self.allocator, .{
                             .constraint_a = idx_a,
                             .constraint_b = idx_b,
                             .description = "Constraints are incompatible",
@@ -230,7 +230,7 @@ pub const Braid = struct {
             }
         }
 
-        return try conflicts.toOwnedSlice();
+        return try conflicts.toOwnedSlice(self.allocator);
     }
 
     fn constraintsConflict(self: *Braid, a: Constraint, b: Constraint) bool {
@@ -283,10 +283,10 @@ pub const Braid = struct {
                 .issue = try self.allocator.dupe(u8, conflict.description),
             };
 
-            try descriptions.append(desc);
+            try descriptions.append(self.allocator, desc);
         }
 
-        return try descriptions.toOwnedSlice();
+        return try descriptions.toOwnedSlice(self.allocator);
     }
 
     fn applyClaudeResolution(

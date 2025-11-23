@@ -74,7 +74,7 @@ fn benchmarkExtraction(
 
     for (0..iterations) |_| {
         timer.reset();
-        const result = try clew.extractFromCode(source, language);
+        var result = try clew.extractFromCode(source, language);
         total_ns += timer.read();
         result.deinit();
     }
@@ -135,22 +135,16 @@ fn benchmarkMemoryUsage(
     source: []const u8,
     language: []const u8,
 ) !void {
-    // Track memory usage
-    var tracking_allocator = std.heap.trackingAllocator(allocator);
-    const tracking = tracking_allocator.allocator();
+    // Note: Memory tracking removed in Zig 0.15.x
+    // Use profiling tools like valgrind or heaptrack for memory analysis
 
-    var clew = try Clew.init(tracking);
+    var clew = try Clew.init(allocator);
     defer clew.deinit();
 
-    const before = tracking_allocator.total_allocated_bytes;
-    const result = try clew.extractFromCode(source, language);
-    const after = tracking_allocator.total_allocated_bytes;
-    result.deinit();
+    var result = try clew.extractFromCode(source, language);
+    defer result.deinit();
 
-    const bytes_used = after - before;
-
-    std.debug.print("Memory Usage:\n", .{});
-    std.debug.print("  Allocated: {} bytes\n", .{bytes_used});
-    std.debug.print("  Per source byte: {d:.2}\n", .{@as(f64, @floatFromInt(bytes_used)) / @as(f64, @floatFromInt(source.len))});
+    std.debug.print("Memory tracking not available in Zig 0.15.x\n", .{});
+    std.debug.print("Use external profiling tools (valgrind, heaptrack) for memory analysis\n", .{});
     std.debug.print("\n", .{});
 }

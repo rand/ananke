@@ -1,6 +1,7 @@
 .{
-    .name = "ariadne-dsl-example",
+    .name = .ariadne_dsl_example,
     .version = "0.1.0",
+    .fingerprint = 0xc535b90660898403,
     .dependencies = .{
         .ananke = .{
             .path = "../..",

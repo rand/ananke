@@ -12,13 +12,15 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "simple-extraction",
-        .root_source_file = b.path("main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke.module("ananke") },
+            },
+        }),
     });
-
-    // Link ananke module
-    exe.root_module.addImport("ananke", ananke.module("ananke"));
 
     b.installArtifact(exe);
 
