@@ -141,7 +141,6 @@ class AnankeLLM:
         """Initialize vLLM engine with llguidance support on container start"""
         import logging
         from vllm import LLM, SamplingParams
-        from vllm.guided_decoding import GuidedDecodingMode
 
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
