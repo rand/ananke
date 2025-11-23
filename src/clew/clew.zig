@@ -76,13 +76,7 @@ pub const Clew = struct {
                     .severity = convertSeverity(claude_constraint.severity),
                     .name = claude_constraint.name,
                     .description = claude_constraint.description,
-                    .source = .{
-                        .llm_analysis = .{
-                            .provider = "claude",
-                            .prompt = "code_analysis",
-                            .confidence = claude_constraint.confidence,
-                        },
-                    },
+                    .source = .LLM_Analysis,
                     .confidence = claude_constraint.confidence,
                 };
                 try constraint_set.add(ananke_constraint);
@@ -119,13 +113,7 @@ pub const Clew = struct {
                     .severity = convertSeverity(claude_constraint.severity),
                     .name = claude_constraint.name,
                     .description = claude_constraint.description,
-                    .source = .{
-                        .llm_analysis = .{
-                            .provider = "claude",
-                            .prompt = "test_intent_analysis",
-                            .confidence = claude_constraint.confidence,
-                        },
-                    },
+                    .source = .LLM_Analysis,
                     .confidence = claude_constraint.confidence,
                 };
                 try constraint_set.add(ananke_constraint);
@@ -147,10 +135,7 @@ pub const Clew = struct {
                     .severity = .warning,
                     .name = "latency_bound",
                     .description = "P99 latency should be under 100ms",
-                    .source = .{ .telemetry = .{
-                        .metric_name = "latency_p99",
-                        .threshold = 100.0,
-                    }},
+                    .source = .Telemetry,
                 };
                 try constraint_set.add(constraint);
             }
@@ -164,10 +149,7 @@ pub const Clew = struct {
                     .severity = .err,
                     .name = "error_rate",
                     .description = "Error rate should be under 1%",
-                    .source = .{ .telemetry = .{
-                        .metric_name = "error_rate",
-                        .threshold = 0.01,
-                    }},
+                    .source = .Telemetry,
                 };
                 try constraint_set.add(constraint);
             }
@@ -352,7 +334,7 @@ pub const Clew = struct {
                 .severity = .info,
                 .name = "has_functions",
                 .description = "Code contains function definitions",
-                .source = .{ .static_analysis = {} },
+                .source = .AST_Pattern,
             });
         }
 
@@ -377,7 +359,7 @@ pub const Clew = struct {
                 .severity = .warning,
                 .name = "avoid_any_type",
                 .description = "Avoid using 'any' or 'unknown' types",
-                .source = .{ .static_analysis = {} },
+                .source = .Type_System,
             };
             try constraints.append(self.allocator, constraint);
         }
@@ -392,7 +374,7 @@ pub const Clew = struct {
                 .severity = .info,
                 .name = "null_safety",
                 .description = "Handle null/undefined values properly",
-                .source = .{ .static_analysis = {} },
+                .source = .Type_System,
             };
             try constraints.append(self.allocator, constraint);
         }
