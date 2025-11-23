@@ -247,3 +247,88 @@ pub fn build(b: *std.Build) void {
     // Lastly, the Zig build system is relatively simple and self-contained,
     // and reading its source code will allow you to master it.
 }
+
+    // ============================================================================
+    // Performance Benchmarks
+    // ============================================================================
+
+    // Clew extraction benchmarks
+    const clew_bench = b.addExecutable(.{
+        .name = "clew_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/clew_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast, // Always benchmark with optimizations
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+            },
+        }),
+    });
+    b.installArtifact(clew_bench);
+
+    const run_clew_bench = b.addRunArtifact(clew_bench);
+    const clew_bench_step = b.step("bench-clew", "Run Clew extraction benchmarks");
+    clew_bench_step.dependOn(&run_clew_bench.step);
+
+    // Braid compilation benchmarks
+    const braid_bench = b.addExecutable(.{
+        .name = "braid_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/braid_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    b.installArtifact(braid_bench);
+
+    const run_braid_bench = b.addRunArtifact(braid_bench);
+    const braid_bench_step = b.step("bench-braid", "Run Braid compilation benchmarks");
+    braid_bench_step.dependOn(&run_braid_bench.step);
+
+    // FFI bridge benchmarks
+    const ffi_bench = b.addExecutable(.{
+        .name = "ffi_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/ffi_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "zig_ffi", .module = b.addModule("zig_ffi", .{
+                    .root_source_file = b.path("src/ffi/zig_ffi.zig"),
+                    .target = target,
+                }) },
+            },
+        }),
+    });
+    b.installArtifact(ffi_bench);
+
+    const run_ffi_bench = b.addRunArtifact(ffi_bench);
+    const ffi_bench_step = b.step("bench-ffi", "Run FFI bridge benchmarks");
+    ffi_bench_step.dependOn(&run_ffi_bench.step);
+
+    // Run all Zig benchmarks
+    const bench_all_zig_step = b.step("bench-zig", "Run all Zig benchmarks");
+    bench_all_zig_step.dependOn(clew_bench_step);
+    bench_all_zig_step.dependOn(braid_bench_step);
+    bench_all_zig_step.dependOn(ffi_bench_step);
+
+    // Combined benchmark step (Zig + Rust)
+    const bench_all_step = b.step("bench", "Run all benchmarks (Zig + Rust)");
+    bench_all_step.dependOn(bench_all_zig_step);
+    
+    // Add Rust benchmarks via cargo
+    const cargo_bench = b.addSystemCommand(&.{
+        "cargo",
+        "bench",
+        "--manifest-path",
+        "maze/Cargo.toml",
+    });
+    const rust_bench_step = b.step("bench-rust", "Run Rust Maze benchmarks");
+    rust_bench_step.dependOn(&cargo_bench.step);
+    bench_all_step.dependOn(rust_bench_step);

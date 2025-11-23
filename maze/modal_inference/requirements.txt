@@ -1,0 +1,19 @@
+# Ananke Modal Inference Service Dependencies
+
+# Modal deployment
+modal>=0.56.0
+
+# Client dependencies
+requests>=2.31.0
+urllib3>=2.0.0
+
+# vLLM (installed in Modal container)
+# vllm==0.8.2
+
+# llguidance (installed in Modal container)
+# llguidance>=0.5.0
+
+# Development tools
+pytest>=7.4.0
+black>=23.0.0
+mypy>=1.5.0

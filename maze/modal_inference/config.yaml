@@ -1,0 +1,120 @@
+# Ananke Modal Inference Service Configuration
+
+service:
+  name: ananke-inference
+  version: 1.0.0
+  description: "GPU-based constrained code generation using vLLM + llguidance"
+
+# Model configuration
+model:
+  # Model to use for inference
+  name: meta-llama/Llama-3.1-8B-Instruct
+
+  # Alternative models (uncomment to use):
+  # name: meta-llama/Llama-3.1-70B-Instruct  # Better quality, slower
+  # name: deepseek-ai/deepseek-coder-33b-instruct  # Code-specific
+  # name: codellama/CodeLlama-34b-Instruct-hf  # Legacy code model
+
+  # Model parameters
+  max_model_len: 8192
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.95
+  trust_remote_code: true
+
+# GPU configuration
+gpu:
+  type: A100
+  count: 1
+  size: 40GB
+
+  # Alternative GPU configs (uncomment to use):
+  # type: A10G  # Cheaper, slower
+  # type: H100  # Faster, more expensive
+
+# Deployment configuration
+deployment:
+  # Timeout for individual requests (seconds)
+  timeout: 600
+
+  # Idle timeout before scaling to zero (seconds)
+  container_idle_timeout: 60
+
+  # Maximum concurrent requests per container
+  allow_concurrent_inputs: 10
+
+  # Minimum containers to keep warm (0 for full scale-to-zero)
+  min_containers: 0
+
+  # Maximum containers to scale up to
+  max_containers: 10
+
+# Generation defaults
+generation:
+  max_tokens: 2048
+  temperature: 0.7
+  top_p: 0.95
+  top_k: 50
+
+# Constraint backend
+constraints:
+  backend: llguidance
+  version: ">=0.5.0"
+
+  # Enable different constraint types
+  enable_json_schema: true
+  enable_grammar: true
+  enable_regex: true
+  enable_token_mask: false  # Not yet fully supported
+
+# Logging
+logging:
+  level: INFO
+  format: json
+
+# Security
+security:
+  # Set to true to require API key authentication
+  require_api_key: false
+
+  # Rate limiting (requests per minute per IP)
+  rate_limit: 60
+
+# Monitoring
+monitoring:
+  # Enable Prometheus metrics
+  enable_metrics: true
+
+  # Enable health check endpoint
+  enable_health_check: true
+
+# Cost optimization
+cost:
+  # Target cost per 1K tokens (USD)
+  # A100 40GB: ~$0.001/s = ~$3.60/hour
+  # Idle timeout helps minimize costs when not in use
+  target_cost_per_1k_tokens: 0.05
+
+# Performance targets
+performance:
+  # Cold start time (seconds)
+  target_cold_start: 5
+
+  # Warm inference latency (seconds)
+  target_warm_latency: 10
+
+  # Per-token latency (milliseconds)
+  target_per_token_latency: 100
+
+  # Constraint masking overhead (microseconds)
+  target_constraint_overhead: 50
+
+# Development settings
+development:
+  # Use smaller model for faster iteration
+  use_small_model: true
+
+  # Reduce timeout for faster failures
+  reduce_timeout: true
+
+  # Enable verbose logging
+  verbose: true
