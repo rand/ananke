@@ -33,8 +33,8 @@ os.environ["VLLM_USE_V1"] = "0"
 # Modal app definition
 app = modal.App("ananke-inference")
 
-# GPU configuration (updated syntax)
-GPU_CONFIG = modal.gpu.A100(memory=80)  # 80GB for production, can use 40 for smaller models
+# GPU configuration
+GPU_CONFIG = modal.gpu.A100(count=1, size="80GB")  # 80GB for production, can use "40GB" for smaller models
 
 # vLLM image with llguidance support - using NVIDIA CUDA base for production
 vllm_image = (
@@ -388,7 +388,7 @@ def health():
 
 @app.function(
     image=vllm_image,
-    timeout=10,
+    timeout=600,  # 10 minute timeout for cold start + generation
 )
 @modal.fastapi_endpoint(method="POST")
 def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -419,7 +419,7 @@ def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {...}
     }
     """
-    # Use the class-based method which properly caches the model
+    # Get Modal reference to the AnankeLLM class and call its generate method
     # Modal handles the lifecycle and caching automatically
     llm = AnankeLLM()
     return llm.generate.remote(request)
