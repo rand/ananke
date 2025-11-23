@@ -1,20 +1,18 @@
 """
 Ananke Modal Inference Service
 
-GPU-based constrained code generation using vLLM 0.11.2 with llguidance.
+GPU-based constrained code generation using vLLM 0.11.0 with llguidance.
 Provides HTTP API for token-level constraint enforcement during inference.
 
 Architecture:
-- vLLM 0.11.2 (V0 architecture for full llguidance support)
-- llguidance 1.3.0 for ~50μs per-token constraint masking
+- Qwen2.5-Coder-32B-Instruct for code generation
+- vLLM 0.11.0 with V1 structured outputs API
+- llguidance 0.7.11-0.8.0 for grammar-constrained generation
 - Modal for serverless scale-to-zero deployment
 - A100-80GB GPU with 60s idle timeout
 - NVIDIA CUDA 12.8.0 base image with Python 3.12
 
-Version Notes:
-- Using V0 architecture (VLLM_USE_V1=0) for full llguidance compatibility
-- V1 architecture will be enabled once llguidance support is complete
-- PyTorch 2.9.0, transformers 4.56.0+ for latest compatibility
+Based on working maze example at /Users/rand/src/maze/deployment/modal/modal_app.py
 """
 
 import json
@@ -33,8 +31,8 @@ os.environ["VLLM_USE_V1"] = "0"
 # Modal app definition
 app = modal.App("ananke-inference")
 
-# GPU configuration
-GPU_CONFIG = modal.gpu.A100(count=1, size="80GB")  # 80GB for production, can use "40GB" for smaller models
+# GPU configuration (use string format per Modal 1.0 API)
+GPU_CONFIG = "A100-80GB"  # 80GB for 32B model, use "A100-40GB" for smaller models
 
 # vLLM image with llguidance support - using NVIDIA CUDA base for production
 vllm_image = (
@@ -43,14 +41,14 @@ vllm_image = (
         add_python="3.12"
     )
     .pip_install(
-        # Core vLLM stack (latest stable versions)
-        "vllm==0.11.2",
+        # Core vLLM stack
+        "vllm==0.11.0",  # Stable version with llguidance support
         "torch==2.9.0",
-        "transformers>=4.56.0,<5",
+        "transformers==4.55.2",  # Required by vLLM 0.11.0
         "tokenizers>=0.21.1",
 
         # Structured output backends
-        "llguidance>=1.3.0,<1.4.0",  # CRITICAL: Up from 0.5.0 for vLLM 0.11.2 compatibility
+        "llguidance>=0.7.11,<0.8.0",  # CRITICAL: vLLM 0.11.0 requires <0.8.0
         "xgrammar==0.1.25",
         "lm-format-enforcer==0.11.3",
         "outlines_core==0.2.11",
@@ -154,7 +152,7 @@ class AnankeLLM:
     Scales to zero when idle, cold start ~3-5 seconds.
     """
 
-    model_name: str = "meta-llama/Llama-3.1-8B-Instruct"
+    model_name: str = "Qwen/Qwen2.5-Coder-32B-Instruct"  # Better code model than Llama
 
     @modal.enter()
     def initialize_model(self):
@@ -176,24 +174,24 @@ class AnankeLLM:
             llguidance_version = llguidance.__version__
 
             logger.info(f"Initializing vLLM {vllm_version} with llguidance {llguidance_version}")
-            logger.info(f"Architecture: V{'1' if os.environ.get('VLLM_USE_V1') == '1' else '0'}")
             logger.info(f"Model: {self.model_name}")
 
-            # Check version compatibility
-            if vllm_version < "0.11.0":
-                logger.warning(f"vLLM {vllm_version} is outdated, 0.11.2+ recommended")
-            if llguidance_version < "1.3.0":
-                raise ValueError(f"llguidance {llguidance_version} incompatible with vLLM {vllm_version}, need >=1.3.0")
+            # Check version compatibility (vLLM 0.11.0 requires llguidance <0.8.0)
+            if vllm_version != "0.11.0":
+                logger.warning(f"vLLM {vllm_version} may have compatibility issues, 0.11.0 recommended")
+            if not ("0.7.11" <= llguidance_version < "0.8.0"):
+                raise ValueError(f"llguidance {llguidance_version} incompatible with vLLM {vllm_version}, need >=0.7.11,<0.8.0")
 
-            # Initialize vLLM
+            # Initialize vLLM with V1 structured outputs API
             self.llm = LLM(
                 model=self.model_name,
                 tensor_parallel_size=1,
-                gpu_memory_utilization=0.95,
+                gpu_memory_utilization=0.90,
                 max_model_len=8192,
+                dtype="bfloat16",
                 trust_remote_code=True,
-                # Enable llguidance for constraint enforcement (V0 architecture)
-                guided_decoding_backend="llguidance",
+                # V1 structured outputs backend - use guidance for llguidance support
+                structured_outputs_config={"backend": "guidance"},
             )
 
             self.tokenizer = self.llm.get_tokenizer()
@@ -203,7 +201,7 @@ class AnankeLLM:
             logger.info(f"✓ Model loaded in {init_duration:.1f}s")
             logger.info(f"✓ Vocabulary size: {len(self.tokenizer)}")
             logger.info(f"✓ Max model length: 8192 tokens")
-            logger.info(f"✓ Backend: llguidance (V0 architecture)")
+            logger.info(f"✓ Backend: llguidance via structured_outputs_config")
 
         except Exception as e:
             logger.error(f"✗ Model initialization failed: {e}", exc_info=True)
@@ -226,6 +224,7 @@ class AnankeLLM:
         import traceback
         import uuid
         from vllm import SamplingParams
+        from vllm.sampling_params import StructuredOutputsParams
 
         logger = logging.getLogger(__name__)
         request_id = request_data.get('request_id', str(uuid.uuid4())[:8])
@@ -247,18 +246,10 @@ class AnankeLLM:
             prompt_length = len(self.tokenizer.encode(full_prompt))
             logger.info(f"[{request_id}] Starting generation: prompt_tokens={prompt_length}, max_tokens={request.max_tokens}")
 
-            # Configure sampling parameters
-            sampling_params = SamplingParams(
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                top_p=request.top_p,
-                top_k=request.top_k,
-                stop=request.stop_sequences or [],
-            )
-
-            # Apply constraints if provided
+            # Apply constraints if provided (using V1 StructuredOutputsParams API)
             constraint_satisfied = True
             constraint_type_used = None
+
             if request.constraints:
                 try:
                     constraint_spec = ConstraintSpec(**request.constraints)
@@ -268,23 +259,82 @@ class AnankeLLM:
                         constraint_type = llguidance_constraint["type"]
                         constraint_type_used = constraint_type
 
+                        # Use V1 StructuredOutputsParams API
                         if constraint_type == "json":
-                            sampling_params.guided_json = llguidance_constraint["schema"]
+                            sampling_params = SamplingParams(
+                                max_tokens=request.max_tokens,
+                                temperature=request.temperature,
+                                top_p=request.top_p,
+                                top_k=request.top_k,
+                                stop=request.stop_sequences or [],
+                                structured_outputs=StructuredOutputsParams(
+                                    json_schema=llguidance_constraint["schema"]
+                                ),
+                            )
                             logger.info(f"[{request_id}] Applied JSON schema constraint")
                         elif constraint_type == "grammar":
-                            sampling_params.guided_grammar = llguidance_constraint["grammar"]
+                            sampling_params = SamplingParams(
+                                max_tokens=request.max_tokens,
+                                temperature=request.temperature,
+                                top_p=request.top_p,
+                                top_k=request.top_k,
+                                stop=request.stop_sequences or [],
+                                structured_outputs=StructuredOutputsParams(
+                                    grammar=llguidance_constraint["grammar"]
+                                ),
+                            )
                             logger.info(f"[{request_id}] Applied grammar constraint")
                         elif constraint_type == "regex":
-                            # Use first regex pattern (vLLM limitation)
-                            sampling_params.guided_regex = llguidance_constraint["patterns"][0]
+                            sampling_params = SamplingParams(
+                                max_tokens=request.max_tokens,
+                                temperature=request.temperature,
+                                top_p=request.top_p,
+                                top_k=request.top_k,
+                                stop=request.stop_sequences or [],
+                                structured_outputs=StructuredOutputsParams(
+                                    regex=llguidance_constraint["patterns"][0]
+                                ),
+                            )
                             logger.info(f"[{request_id}] Applied regex constraint")
-                        elif constraint_type == "token_mask":
-                            # Token masking via logits processor (custom implementation)
-                            logger.warning(f"[{request_id}] Token mask constraints not yet fully supported")
+                        else:
+                            # No constraint support for this type
+                            sampling_params = SamplingParams(
+                                max_tokens=request.max_tokens,
+                                temperature=request.temperature,
+                                top_p=request.top_p,
+                                top_k=request.top_k,
+                                stop=request.stop_sequences or [],
+                            )
+                            logger.warning(f"[{request_id}] Constraint type {constraint_type} not supported")
+                    else:
+                        # No constraints
+                        sampling_params = SamplingParams(
+                            max_tokens=request.max_tokens,
+                            temperature=request.temperature,
+                            top_p=request.top_p,
+                            top_k=request.top_k,
+                            stop=request.stop_sequences or [],
+                        )
                 except Exception as e:
                     logger.error(f"[{request_id}] Constraint compilation failed: {e}")
                     # Continue without constraints rather than failing
                     constraint_satisfied = False
+                    sampling_params = SamplingParams(
+                        max_tokens=request.max_tokens,
+                        temperature=request.temperature,
+                        top_p=request.top_p,
+                        top_k=request.top_k,
+                        stop=request.stop_sequences or [],
+                    )
+            else:
+                # No constraints requested
+                sampling_params = SamplingParams(
+                    max_tokens=request.max_tokens,
+                    temperature=request.temperature,
+                    top_p=request.top_p,
+                    top_k=request.top_k,
+                    stop=request.stop_sequences or [],
+                )
 
             # Generate with vLLM
             try:
@@ -366,8 +416,8 @@ class AnankeLLM:
         return {
             "status": "healthy",
             "model": self.model_name,
-            "backend": "vllm+llguidance",
-            "gpu": "A100",
+            "backend": "vLLM 0.11.0 + llguidance",
+            "gpu": "A100-80GB",
         }
 
 
