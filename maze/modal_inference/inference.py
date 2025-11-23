@@ -311,7 +311,7 @@ class AnankeLLM:
                                 top_k=request.top_k,
                                 stop=request.stop_sequences or [],
                                 structured_outputs=StructuredOutputsParams(
-                                    json_schema=llguidance_constraint["schema"]
+                                    json=llguidance_constraint["schema"]  # Fixed: parameter is 'json' not 'json_schema'
                                 ),
                             )
                             logger.info(f"[{request_id}] Applied JSON schema constraint")
