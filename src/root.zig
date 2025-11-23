@@ -15,6 +15,16 @@ pub const types = struct {
     pub const intent = @import("types/intent.zig");
 };
 
+// Re-export commonly used types at top level for convenience
+pub const Constraint = types.constraint.Constraint;
+pub const ConstraintID = types.constraint.ConstraintID;
+pub const ConstraintIR = types.constraint.ConstraintIR;
+pub const ConstraintSet = types.constraint.ConstraintSet;
+pub const ConstraintKind = types.constraint.ConstraintKind;
+pub const ConstraintSource = types.constraint.ConstraintSource;
+pub const EnforcementType = types.constraint.EnforcementType;
+pub const ConstraintPriority = types.constraint.ConstraintPriority;
+
 // Main Ananke API
 pub const Ananke = struct {
     allocator: std.mem.Allocator,
