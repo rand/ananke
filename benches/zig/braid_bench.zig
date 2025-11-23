@@ -41,7 +41,7 @@ fn createTestConstraint(allocator: std.mem.Allocator, index: usize) !Constraint 
         .severity = if (index % 2 == 0) .err else .warning,
         .name = name,
         .description = description,
-        .source = .{ .static_analysis = {} },
+        .source = .AST_Pattern,
         .confidence = 0.9,
     };
 }
