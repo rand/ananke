@@ -167,13 +167,13 @@ jobs:
           fetch-depth: 0
 
       - name: Download current benchmarks
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: zig-benchmark-results
           path: current/
 
       - name: Download current Rust benchmarks
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: rust-benchmark-results
           path: current/
@@ -222,12 +222,12 @@ jobs:
 
     steps:
       - name: Download benchmark results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: zig-benchmark-results
 
       - name: Download Rust benchmark results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: rust-benchmark-results
 
@@ -272,7 +272,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
 
       - name: Generate summary
         run: |
