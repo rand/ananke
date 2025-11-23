@@ -89,23 +89,25 @@ cd 03-ariadne-dsl
 zig build run
 ```
 
-### [04-full-pipeline](./04-full-pipeline/) - End-to-End Generation (Coming Soon)
+### [04-full-pipeline](./04-full-pipeline/) - End-to-End Pipeline
 
-**What**: Complete pipeline from intent to validated code
+**What**: Complete pipeline demonstrating Extract → Compile → Generate workflow
 
-**Status**: Placeholder - Maze implementation in progress
+**Status**: Available (Partial - Generation step coming soon)
 
-**Will Demonstrate**:
-- Extract → Compile → Generate → Validate
-- Constrained code generation
-- Repair and iteration
-- Real-world workflow
+**Demonstrates**:
+- Constraint extraction from TypeScript code (Clew)
+- Constraint compilation to IR (Braid)
+- JSON serialization for Rust FFI integration
+- Foundation for constrained code generation
 
-**Availability**: Week 8 of implementation plan
+**Note**: Full code generation via Maze/Modal will be available once FFI functions are implemented
+
+**Run Time**: ~100ms (extraction + compilation only)
 
 ```bash
 cd 04-full-pipeline
-cat README.md  # See placeholder documentation
+zig build run
 ```
 
 ### [05-mixed-mode](./05-mixed-mode/) - Combining Multiple Approaches
@@ -157,7 +159,7 @@ zig build run
 | 01      | ✓         |        |         |      |            | Low       |
 | 02      | ✓         | ✓      |         |      |            | Medium    |
 | 03      |           |        | ✓       |      |            | Medium    |
-| 04      | ✓         | ✓      | ✓       | ✓    | ✓          | High      |
+| 04      | ✓         |        |         | ✓    | (partial)  | Medium    |
 | 05      | ✓         |        | ✓       | ✓    |            | High      |
 
 ## Recommended Learning Path
@@ -219,7 +221,7 @@ All approaches combined:
 | 01      | 50ms      | -           | 50ms    | No           |
 | 02      | 50ms      | -           | 2000ms  | Claude       |
 | 03      | -         | 30ms        | 30ms    | No           |
-| 04      | 100ms     | 50ms        | 5000ms  | Modal+Claude |
+| 04      | 50ms      | 50ms        | 100ms   | (No - gen pending) |
 | 05      | 150ms     | 50ms        | 200ms   | No           |
 
 All examples are fast enough for interactive use.
@@ -238,9 +240,8 @@ All examples are fast enough for interactive use.
 
 ### Example 04 (Full Pipeline)
 
-- Modal deployment (see `/modal_inference/`)
-- GPU infrastructure
-- Claude API (optional)
+- Currently: No additional requirements (extraction + compilation only)
+- Future: Modal deployment for code generation (see `/modal_inference/`)
 
 ## Example Structure
 
