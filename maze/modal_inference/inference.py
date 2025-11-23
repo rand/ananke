@@ -464,7 +464,7 @@ def health():
 
 @app.function(
     image=vllm_image,
-    timeout=600,  # 10 minute timeout for cold start + generation
+    timeout=3600,  # 1 hour timeout (same as class, handles first-time download)
 )
 @modal.fastapi_endpoint(method="POST")
 def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
