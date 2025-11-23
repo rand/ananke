@@ -1,0 +1,241 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Get commits since last tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          else
+            git log --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          fi
+
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## Installation" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "Download the appropriate binary for your platform from the assets below." >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### Verify checksums" >> CHANGELOG.md
+          echo '```bash' >> CHANGELOG.md
+          echo "sha256sum -c ananke-${VERSION}-checksums.txt" >> CHANGELOG.md
+          echo '```' >> CHANGELOG.md
+
+          cat CHANGELOG.md
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
+          generate_release_notes: true
+
+  build-release:
+    name: Build Release Binaries
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - target: x86_64-linux
+            os: ubuntu-latest
+            artifact_name: ananke
+            asset_name: ananke-linux-x86_64
+          - target: aarch64-linux
+            os: ubuntu-latest
+            artifact_name: ananke
+            asset_name: ananke-linux-aarch64
+
+          # macOS builds
+          - target: x86_64-macos
+            os: macos-latest
+            artifact_name: ananke
+            asset_name: ananke-macos-x86_64
+          - target: aarch64-macos
+            os: macos-latest
+            artifact_name: ananke
+            asset_name: ananke-macos-aarch64
+
+          # Windows builds
+          - target: x86_64-windows
+            os: windows-latest
+            artifact_name: ananke.exe
+            asset_name: ananke-windows-x86_64.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: '0.15.2'
+
+      - name: Build release binary
+        run: |
+          zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseFast
+
+      - name: Compress binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd zig-out/bin
+          tar -czf ../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          cd ../..
+
+      - name: Compress binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd zig-out/bin
+          7z a ../../${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
+          cd ../..
+
+      - name: Generate checksum (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          sha256sum ${{ matrix.asset_name }}.tar.gz > ${{ matrix.asset_name }}.tar.gz.sha256
+
+      - name: Generate checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $hash = Get-FileHash ${{ matrix.asset_name }}.zip -Algorithm SHA256
+          "$($hash.Hash.ToLower())  ${{ matrix.asset_name }}.zip" | Out-File -Encoding ASCII ${{ matrix.asset_name }}.zip.sha256
+
+      - name: Upload Release Asset (Unix)
+        if: runner.os != 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            ${{ matrix.asset_name }}.tar.gz
+            ${{ matrix.asset_name }}.tar.gz.sha256
+
+      - name: Upload Release Asset (Windows)
+        if: runner.os == 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            ${{ matrix.asset_name }}.zip
+            ${{ matrix.asset_name }}.zip.sha256
+
+  build-checksums:
+    name: Generate Combined Checksums
+    needs: [create-release, build-release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate combined checksums
+        run: |
+          find . -name "*.sha256" -exec cat {} \; > ananke-${{ needs.create-release.outputs.version }}-checksums.txt
+          cat ananke-${{ needs.create-release.outputs.version }}-checksums.txt
+
+      - name: Upload checksums to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: ananke-${{ needs.create-release.outputs.version }}-checksums.txt
+
+  publish-homebrew:
+    name: Update Homebrew Formula
+    needs: [create-release, build-release]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.create-release.outputs.version, 'alpha') && !contains(needs.create-release.outputs.version, 'beta') && !contains(needs.create-release.outputs.version, 'rc') }}
+
+    steps:
+      - name: Placeholder for Homebrew update
+        run: |
+          echo "To publish to Homebrew:"
+          echo "1. Create a tap repository (e.g., homebrew-ananke)"
+          echo "2. Add formula with download URLs from this release"
+          echo "3. Update formula on each release"
+          echo ""
+          echo "Release version: ${{ needs.create-release.outputs.version }}"
+
+  publish-aur:
+    name: Update AUR Package
+    needs: [create-release, build-release]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.create-release.outputs.version, 'alpha') && !contains(needs.create-release.outputs.version, 'beta') && !contains(needs.create-release.outputs.version, 'rc') }}
+
+    steps:
+      - name: Placeholder for AUR update
+        run: |
+          echo "To publish to AUR:"
+          echo "1. Create AUR package repository"
+          echo "2. Update PKGBUILD with new version and checksums"
+          echo "3. Push to AUR"
+          echo ""
+          echo "Release version: ${{ needs.create-release.outputs.version }}"
+
+  announce-release:
+    name: Announce Release
+    needs: [create-release, build-release, build-checksums]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create announcement
+        run: |
+          echo "Release ${{ needs.create-release.outputs.version }} is now available!"
+          echo ""
+          echo "Download: https://github.com/${{ github.repository }}/releases/tag/${{ needs.create-release.outputs.version }}"
+          echo ""
+          echo "Add steps here to:"
+          echo "- Post to Discord/Slack"
+          echo "- Tweet announcement"
+          echo "- Update documentation site"
+          echo "- Send newsletter"

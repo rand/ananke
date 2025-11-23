@@ -1,0 +1,276 @@
+-- API Security Constraints
+-- Defines security requirements for REST API endpoints
+
+module api.security
+
+import std.{clew, braid}
+
+-- No dangerous operations in API handlers
+constraint no_dangerous_operations {
+    id: "security-001",
+    name: "no_dangerous_operations",
+
+    enforcement: .Structural({
+        pattern: query(javascript) {
+            (call_expression
+                function: (identifier) @fn
+                where @fn in ["eval", "exec", "Function", "setTimeout", "setInterval"]
+            )
+        },
+        action: .Forbid,
+        language: "javascript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "security/owasp-guidelines.md",
+        created_by: "security-team",
+        created_at: "2024-01-15T00:00:00Z"
+    },
+
+    failure_mode: .HardBlock,
+
+    repair: null,  -- No automatic repair, must be manual
+
+    metadata: {
+        "category": "injection",
+        "owasp": "A03:2021-Injection",
+        "severity": "critical"
+    }
+}
+
+-- Require input validation for all API endpoints
+constraint require_input_validation {
+    id: "security-002",
+    name: "require_input_validation",
+
+    enforcement: .Type({
+        signature: {
+            functions: {
+                -- All route handlers must have validated input
+                "*Handler": fn(req: ValidatedRequest, res: Response) -> Promise<void>
+            }
+        },
+        strictness: .Strict,
+        system: .Structural
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "security/input-validation-policy.md"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Synthesize,
+        max_attempts: 3,
+        fallback: .HardBlock
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            // Validate input using schema
+            const validated = await validateInput(req.body, schema);
+            if (!validated.success) {
+                return res.status(400).json({ error: validated.error });
+            }
+        """
+    }
+}
+
+-- SQL injection prevention
+constraint prevent_sql_injection {
+    id: "security-003",
+    name: "prevent_sql_injection",
+
+    enforcement: .Structural({
+        pattern: query(javascript) {
+            (call_expression
+                function: (member_expression
+                    object: (identifier) @obj
+                    property: (property_identifier) @method
+                )
+                arguments: (arguments
+                    (template_string) @query
+                )
+            )
+            where @obj matches "db|database|connection"
+            and @method matches "query|execute|raw"
+            and @query contains "${.*}"
+        },
+        action: .Forbid,
+        language: "javascript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "security/owasp-guidelines.md"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Rewrite,
+        max_attempts: 3
+    }),
+
+    repair: {
+        method: .Rewrite,
+        template: """
+            // Use parameterized queries instead
+            db.query('SELECT * FROM users WHERE id = ?', [userId])
+        """
+    },
+
+    metadata: {
+        "owasp": "A03:2021-Injection",
+        "cwe": "CWE-89"
+    }
+}
+
+-- Rate limiting must be configured
+constraint require_rate_limiting {
+    id: "security-004",
+    name: "require_rate_limiting",
+
+    enforcement: .Structural({
+        pattern: query(javascript) {
+            (call_expression
+                function: (member_expression
+                    object: (identifier) @app
+                    property: (property_identifier) @method
+                )
+                arguments: (arguments
+                    (string) @path
+                    (identifier)+ @handlers
+                )
+            )
+            where @app == "app"
+            and @method matches "get|post|put|delete|patch"
+            and @handlers not_contains "rateLimiter"
+        },
+        action: .Require,
+        language: "javascript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.95,
+        origin_artifact: "architecture/api-standards.md"
+    },
+
+    failure_mode: .SoftWarn({
+        warning_message: "Endpoint should include rate limiting middleware",
+        allow_override: true,
+        require_justification: true
+    })
+}
+
+-- Authentication required for sensitive endpoints
+constraint require_authentication {
+    id: "security-005",
+    name: "require_authentication",
+
+    enforcement: .Semantic({
+        property: .Security({
+            invariant: "All endpoints accessing sensitive data must check authentication",
+            validation: "static_analysis"
+        }),
+        method: .AbstractInterpretation,
+        resources: {
+            timeout_ms: 5000,
+            memory_mb: 512
+        }
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "security/auth-policy.md"
+    },
+
+    failure_mode: .HardBlock,
+
+    metadata: {
+        "applies_to": ["payment", "user", "admin"],
+        "exception_paths": ["/health", "/metrics"]
+    }
+}
+
+-- HTTPS only for production
+constraint require_https {
+    id: "security-006",
+    name: "require_https",
+
+    enforcement: .Semantic({
+        property: .Security({
+            invariant: "All API calls must use HTTPS in production",
+            validation: "runtime_check"
+        }),
+        method: .RuntimeMonitoring,
+        resources: {
+            timeout_ms: 100
+        }
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "security/transport-policy.md"
+    },
+
+    failure_mode: .HardBlock,
+
+    depends_on: [],
+
+    metadata: {
+        "environment": "production",
+        "exception": "localhost development"
+    }
+}
+
+-- Export the constraint set
+pub const api_security_constraints = [
+    no_dangerous_operations,
+    require_input_validation,
+    prevent_sql_injection,
+    require_rate_limiting,
+    require_authentication,
+    require_https
+]
+
+-- Compile to ConstraintIR
+pub fn compile() -> ConstraintIR {
+    let graph = braid.graph.new()
+
+    for constraint in api_security_constraints {
+        graph.add_node(constraint)
+    }
+
+    -- Set up dependencies
+    -- Input validation must come before SQL queries
+    graph.add_dependency(
+        from: "require_input_validation",
+        to: "prevent_sql_injection"
+    )
+
+    -- Authentication must come before rate limiting
+    graph.add_dependency(
+        from: "require_authentication",
+        to: "require_rate_limiting"
+    )
+
+    -- HTTPS is foundational
+    graph.add_dependency(
+        from: "require_https",
+        to: "require_authentication"
+    )
+
+    return graph.build({
+        max_validation_time_ms: 10000,
+        parallelization: .Parallel(4),
+        cache_policy: .Aggressive,
+        failure_strategy: .FailFast
+    })
+}

@@ -1,0 +1,15 @@
+.{
+    .name = "simple-extraction-example",
+    .version = "0.1.0",
+    .dependencies = .{
+        .ananke = .{
+            .path = "../..",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "main.zig",
+        "sample.ts",
+    },
+}
