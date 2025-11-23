@@ -1,0 +1,17 @@
+.{
+    .name = "mixed-mode-example",
+    .version = "0.1.0",
+    .dependencies = .{
+        .ananke = .{
+            .path = "../..",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "main.zig",
+        "sample.ts",
+        "constraints.json",
+        "custom.ariadne",
+    },
+}

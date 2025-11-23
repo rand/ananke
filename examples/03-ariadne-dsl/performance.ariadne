@@ -1,0 +1,147 @@
+-- Performance Constraints
+-- Ensures code meets performance requirements
+
+module perf.constraints
+
+-- Maximum complexity limit
+constraint max_complexity {
+    id: "perf-001",
+    name: "max_cyclomatic_complexity",
+
+    enforcement: .Semantic({
+        property: .Performance({
+            constraints: {
+                max_complexity: 10,
+                max_depth: 4
+            },
+            benchmark: .Static
+        }),
+        method: .StaticAnalysis,
+        resources: {
+            timeout_ms: 1000
+        }
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "code-standards/complexity.md"
+    },
+
+    failure_mode: .SoftWarn({
+        warning_message: "Function complexity exceeds limit",
+        allow_override: true,
+        require_justification: true
+    }),
+
+    metadata: {
+        "tool": "eslint",
+        "rule": "complexity"
+    }
+}
+
+-- Response time requirement
+constraint max_response_time {
+    id: "perf-002",
+    name: "max_api_response_time",
+
+    enforcement: .Semantic({
+        property: .Performance({
+            constraints: {
+                max_time_ms: 200,
+                percentile: 95
+            },
+            benchmark: .LoadTest({
+                requests_per_second: 1000,
+                duration_seconds: 60
+            })
+        }),
+        method: .RuntimeMonitoring,
+        resources: {
+            timeout_ms: 60000,
+            memory_mb: 2048
+        }
+    }),
+
+    provenance: {
+        source: .TelemetryInferred,
+        confidence_score: 0.95,
+        origin_artifact: "metrics/latency-p95.json"
+    },
+
+    failure_mode: .SoftWarn({
+        warning_message: "Response time exceeds SLA",
+        allow_override: false
+    })
+}
+
+-- Memory usage limit
+constraint max_memory_usage {
+    id: "perf-003",
+    name: "max_memory_per_request",
+
+    enforcement: .Semantic({
+        property: .Performance({
+            constraints: {
+                max_memory_mb: 100
+            },
+            benchmark: .Profiling
+        }),
+        method: .RuntimeMonitoring,
+        resources: {
+            timeout_ms: 5000
+        }
+    }),
+
+    provenance: {
+        source: .TelemetryInferred,
+        confidence_score: 0.88,
+        origin_artifact: "metrics/memory-usage.json"
+    },
+
+    failure_mode: .SoftWarn
+}
+
+-- No synchronous file I/O in async code
+constraint no_sync_io {
+    id: "perf-004",
+    name: "no_sync_file_io",
+
+    enforcement: .Structural({
+        pattern: query(javascript) {
+            (call_expression
+                function: (member_expression
+                    object: (identifier) @obj
+                    property: (property_identifier) @method
+                )
+            )
+            where @obj == "fs"
+            and @method matches ".*Sync$"
+        },
+        action: .Forbid,
+        language: "javascript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "code-standards/async-best-practices.md"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Rewrite,
+        max_attempts: 3
+    }),
+
+    repair: {
+        method: .Rewrite,
+        template: "Replace fs.readFileSync with fs.promises.readFile"
+    }
+}
+
+pub const performance_constraints = [
+    max_complexity,
+    max_response_time,
+    max_memory_usage,
+    no_sync_io
+]

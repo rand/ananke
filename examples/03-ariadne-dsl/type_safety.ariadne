@@ -1,0 +1,134 @@
+-- Type Safety Constraints
+-- Ensures strong typing and null safety
+
+module types.safety
+
+-- No 'any' types in TypeScript
+constraint no_any_type {
+    id: "type-001",
+    name: "no_any_type",
+
+    enforcement: .Type({
+        signature: {
+            forbidden_types: ["any", "unknown"],
+            require_explicit: true
+        },
+        strictness: .Strict,
+        system: .Gradual
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "code-standards/typescript.md"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Synthesize,
+        max_attempts: 3
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: "Replace 'any' with specific type based on usage"
+    }
+}
+
+-- Null safety: all nullable values must be handled
+constraint handle_null_values {
+    id: "type-002",
+    name: "handle_null_values",
+
+    enforcement: .Semantic({
+        property: .Safety({
+            invariant: "All potentially null values must be checked before use",
+            validation: "flow_analysis"
+        }),
+        method: .DataflowAnalysis,
+        resources: {
+            timeout_ms: 3000
+        }
+    }),
+
+    provenance: {
+        source: .ClewMined,
+        confidence_score: 0.92,
+        origin_artifact: "src/utils/nullable.ts"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Patch,
+        max_attempts: 2
+    }),
+
+    repair: {
+        method: .Patch,
+        template: """
+            if (value != null) {
+                // Use value
+            }
+        """
+    }
+}
+
+-- Explicit return types for functions
+constraint explicit_return_types {
+    id: "type-003",
+    name: "explicit_return_types",
+
+    enforcement: .Syntactic({
+        grammar: """
+            function = "function" identifier params ":" type "{" body "}"
+            | "async" "function" identifier params ":" "Promise<" type ">" "{" body "}"
+        """,
+        tokens: {
+            required: [":"],
+            forbidden: [],
+            max_tokens: 10000
+        }
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "code-standards/typescript.md"
+    },
+
+    failure_mode: .SoftWarn({
+        warning_message: "Function should have explicit return type",
+        allow_override: false
+    })
+}
+
+-- Type-safe error handling
+constraint typed_error_handling {
+    id: "type-004",
+    name: "typed_error_handling",
+
+    enforcement: .Type({
+        signature: {
+            functions: {
+                -- All async functions should return Result<T, E>
+                "async *": fn(...) -> Result<T, Error>
+            }
+        },
+        strictness: .Lax,
+        system: .Structural
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.85,
+        origin_artifact: "architecture/error-handling.md"
+    },
+
+    failure_mode: .SoftWarn
+}
+
+-- Export constraints
+pub const type_safety_constraints = [
+    no_any_type,
+    handle_null_values,
+    explicit_return_types,
+    typed_error_handling
+]

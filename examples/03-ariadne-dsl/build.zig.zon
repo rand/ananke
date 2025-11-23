@@ -1,0 +1,17 @@
+.{
+    .name = "ariadne-dsl-example",
+    .version = "0.1.0",
+    .dependencies = .{
+        .ananke = .{
+            .path = "../..",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "main.zig",
+        "api_security.ariadne",
+        "type_safety.ariadne",
+        "performance.ariadne",
+    },
+}

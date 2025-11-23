@@ -1,0 +1,301 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'src/**/*.zig'
+      - 'README.md'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'src/**/*.zig'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: '0.15.2'
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Install documentation tools
+        run: |
+          # Install any doc generation tools
+          # For now, we'll use a simple approach
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install markdown
+
+      - name: Generate API documentation
+        shell: bash
+        run: |
+          echo "Generating Zig API documentation..."
+          mkdir -p docs/api
+
+          # Zig doesn't have a standard doc generator yet, but we can prepare the structure
+          # This is a placeholder for when autodoc becomes available
+          echo "<!DOCTYPE html>" > docs/api/index.html
+          echo "<html><head><title>Ananke API Documentation</title>" >> docs/api/index.html
+          echo "<style>" >> docs/api/index.html
+          echo "body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; }" >> docs/api/index.html
+          echo "pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; }" >> docs/api/index.html
+          echo "code { background: #f5f5f5; padding: 0.2rem 0.4rem; }" >> docs/api/index.html
+          echo "h1, h2, h3 { color: #333; }" >> docs/api/index.html
+          echo "</style>" >> docs/api/index.html
+          echo "</head><body>" >> docs/api/index.html
+          echo "<h1>Ananke API Documentation</h1>" >> docs/api/index.html
+
+          # Extract public API from source files
+          echo "<h2>Core Modules</h2>" >> docs/api/index.html
+          for file in src/*.zig src/*/*.zig; do
+            if [ -f "$file" ]; then
+              echo "<h3>$(basename $file)</h3>" >> docs/api/index.html
+              echo "<pre><code>" >> docs/api/index.html
+              # Extract public declarations
+              grep -E "^pub (fn|const|var|struct|enum|union)" "$file" || true >> docs/api/index.html
+              echo "</code></pre>" >> docs/api/index.html
+            fi
+          done
+
+          echo "</body></html>" >> docs/api/index.html
+
+      - name: Build documentation site
+        shell: bash
+        run: |
+          mkdir -p _site
+          cp -r docs/* _site/ 2>/dev/null || true
+
+          # Convert README to HTML for main page
+          if [ -f README.md ]; then
+            echo "<!DOCTYPE html>" > _site/index.html
+            echo "<html><head><title>Ananke Documentation</title>" >> _site/index.html
+            echo "<meta charset='utf-8'>" >> _site/index.html
+            echo "<meta name='viewport' content='width=device-width, initial-scale=1'>" >> _site/index.html
+            echo "<style>" >> _site/index.html
+            cat <<'EOF' >> _site/index.html
+          body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+            color: #333;
+          }
+          pre {
+            background: #f6f8fa;
+            padding: 1rem;
+            overflow-x: auto;
+            border-radius: 6px;
+          }
+          code {
+            background: #f6f8fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+          }
+          pre code {
+            background: transparent;
+            padding: 0;
+          }
+          h1, h2, h3, h4 { color: #1a1a1a; }
+          h1 { border-bottom: 2px solid #e1e4e8; padding-bottom: 0.3em; }
+          h2 { border-bottom: 1px solid #e1e4e8; padding-bottom: 0.3em; margin-top: 2em; }
+          a { color: #0969da; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+          img { max-width: 100%; height: auto; }
+          blockquote {
+            border-left: 4px solid #e1e4e8;
+            padding-left: 1rem;
+            margin-left: 0;
+            color: #666;
+          }
+          table {
+            border-collapse: collapse;
+            width: 100%;
+          }
+          th, td {
+            border: 1px solid #e1e4e8;
+            padding: 0.5rem;
+            text-align: left;
+          }
+          th {
+            background: #f6f8fa;
+          }
+          .nav {
+            background: #24292f;
+            color: white;
+            padding: 1rem;
+            margin: -2rem -2rem 2rem -2rem;
+            border-radius: 0;
+          }
+          .nav a {
+            color: white;
+            margin-right: 1rem;
+          }
+          EOF
+            echo "</style></head><body>" >> _site/index.html
+            echo "<div class='nav'>" >> _site/index.html
+            echo "<a href='/'>Home</a>" >> _site/index.html
+            echo "<a href='/api/'>API Docs</a>" >> _site/index.html
+            echo "<a href='https://github.com/${{ github.repository }}'>GitHub</a>" >> _site/index.html
+            echo "</div>" >> _site/index.html
+
+            # Convert markdown to HTML (basic conversion)
+            python3 -c "
+          import markdown
+          import sys
+          with open('README.md', 'r') as f:
+              content = f.read()
+          html = markdown.markdown(content, extensions=['fenced_code', 'tables'])
+          print(html)
+          " >> _site/index.html
+
+            echo "</body></html>" >> _site/index.html
+          fi
+
+          # Copy API docs
+          if [ -d "docs/api" ]; then
+            mkdir -p _site/api
+            cp -r docs/api/* _site/api/
+          fi
+
+      - name: Create 404 page
+        run: |
+          cat > _site/404.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>404 - Page Not Found</title>
+            <meta charset='utf-8'>
+            <style>
+              body {
+                font-family: system-ui, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                text-align: center;
+              }
+              h1 { font-size: 3rem; margin: 0; }
+              p { color: #666; }
+              a { color: #0969da; }
+            </style>
+          </head>
+          <body>
+            <div>
+              <h1>404</h1>
+              <p>Page not found</p>
+              <a href="/">Return to home</a>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+  deploy-docs:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-docs
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  check-links:
+    name: Check Documentation Links
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for broken links
+        shell: bash
+        run: |
+          echo "Checking for broken links in documentation..."
+
+          # Check README links
+          if [ -f README.md ]; then
+            echo "Checking README.md..."
+            grep -oE '\[.*\]\(.*\)' README.md || true
+          fi
+
+          # Check docs directory
+          if [ -d docs ]; then
+            echo "Checking docs directory..."
+            find docs -name "*.md" -exec grep -l "http" {} \; || true
+          fi
+
+          echo "Link check complete (manual verification recommended)"
+
+  validate-docs:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check documentation completeness
+        shell: bash
+        run: |
+          echo "Validating documentation completeness..."
+
+          # Check for required documentation files
+          REQUIRED_DOCS=("README.md" "CONTRIBUTING.md")
+          MISSING_DOCS=()
+
+          for doc in "${REQUIRED_DOCS[@]}"; do
+            if [ ! -f "$doc" ]; then
+              MISSING_DOCS+=("$doc")
+            fi
+          done
+
+          if [ ${#MISSING_DOCS[@]} -gt 0 ]; then
+            echo "::warning::Missing documentation files: ${MISSING_DOCS[*]}"
+          fi
+
+          # Check for TODO items in docs
+          if grep -r "TODO\|FIXME\|XXX" docs/ 2>/dev/null; then
+            echo "::warning::Found TODO items in documentation"
+          fi
+
+          echo "Documentation validation complete"

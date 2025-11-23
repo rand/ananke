@@ -1,0 +1,99 @@
+name: Clew Constraint Extraction
+description: Implementation of the Clew constraint extraction engine
+created: 2025-11-23
+status: pending
+
+components:
+  - name: Tree-sitter Integration
+    status: pending
+    tasks:
+      - name: Language parser setup
+        languages: [typescript, python, rust, go, java]
+        description: Configure Tree-sitter grammars for target languages
+      - name: AST traversal
+        description: Implement efficient AST walking and pattern matching
+      - name: Incremental parsing
+        description: Support incremental updates for IDE integration
+
+  - name: Constraint Categories
+    status: pending
+    types:
+      - name: Syntactic
+        patterns:
+          - Function signatures
+          - Variable declarations
+          - Import statements
+          - Class definitions
+      - name: Type
+        patterns:
+          - Type annotations
+          - Generic constraints
+          - Null safety rules
+          - Return types
+      - name: Semantic
+        patterns:
+          - Data flow
+          - Control flow
+          - Side effects
+          - Purity analysis
+      - name: Architectural
+        patterns:
+          - Module boundaries
+          - Layer violations
+          - Dependency cycles
+          - Interface contracts
+      - name: Operational
+        patterns:
+          - Performance bounds
+          - Memory limits
+          - Concurrency patterns
+          - Resource usage
+      - name: Security
+        patterns:
+          - Input validation
+          - Authentication checks
+          - Authorization rules
+          - Dangerous functions
+
+  - name: Claude Integration
+    status: pending
+    tasks:
+      - name: API client
+        description: Lightweight Claude client for semantic analysis
+      - name: Prompt engineering
+        description: Optimized prompts for constraint discovery
+      - name: Result parsing
+        description: Extract structured constraints from Claude responses
+      - name: Caching layer
+        description: Cache Claude analysis results for efficiency
+
+  - name: Test Pattern Mining
+    status: pending
+    tasks:
+      - name: Test parser
+        description: Extract patterns from test files
+      - name: Assertion analysis
+        description: Infer constraints from test assertions
+      - name: Coverage mapping
+        description: Map tests to code constraints
+      - name: Invariant discovery
+        description: Identify implicit invariants from tests
+
+  - name: Telemetry Integration
+    status: pending
+    tasks:
+      - name: Metric ingestion
+        description: Parse performance and usage metrics
+      - name: Anomaly detection
+        description: Identify constraint violations in production
+      - name: Pattern learning
+        description: Learn new constraints from telemetry
+      - name: Feedback loop
+        description: Update constraints based on production behavior
+
+performance_targets:
+  extraction_time:
+    without_claude: 100ms
+    with_claude: 2s
+  memory_usage: 128MB
+  incremental_update: 10ms

@@ -1,0 +1,125 @@
+name: Inference Service Setup
+description: Configuration and deployment of constrained generation infrastructure
+created: 2025-11-23
+status: pending
+
+infrastructure:
+  - name: Modal Configuration
+    platform: Modal.com
+    status: pending
+    tasks:
+      - name: Account setup
+        description: Create Modal account with $30 free credits
+      - name: GPU selection
+        options:
+          - A100 40GB for 30B+ models
+          - A10G 24GB for 13B models
+          - T4 16GB for 7B models
+        description: Choose appropriate GPU based on model size
+      - name: Container configuration
+        description: Set up vLLM container with dependencies
+      - name: Secrets management
+        description: Configure HuggingFace token for model access
+
+  - name: vLLM Setup
+    version: 0.8.2+
+    status: pending
+    tasks:
+      - name: Server configuration
+        description: Configure vLLM with optimal settings
+        settings:
+          gpu_memory_utilization: 0.9
+          enforce_eager: true
+          max_model_len: 4096
+      - name: Model loading
+        description: Efficient model loading and caching
+      - name: Batch optimization
+        description: Configure batching for throughput
+
+  - name: llguidance Integration
+    status: pending
+    tasks:
+      - name: Installation
+        description: Install llguidance with vLLM support
+      - name: Schema compilation
+        description: Compile constraints to FSM
+      - name: Token masking
+        description: Implement <50μs token validation
+      - name: Grammar support
+        description: Context-free grammar enforcement
+
+  - name: Model Selection
+    status: pending
+    options:
+      - name: Llama 3.1 8B
+        vram: 16GB
+        quality: Good for most tasks
+        speed: Fast
+      - name: Llama 3.1 70B
+        vram: 40GB+
+        quality: Excellent
+        speed: Slower
+      - name: Mistral 7B
+        vram: 16GB
+        quality: Good for code
+        speed: Fast
+      - name: DeepSeek Coder
+        vram: 16GB
+        quality: Specialized for code
+        speed: Fast
+
+  - name: Alternative Deployments
+    status: planning
+    options:
+      - name: RunPod
+        cost: $0.35-1.19/hr
+        pros: Cheaper for sustained load
+        cons: No scale-to-zero
+      - name: Local GGUF
+        cost: Free after hardware
+        pros: No network latency
+        cons: Requires local GPU
+      - name: Lambda Labs
+        cost: $1.25-2.00/hr
+        pros: High-end GPUs
+        cons: More expensive
+
+deployment_patterns:
+  - name: Development
+    description: Local GGUF models for testing
+    latency: <1s
+    cost: Free
+
+  - name: Staging
+    description: Modal with small models
+    latency: 3-5s (cold start)
+    cost: ~$0.01/request
+
+  - name: Production
+    description: Modal with auto-scaling
+    latency: <5s
+    cost: ~$0.10/1000 requests
+
+monitoring:
+  metrics:
+    - Token generation rate
+    - Constraint validation time
+    - Invalid output rate
+    - Model loading time
+    - Memory usage
+
+  alerts:
+    - High latency (>5s)
+    - Invalid outputs (>1%)
+    - OOM errors
+    - API failures
+
+testing:
+  - name: Constraint validation
+    description: Verify all constraint types work
+  - name: Performance benchmarks
+    description: Measure latency and throughput
+  - name: Error handling
+    description: Test failure modes and recovery
+  - name: Load testing
+    description: Verify scaling under load
