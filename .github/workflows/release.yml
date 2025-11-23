@@ -90,26 +90,36 @@ jobs:
             os: ubuntu-latest
             artifact_name: ananke
             asset_name: ananke-linux-x86_64
+            rust_target: x86_64-unknown-linux-gnu
+            lib_ext: so
           - target: aarch64-linux
             os: ubuntu-latest
             artifact_name: ananke
             asset_name: ananke-linux-aarch64
+            rust_target: aarch64-unknown-linux-gnu
+            lib_ext: so
 
           # macOS builds
           - target: x86_64-macos
             os: macos-latest
             artifact_name: ananke
             asset_name: ananke-macos-x86_64
+            rust_target: x86_64-apple-darwin
+            lib_ext: dylib
           - target: aarch64-macos
             os: macos-latest
             artifact_name: ananke
             asset_name: ananke-macos-aarch64
+            rust_target: aarch64-apple-darwin
+            lib_ext: dylib
 
           # Windows builds
           - target: x86_64-windows
             os: windows-latest
             artifact_name: ananke.exe
-            asset_name: ananke-windows-x86_64.exe
+            asset_name: ananke-windows-x86_64
+            rust_target: x86_64-pc-windows-msvc
+            lib_ext: dll
 
     runs-on: ${{ matrix.os }}
 
@@ -122,35 +132,99 @@ jobs:
         with:
           version: '0.15.2'
 
-      - name: Build release binary
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            maze/target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Zig binary
         run: |
           zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseFast
 
-      - name: Compress binary (Unix)
+      - name: Build Zig static library
+        run: |
+          zig build-lib -static -O ReleaseFast src/ffi/zig_ffi.zig -femit-bin=libananke.a
+
+      - name: Build Rust Maze library
+        working-directory: maze
+        run: |
+          cargo build --release --target ${{ matrix.rust_target }}
+
+      - name: Create release package structure
+        shell: bash
+        run: |
+          VERSION=${{ needs.create-release.outputs.version }}
+          PKG_NAME="ananke-${VERSION}-${{ matrix.asset_name }}"
+          mkdir -p ${PKG_NAME}/{bin,lib,include,examples,docs}
+
+          # Copy Zig binary
+          cp zig-out/bin/${{ matrix.artifact_name }} ${PKG_NAME}/bin/
+
+          # Copy Zig static library
+          cp libananke.a ${PKG_NAME}/lib/
+
+          # Copy Rust Maze library
+          if [ -f maze/target/${{ matrix.rust_target }}/release/libmaze.${{ matrix.lib_ext }} ]; then
+            cp maze/target/${{ matrix.rust_target }}/release/libmaze.${{ matrix.lib_ext }} ${PKG_NAME}/lib/
+          elif [ -f maze/target/${{ matrix.rust_target }}/release/maze.${{ matrix.lib_ext }} ]; then
+            cp maze/target/${{ matrix.rust_target }}/release/maze.${{ matrix.lib_ext }} ${PKG_NAME}/lib/
+          fi
+
+          # Copy FFI headers (create if missing)
+          if [ -f src/ffi/ananke.h ]; then
+            cp src/ffi/ananke.h ${PKG_NAME}/include/
+          else
+            touch ${PKG_NAME}/include/ananke.h
+          fi
+
+          # Copy examples
+          cp -r examples/*.zig ${PKG_NAME}/examples/ 2>/dev/null || true
+
+          # Copy documentation
+          cp README.md ${PKG_NAME}/ 2>/dev/null || touch ${PKG_NAME}/README.md
+          cp LICENSE* ${PKG_NAME}/ 2>/dev/null || touch ${PKG_NAME}/LICENSE
+          cp QUICKSTART.md ${PKG_NAME}/docs/ 2>/dev/null || true
+
+          # Create installation script
+          cat > ${PKG_NAME}/install.sh <<'EOF'
+          #!/bin/bash
+          set -e
+          PREFIX=${PREFIX:-/usr/local}
+          echo "Installing Ananke to ${PREFIX}..."
+          mkdir -p ${PREFIX}/{bin,lib,include}
+          cp bin/ananke ${PREFIX}/bin/
+          cp lib/* ${PREFIX}/lib/
+          cp include/* ${PREFIX}/include/
+          chmod +x ${PREFIX}/bin/ananke
+          echo "Ananke installed successfully!"
+          echo "Run 'ananke --version' to verify."
+          EOF
+          chmod +x ${PKG_NAME}/install.sh
+
+          echo "PKG_NAME=${PKG_NAME}" >> $GITHUB_ENV
+
+      - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
-          cd zig-out/bin
-          tar -czf ../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
-          cd ../..
+          tar -czf ${PKG_NAME}.tar.gz ${PKG_NAME}
+          sha256sum ${PKG_NAME}.tar.gz > ${PKG_NAME}.tar.gz.sha256
 
-      - name: Compress binary (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cd zig-out/bin
-          7z a ../../${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
-          cd ../..
-
-      - name: Generate checksum (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          sha256sum ${{ matrix.asset_name }}.tar.gz > ${{ matrix.asset_name }}.tar.gz.sha256
-
-      - name: Generate checksum (Windows)
+      - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $hash = Get-FileHash ${{ matrix.asset_name }}.zip -Algorithm SHA256
-          "$($hash.Hash.ToLower())  ${{ matrix.asset_name }}.zip" | Out-File -Encoding ASCII ${{ matrix.asset_name }}.zip.sha256
+          7z a ${env:PKG_NAME}.zip ${env:PKG_NAME}
+          $hash = Get-FileHash ${env:PKG_NAME}.zip -Algorithm SHA256
+          "$($hash.Hash.ToLower())  ${env:PKG_NAME}.zip" | Out-File -Encoding ASCII ${env:PKG_NAME}.zip.sha256
 
       - name: Upload Release Asset (Unix)
         if: runner.os != 'Windows'
@@ -158,8 +232,8 @@ jobs:
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
           files: |
-            ${{ matrix.asset_name }}.tar.gz
-            ${{ matrix.asset_name }}.tar.gz.sha256
+            ${{ env.PKG_NAME }}.tar.gz
+            ${{ env.PKG_NAME }}.tar.gz.sha256
 
       - name: Upload Release Asset (Windows)
         if: runner.os == 'Windows'
@@ -167,8 +241,8 @@ jobs:
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
           files: |
-            ${{ matrix.asset_name }}.zip
-            ${{ matrix.asset_name }}.zip.sha256
+            ${{ env.PKG_NAME }}.zip
+            ${{ env.PKG_NAME }}.zip.sha256
 
   build-checksums:
     name: Generate Combined Checksums
@@ -190,6 +264,26 @@ jobs:
           tag_name: ${{ needs.create-release.outputs.version }}
           files: ananke-${{ needs.create-release.outputs.version }}-checksums.txt
 
+  publish-crate:
+    name: Publish Maze to crates.io
+    needs: [create-release, build-release]
+    runs-on: ubuntu-latest
+    if: ${{ !contains(needs.create-release.outputs.version, 'alpha') && !contains(needs.create-release.outputs.version, 'beta') && !contains(needs.create-release.outputs.version, 'rc') }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        working-directory: maze
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish --allow-dirty || echo "Already published or publish failed"
+
   publish-homebrew:
     name: Update Homebrew Formula
     needs: [create-release, build-release]
@@ -197,12 +291,71 @@ jobs:
     if: ${{ !contains(needs.create-release.outputs.version, 'alpha') && !contains(needs.create-release.outputs.version, 'beta') && !contains(needs.create-release.outputs.version, 'rc') }}
 
     steps:
-      - name: Placeholder for Homebrew update
+      - name: Download macOS artifacts for checksums
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ananke-*-macos-*.tar.gz.sha256
+
+      - name: Generate Homebrew Formula
+        shell: bash
+        run: |
+          VERSION=${{ needs.create-release.outputs.version }}
+          VERSION_NUM=${VERSION#v}
+
+          # Find checksum files
+          SHA256_X86=$(cat ananke-${VERSION}-macos-x86_64.tar.gz.sha256 2>/dev/null | cut -d' ' -f1 || echo "PLACEHOLDER")
+          SHA256_ARM=$(cat ananke-${VERSION}-macos-aarch64.tar.gz.sha256 2>/dev/null | cut -d' ' -f1 || echo "PLACEHOLDER")
+
+          cat > homebrew-ananke.rb <<EOF
+          class Ananke < Formula
+            desc "Constraint-driven code generation system"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${VERSION_NUM}"
+            license "MIT OR Apache-2.0"
+
+            on_macos do
+              if Hardware::CPU.intel?
+                url "https://github.com/${{ github.repository }}/releases/download/${VERSION}/ananke-${VERSION}-macos-x86_64.tar.gz"
+                sha256 "${SHA256_X86}"
+              elsif Hardware::CPU.arm?
+                url "https://github.com/${{ github.repository }}/releases/download/${VERSION}/ananke-${VERSION}-macos-aarch64.tar.gz"
+                sha256 "${SHA256_ARM}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel?
+                url "https://github.com/${{ github.repository }}/releases/download/${VERSION}/ananke-${VERSION}-linux-x86_64.tar.gz"
+              end
+            end
+
+            def install
+              bin.install "ananke-${VERSION}-*/bin/ananke" => "ananke"
+              lib.install Dir["ananke-${VERSION}-*/lib/*"]
+              include.install Dir["ananke-${VERSION}-*/include/*"]
+              doc.install "ananke-${VERSION}-*/README.md"
+            end
+
+            test do
+              assert_match "Ananke v", shell_output("#{bin}/ananke --version")
+            end
+          end
+          EOF
+
+          cat homebrew-ananke.rb
+
+      - name: Upload Formula as Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: homebrew-ananke.rb
+
+      - name: Instructions
         run: |
           echo "To publish to Homebrew:"
-          echo "1. Create a tap repository (e.g., homebrew-ananke)"
-          echo "2. Add formula with download URLs from this release"
-          echo "3. Update formula on each release"
+          echo "1. Create a tap repository: homebrew-ananke"
+          echo "2. Copy homebrew-ananke.rb to the tap repository as Formula/ananke.rb"
+          echo "3. Commit and push to publish"
           echo ""
           echo "Release version: ${{ needs.create-release.outputs.version }}"
 

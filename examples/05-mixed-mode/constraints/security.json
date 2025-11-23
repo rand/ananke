@@ -1,0 +1,183 @@
+{
+  "constraints": [
+    {
+      "id": "sec-001",
+      "kind": "security",
+      "name": "require_password_hashing",
+      "description": "Passwords must be hashed before storage using bcrypt or argon2",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "password fields must only store hashed values, never plain text"
+      },
+      "examples": {
+        "good": [
+          "passwordHash: string",
+          "const hash = await bcrypt.hash(password, 10);",
+          "user.passwordHash = await argon2.hash(password);"
+        ],
+        "bad": [
+          "password: string  // Stored in plain text",
+          "user.password = password;  // No hashing"
+        ]
+      },
+      "provenance": {
+        "source": "manual_policy",
+        "confidence": 1.0,
+        "created_at": "2024-01-15T00:00:00Z",
+        "created_by": "security-team"
+      }
+    },
+    {
+      "id": "sec-002",
+      "kind": "security",
+      "name": "prevent_sql_injection",
+      "description": "SQL queries must use parameterized statements, never string concatenation",
+      "severity": "error",
+      "pattern": {
+        "type": "structural",
+        "rule": "forbid template literals or string concatenation in SQL queries"
+      },
+      "examples": {
+        "good": [
+          "db.query('SELECT * FROM users WHERE id = ?', [userId])",
+          "db.query('INSERT INTO users (name) VALUES (?)', [name])"
+        ],
+        "bad": [
+          "db.query(`SELECT * FROM users WHERE id = ${userId}`)",
+          "db.query('SELECT * FROM users WHERE name = ' + name)"
+        ]
+      },
+      "provenance": {
+        "source": "owasp",
+        "confidence": 1.0,
+        "reference": "OWASP A03:2021 Injection"
+      }
+    },
+    {
+      "id": "sec-003",
+      "kind": "security",
+      "name": "require_authentication",
+      "description": "Protected routes must verify authentication before processing",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "API endpoints must check authentication status before accessing protected resources"
+      },
+      "examples": {
+        "good": [
+          "if (!req.user) throw new UnauthorizedError();",
+          "router.use(authMiddleware);"
+        ],
+        "bad": [
+          "// No authentication check",
+          "router.get('/admin', directHandler)  // No auth middleware"
+        ]
+      }
+    },
+    {
+      "id": "sec-004",
+      "kind": "security",
+      "name": "sanitize_user_input",
+      "description": "User input must be validated and sanitized before use",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "all user input must be validated against schema before processing"
+      },
+      "examples": {
+        "good": [
+          "const validated = schema.safeParse(req.body);",
+          "if (!validateEmail(email)) throw new Error();"
+        ],
+        "bad": [
+          "const data = req.body;  // No validation",
+          "return eval(req.query.code);  // Dangerous"
+        ]
+      }
+    },
+    {
+      "id": "sec-005",
+      "kind": "security",
+      "name": "rate_limit_endpoints",
+      "description": "Public endpoints must implement rate limiting to prevent abuse",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "authentication, signup, and sensitive endpoints must have rate limiting"
+      },
+      "examples": {
+        "good": [
+          "router.post('/login', rateLimiter, loginHandler);",
+          "app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));"
+        ],
+        "bad": [
+          "router.post('/login', loginHandler);  // No rate limit"
+        ]
+      }
+    },
+    {
+      "id": "sec-006",
+      "kind": "security",
+      "name": "no_sensitive_data_in_logs",
+      "description": "Logs must not contain passwords, tokens, or PII",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "never log sensitive fields like password, token, ssn, credit card"
+      },
+      "examples": {
+        "good": [
+          "logger.info('User logged in', { userId: user.id });",
+          "logger.info('Creating user', { email: user.email });"
+        ],
+        "bad": [
+          "logger.info('User data', user);  // May contain password",
+          "console.log('Token:', token);  // Logging sensitive data"
+        ]
+      }
+    },
+    {
+      "id": "sec-007",
+      "kind": "security",
+      "name": "use_https_only",
+      "description": "External API calls must use HTTPS, not HTTP",
+      "severity": "error",
+      "pattern": {
+        "type": "structural",
+        "rule": "forbid HTTP URLs in fetch/axios calls"
+      },
+      "examples": {
+        "good": [
+          "fetch('https://api.example.com/data')",
+          "axios.get('https://secure-api.com')"
+        ],
+        "bad": [
+          "fetch('http://api.example.com/data')  // Insecure",
+          "axios.get('http://example.com')  // No encryption"
+        ]
+      }
+    },
+    {
+      "id": "sec-008",
+      "kind": "security",
+      "name": "prevent_path_traversal",
+      "description": "File paths from user input must be validated to prevent directory traversal",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "validate and sanitize file paths before file system operations"
+      },
+      "examples": {
+        "good": [
+          "const safePath = path.join(baseDir, path.basename(userPath));",
+          "if (filePath.includes('..')) throw new Error();"
+        ],
+        "bad": [
+          "fs.readFile(req.params.file)  // Allows ../../../etc/passwd",
+          "fs.writeFile(userInput, data)  // No validation"
+        ]
+      }
+    }
+  ]
+}
