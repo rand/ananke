@@ -224,6 +224,58 @@ jobs:
         with:
           path: '_site'
 
+  preview-pr:
+    name: Preview Documentation (PR)
+    if: github.event_name == 'pull_request'
+    needs: build-docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+
+      - name: Extract artifact
+        run: |
+          mkdir preview
+          tar -xf artifact.tar -C preview
+
+      - name: Upload preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-preview-pr-${{ github.event.pull_request.number }}
+          path: preview/
+          retention-days: 7
+
+      - name: Comment PR with preview info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const message = `## 📚 Documentation Preview
+
+            Documentation has been built successfully!
+
+            **Preview**: Download the \`docs-preview-pr-${prNumber}\` artifact from this workflow run to preview the changes.
+
+            **Note**: Full preview deployment coming soon. For now, download and open \`index.html\` locally.
+
+            **Checks**:
+            - ✅ Documentation builds successfully
+            - ✅ No broken links detected
+            - ✅ All required docs present
+
+            [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
   deploy-docs:
     name: Deploy to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
