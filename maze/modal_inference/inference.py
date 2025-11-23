@@ -112,8 +112,8 @@ class GenerationResponse:
 @app.cls(
     image=vllm_image,
     gpu=GPU_CONFIG,
-    timeout=600,  # 10 minute timeout for long generations
-    scaledown_window=60,  # Scale to zero after 60s idle
+    timeout=3600,  # 1 hour timeout (needed for first-time model download ~15min + generation)
+    scaledown_window=120,  # Scale to zero after 2min idle (was 60s)
     allow_concurrent_inputs=10,  # Handle multiple requests per container
     volumes={
         # Cache HuggingFace model weights for faster cold starts
@@ -131,7 +131,7 @@ class AnankeLLM:
     Ananke LLM inference service with constrained generation.
 
     Uses vLLM for fast GPU inference and llguidance for constraint enforcement.
-    Scales to zero when idle, cold start ~3-5 seconds.
+    Scales to zero when idle. First cold start: 10-15min (model download), subsequent: ~3-5s (cached).
     """
 
     model_name: str = "Qwen/Qwen2.5-Coder-32B-Instruct"  # Better code model than Llama
