@@ -7,12 +7,14 @@ Provides HTTP API for token-level constraint enforcement during inference.
 Architecture:
 - Qwen2.5-Coder-32B-Instruct for code generation
 - vLLM 0.11.0 with V1 structured outputs API
-- llguidance 0.7.11-0.8.0 for grammar-constrained generation
+- llguidance 0.7.11-0.8.0 for grammar-constrained generation (requires Rust compiler)
+- transformers 4.55.2, fastapi 0.115.12 (pinned for reproducibility)
 - Modal for serverless scale-to-zero deployment
-- A100-80GB GPU with 60s idle timeout
-- NVIDIA CUDA 12.8.0 base image with Python 3.12
+- A100-80GB GPU with 120s idle timeout
+- NVIDIA CUDA 12.4.1 devel base image with Python 3.12
+- Rust compiler for llguidance compilation from source
 
-Based on working maze example at /Users/rand/src/maze/deployment/modal/modal_app.py
+Based on proven working configuration from /Users/rand/src/maze/deployment/modal/modal_app.py
 """
 
 import json
@@ -23,38 +25,69 @@ from dataclasses import dataclass, asdict
 
 import modal
 
-# Force V0 architecture for full llguidance support
-# V1 architecture is 1.7x faster but currently only supports xgrammar backend
-# Will switch to V1 once llguidance backend is fully supported
-os.environ["VLLM_USE_V1"] = "0"
-
 # Modal app definition
 app = modal.App("ananke-inference")
 
 # GPU configuration (use string format per Modal 1.0 API)
 GPU_CONFIG = "A100-80GB"  # 80GB for 32B model, use "A100-40GB" for smaller models
 
+# Pinned versions for reproducibility (matches working maze example)
+VLLM_VERSION = "0.11.0"
+TRANSFORMERS_VERSION = "4.55.2"
+FASTAPI_VERSION = "0.115.12"
+
 # vLLM image with llguidance support - using NVIDIA CUDA base for production
+# Based on working maze example at /Users/rand/src/maze/deployment/modal/modal_app.py
 vllm_image = (
+    # Use NVIDIA CUDA 12.4.1 development image (required for llguidance + flashinfer JIT)
+    # Includes Rust compiler needed for llguidance build
     modal.Image.from_registry(
-        "nvidia/cuda:12.8.0-devel-ubuntu22.04",
+        "nvidia/cuda:12.4.1-devel-ubuntu22.04",
         add_python="3.12"
     )
-    .pip_install(
-        # Core vLLM (let it pull its own dependencies: torch, xformers, transformers, etc.)
-        "vllm==0.11.0",
-
-        # llguidance for constraint enforcement
-        "llguidance>=0.7.11,<0.8.0",  # CRITICAL: vLLM 0.11.0 requires <0.8.0
-
-        # FastAPI and serving
-        "fastapi[standard]>=0.115.0",
+    # System dependencies including Rust for llguidance
+    .apt_install(
+        "git",
+        "wget",
+        "curl",
+        "build-essential",  # C/C++ compilers
+        "pkg-config",
+        "libssl-dev",  # For Rust builds
+    )
+    # Install Rust (required for llguidance compilation from source)
+    .run_commands(
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
+        "echo 'source $HOME/.cargo/env' >> $HOME/.bashrc",
+    )
+    # Core ML dependencies
+    .uv_pip_install(
+        f"vllm=={VLLM_VERSION}",
+        f"transformers=={TRANSFORMERS_VERSION}",
+        f"fastapi[standard]=={FASTAPI_VERSION}",
         "huggingface-hub>=0.20.0",
         "hf-transfer",
+        "flashinfer-python",
+    )
+    # Install compatible llguidance version via uv
+    # vLLM 0.11.0 requires llguidance<0.8.0,>=0.7.11
+    .uv_pip_install(
+        "llguidance>=0.7.11,<0.8.0",  # Version compatible with vLLM 0.11.0
+    )
+    # Environment configuration
+    .run_commands(
+        'echo "export PATH=/usr/local/cuda/bin:/root/.cargo/bin:$PATH" >> /root/.bashrc',
+        'echo "export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/lib" >> /root/.bashrc',
     )
     .env({
-        "HF_HUB_ENABLE_HF_TRANSFER": "1",  # Faster model downloads
-        "VLLM_USE_V1": "0",  # Force V0 architecture
+        # CUDA
+        "CUDA_HOME": "/usr/local/cuda",
+        # Performance
+        "HF_HUB_ENABLE_HF_TRANSFER": "1",
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "TOKENIZERS_PARALLELISM": "false",
+        # Cache
+        "HF_HOME": "/cache/huggingface",
+        "TRANSFORMERS_CACHE": "/cache/transformers",
     })
 )
 
@@ -113,16 +146,16 @@ class GenerationResponse:
     image=vllm_image,
     gpu=GPU_CONFIG,
     timeout=3600,  # 1 hour timeout (needed for first-time model download ~15min + generation)
-    scaledown_window=120,  # Scale to zero after 2min idle (was 60s)
+    scaledown_window=120,  # Scale to zero after 2min idle
     allow_concurrent_inputs=10,  # Handle multiple requests per container
     volumes={
-        # Cache HuggingFace model weights for faster cold starts
-        "/root/.cache/huggingface": modal.Volume.from_name(
-            "huggingface-cache", create_if_missing=True
+        # Cache HuggingFace model weights for faster cold starts (matches working maze example)
+        "/cache": modal.Volume.from_name(
+            "ananke-model-cache", create_if_missing=True
         ),
-        # Cache vLLM compilation artifacts
+        # Cache vLLM/torch compilation artifacts
         "/root/.cache/vllm": modal.Volume.from_name(
-            "vllm-cache", create_if_missing=True
+            "ananke-torch-cache", create_if_missing=True
         ),
     },
 )
@@ -171,6 +204,7 @@ class AnankeLLM:
                 max_model_len=8192,
                 dtype="bfloat16",
                 trust_remote_code=True,
+                download_dir="/cache/models",  # Use persistent volume for model cache
                 # V1 structured outputs backend - use guidance for llguidance support
                 structured_outputs_config={"backend": "guidance"},
             )
