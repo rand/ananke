@@ -73,6 +73,10 @@ criterion = "0.5"
 [build-dependencies]
 cc = "1.0"
 
+[[test]]
+name = "integration"
+path = "tests/integration/integration_tests.rs"
+
 [[example]]
 name = "simple_generation"
 path = "examples/simple_generation.rs"

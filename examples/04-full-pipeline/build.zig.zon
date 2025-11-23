@@ -1,0 +1,16 @@
+.{
+    .name = .full_pipeline_example,
+    .version = "0.1.0",
+    .fingerprint = 0x7ebe30147688d173,
+    .dependencies = .{
+        .ananke = .{
+            .path = "../..",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "main.zig",
+        "sample.ts",
+    },
+}
