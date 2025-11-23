@@ -711,7 +711,7 @@ fn parseConstraintsJson(
             .severity = severity,
             .name = try allocator.dupe(u8, constraint_name),
             .description = try allocator.dupe(u8, description),
-            .source = .{ .user_defined = {} },
+            .source = .User_Defined,
             .confidence = if (constraint_obj.get("confidence")) |c| @floatCast(c.float) else 1.0,
         };
 
