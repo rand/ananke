@@ -1,0 +1,191 @@
+# Zig Build System
+zig-cache/
+.zig-cache/
+zig-out/
+.build/
+
+# Build artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.pdb
+
+# Test artifacts
+test-results/
+coverage/
+*.profdata
+*.profraw
+
+# Dependencies
+.zigmod/
+.gyro/
+deps.zig
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+.classpath
+
+# JetBrains IDEs
+.fleet/
+.idea/
+*.iml
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+\#*\#
+.\#*
+*~
+.*.swp
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.crt
+secrets/
+credentials/
+.secrets/
+
+# API keys and tokens
+**/*secret*
+**/*token*
+**/*api*key*
+!src/**/*.zig
+!docs/**/*.md
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Documentation build artifacts
+docs/_build/
+docs/.doctrees/
+site/
+_site/
+
+# Package managers
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (if used for tooling)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+ENV/
+
+# Rust (if Maze is in the repo)
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Modal deployment
+.modal/
+modal-cache/
+
+# Beads task management
+.beads-cache/
+
+# Coverage and profiling
+*.gcov
+*.gcda
+*.gcno
+
+# Benchmarking results
+benchmark-results/
+*.bench
+
+# Release artifacts (should be in GitHub Releases)
+releases/
+dist/
+
+# Git worktrees (from multi-agent development)
+.git/worktrees/
+
+# Claude Code agent directories (user's workflow)
+ananke_documentation/
+ananke_implementation_plan/
+ananke_in_zig/
+ananke_plan_revised/
+*_spec/
+*_design/
+*_worktree/
+
+# Development databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Lock files for Zig (when they exist)
+zig.lock
+
+# CI/CD artifacts
+.github/workflows/artifacts/
+
+# Keep important dotfiles
+!.gitignore
+!.github/
+!.gitattributes
+!.editorconfig

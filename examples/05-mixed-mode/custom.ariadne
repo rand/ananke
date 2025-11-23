@@ -1,0 +1,125 @@
+-- Custom project-specific constraints
+-- These complement the JSON config and extracted constraints
+
+module project.custom
+
+-- Specific to this project: database transactions must use retry logic
+constraint require_retry_logic {
+    id: "custom-001",
+    name: "require_transaction_retry",
+
+    enforcement: .Semantic({
+        property: .Correctness({
+            invariant: "Database transactions must include retry logic for deadlocks",
+            validation: "data_flow_analysis"
+        }),
+        method: .DataflowAnalysis,
+        resources: {
+            timeout_ms: 3000
+        }
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.95,
+        origin_artifact: "docs/database-guidelines.md",
+        rationale: "Production database experiences occasional deadlocks under load"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Synthesize,
+        max_attempts: 2
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            async function withRetry<T>(operation: () => Promise<T>, maxAttempts = 3): Promise<T> {
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        return await operation();
+                    } catch (error) {
+                        if (isDeadlock(error) && attempt < maxAttempts) {
+                            await sleep(Math.pow(2, attempt) * 100);
+                            continue;
+                        }
+                        throw error;
+                    }
+                }
+            }
+        """
+    },
+
+    metadata: {
+        "priority": "high",
+        "affected_files": ["src/database/*.ts"]
+    }
+}
+
+-- Project-specific: API responses must follow standard format
+constraint standard_response_format {
+    id: "custom-002",
+    name: "standard_api_response",
+
+    enforcement: .Type({
+        signature: {
+            functions: {
+                "*Handler": fn(...) -> Promise<StandardResponse>
+            },
+            types: {
+                "StandardResponse": {
+                    "success": "boolean",
+                    "data": "T",
+                    "error": "string?",
+                    "meta": "ResponseMeta"
+                }
+            }
+        },
+        strictness: .Strict
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "docs/api-spec.md"
+    },
+
+    failure_mode: .AutoFix({
+        repair_strategy: .Rewrite,
+        max_attempts: 3
+    })
+}
+
+-- Custom: specific business rule for this domain
+constraint payment_amount_validation {
+    id: "custom-003",
+    name: "validate_payment_amounts",
+
+    enforcement: .Semantic({
+        property: .Correctness({
+            invariant: "Payment amounts must be positive and have maximum 2 decimal places",
+            validation: "value_range"
+        }),
+        method: .AbstractInterpretation
+    }),
+
+    provenance: {
+        source: .DomainExpert,
+        confidence_score: 1.0,
+        origin_artifact: "requirements/payments.md",
+        rationale: "Financial regulations require specific precision"
+    },
+
+    failure_mode: .HardBlock,
+
+    metadata: {
+        "domain": "financial",
+        "regulatory": true
+    }
+}
+
+pub const custom_constraints = [
+    require_retry_logic,
+    standard_response_format,
+    payment_amount_validation
+]

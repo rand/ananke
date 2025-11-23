@@ -1,0 +1,48 @@
+version: 2
+
+updates:
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    reviewers:
+      - "ananke-ai/maintainers"
+    assignees:
+      - "ananke-ai/maintainers"
+
+  # Zig dependencies (via build.zig.zon)
+  # Note: Dependabot doesn't natively support Zig yet, but this structure
+  # is ready for when support is added or for custom automation
+  # For now, manual updates are required for build.zig.zon dependencies
+
+# Additional configuration for future use:
+#
+# When Zig package manager support is added to Dependabot, or when using
+# a custom solution, monitor these files:
+# - build.zig.zon (package dependencies)
+# - build.zig (build system updates)
+#
+# Manual dependency update process:
+# 1. Check for Zig updates: https://ziglang.org/download/
+# 2. Review build.zig.zon for package updates
+# 3. Test with: zig build test
+# 4. Update version in workflows if Zig version changes
+#
+# Recommended update schedule:
+# - Zig toolchain: Monthly (stable releases), or as needed for bug fixes
+# - Dependencies in build.zig.zon: Weekly review, update as needed
+# - GitHub Actions: Automated via this config
+
+# Security updates
+# Dependabot will automatically create PRs for security updates
+# regardless of the schedule configuration above

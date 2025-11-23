@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "name": "mixed-mode-constraints",
+    "description": "Combines JSON config, Ariadne DSL, and extracted constraints",
+    "created_at": "2024-01-20T00:00:00Z"
+  },
+  "nodes": {
+    "json-001": {
+      "id": "json-001",
+      "name": "environment_variables",
+      "enforcement": {
+        "type": "Structural",
+        "pattern": "(member_expression object: (identifier) @obj property: (identifier) @prop) where @obj == \"process\" and @prop == \"env\"",
+        "action": "Require",
+        "language": "javascript"
+      },
+      "provenance": {
+        "source": "ManualPolicy",
+        "confidence_score": 1.0,
+        "origin_artifact": "config/env-vars.json"
+      },
+      "failure_mode": "SoftWarn",
+      "metadata": {
+        "required_vars": [
+          "DATABASE_URL",
+          "REDIS_URL",
+          "API_KEY"
+        ]
+      }
+    },
+    "json-002": {
+      "id": "json-002",
+      "name": "error_logging_format",
+      "enforcement": {
+        "type": "Syntactic",
+        "grammar": "log_call ::= identifier '.' 'error' '(' string ',' object ')'",
+        "tokens": {
+          "required": ["error", "message", "timestamp"],
+          "forbidden": ["password", "token", "secret"],
+          "max_tokens": 500
+        }
+      },
+      "provenance": {
+        "source": "ManualPolicy",
+        "confidence_score": 1.0,
+        "origin_artifact": "config/logging.json"
+      },
+      "failure_mode": "AutoFix",
+      "repair": {
+        "method": "Patch",
+        "template": "logger.error(message, { timestamp: new Date().toISOString(), ...sanitizedContext })"
+      }
+    },
+    "json-003": {
+      "id": "json-003",
+      "name": "test_coverage_minimum",
+      "enforcement": {
+        "type": "Semantic",
+        "property": {
+          "type": "Quality",
+          "metric": "test_coverage",
+          "threshold": 85.0,
+          "validation": "static_analysis"
+        },
+        "method": "StaticAnalysis",
+        "resources": {
+          "timeout_ms": 5000
+        }
+      },
+      "provenance": {
+        "source": "ManualPolicy",
+        "confidence_score": 1.0,
+        "origin_artifact": "config/quality-gates.json"
+      },
+      "failure_mode": "SoftWarn"
+    }
+  },
+  "adjacency": {
+    "json-001": [],
+    "json-002": ["json-001"],
+    "json-003": []
+  },
+  "root_set": ["json-001"],
+  "config": {
+    "max_validation_time_ms": 10000,
+    "parallelization": "Parallel",
+    "cache_policy": "Aggressive",
+    "failure_strategy": "BestEffort"
+  }
+}
