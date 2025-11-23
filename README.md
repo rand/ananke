@@ -2,7 +2,10 @@
 
 > Constraint-driven code generation that transforms AI from probabilistic guessing into controlled search through valid program spaces.
 
-[![Build Status](https://github.com/ananke-ai/ananke/actions/workflows/test.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions)
+[![CI](https://github.com/ananke-ai/ananke/actions/workflows/ci.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/ci.yml)
+[![Maze Tests](https://github.com/ananke-ai/ananke/actions/workflows/maze-tests.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/maze-tests.yml)
+[![Security](https://github.com/ananke-ai/ananke/actions/workflows/security.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/security.yml)
+[![Docs](https://github.com/ananke-ai/ananke/actions/workflows/docs.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/docs.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Language: Zig](https://img.shields.io/badge/Language-Zig-blue.svg)](https://ziglang.org/)
 [![Status: Early Development](https://img.shields.io/badge/Status-Early%20Development-orange.svg)](#current-project-status)

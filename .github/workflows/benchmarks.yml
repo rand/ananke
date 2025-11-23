@@ -1,0 +1,327 @@
+name: Benchmarks
+
+on:
+  # Run weekly on main branch (Sundays at 3 AM UTC)
+  schedule:
+    - cron: '0 3 * * 0'
+
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      compare_with:
+        description: 'Baseline commit/tag to compare against (optional)'
+        required: false
+        type: string
+
+  # Run on release tags to capture baseline performance
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark-zig:
+    name: Zig Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: '0.15.2'
+
+      - name: Cache Zig dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/zig
+            .zig-cache
+            zig-out
+          key: ${{ runner.os }}-zig-bench-${{ hashFiles('build.zig.zon', 'build.zig') }}
+          restore-keys: |
+            ${{ runner.os }}-zig-bench-
+            ${{ runner.os }}-zig-
+
+      - name: Build benchmarks
+        run: |
+          zig build bench-zig -Doptimize=ReleaseFast
+
+      - name: Run Clew benchmarks
+        run: |
+          echo "## Clew Extraction Benchmarks" > benchmark-results.md
+          echo "\`\`\`" >> benchmark-results.md
+          zig build bench-clew 2>&1 | tee -a benchmark-results.md
+          echo "\`\`\`" >> benchmark-results.md
+          echo "" >> benchmark-results.md
+
+      - name: Run Braid benchmarks
+        run: |
+          echo "## Braid Compilation Benchmarks" >> benchmark-results.md
+          echo "\`\`\`" >> benchmark-results.md
+          zig build bench-braid 2>&1 | tee -a benchmark-results.md
+          echo "\`\`\`" >> benchmark-results.md
+          echo "" >> benchmark-results.md
+
+      - name: Run FFI benchmarks
+        run: |
+          echo "## FFI Bridge Benchmarks" >> benchmark-results.md
+          echo "\`\`\`" >> benchmark-results.md
+          zig build bench-ffi 2>&1 | tee -a benchmark-results.md
+          echo "\`\`\`" >> benchmark-results.md
+          echo "" >> benchmark-results.md
+
+      - name: Upload Zig benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: zig-benchmark-results
+          path: benchmark-results.md
+          retention-days: 90
+
+  benchmark-rust:
+    name: Rust Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            maze/target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+            ${{ runner.os }}-cargo-
+
+      - name: Install cargo-criterion
+        run: cargo install cargo-criterion || true
+
+      - name: Run benchmarks
+        run: |
+          cd maze
+          cargo bench --bench orchestration -- --output-format bencher | tee ../rust-bench-orchestration.txt
+          cargo bench --bench constraint_compilation -- --output-format bencher | tee ../rust-bench-compilation.txt
+          cargo bench --bench cache_performance -- --output-format bencher | tee ../rust-bench-cache.txt
+
+      - name: Generate benchmark report
+        run: |
+          echo "# Rust Maze Benchmarks" > rust-benchmark-results.md
+          echo "" >> rust-benchmark-results.md
+          echo "## Orchestration Benchmarks" >> rust-benchmark-results.md
+          echo "\`\`\`" >> rust-benchmark-results.md
+          cat rust-bench-orchestration.txt >> rust-benchmark-results.md
+          echo "\`\`\`" >> rust-benchmark-results.md
+          echo "" >> rust-benchmark-results.md
+          echo "## Constraint Compilation Benchmarks" >> rust-benchmark-results.md
+          echo "\`\`\`" >> rust-benchmark-results.md
+          cat rust-bench-compilation.txt >> rust-benchmark-results.md
+          echo "\`\`\`" >> rust-benchmark-results.md
+          echo "" >> rust-benchmark-results.md
+          echo "## Cache Performance Benchmarks" >> rust-benchmark-results.md
+          echo "\`\`\`" >> rust-benchmark-results.md
+          cat rust-bench-cache.txt >> rust-benchmark-results.md
+          echo "\`\`\`" >> rust-benchmark-results.md
+
+      - name: Upload Rust benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-benchmark-results
+          path: rust-benchmark-results.md
+          retention-days: 90
+
+  compare-baseline:
+    name: Compare Against Baseline
+    needs: [benchmark-zig, benchmark-rust]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.compare_with != ''
+
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download current benchmarks
+        uses: actions/download-artifact@v4
+        with:
+          name: zig-benchmark-results
+          path: current/
+
+      - name: Download current Rust benchmarks
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-benchmark-results
+          path: current/
+
+      - name: Checkout baseline
+        run: |
+          git checkout ${{ github.event.inputs.compare_with }}
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: '0.15.2'
+
+      - name: Run baseline Zig benchmarks
+        run: |
+          zig build bench-zig 2>&1 > baseline/zig-benchmark.txt || true
+
+      - name: Generate comparison report
+        run: |
+          echo "# Benchmark Comparison" > comparison.md
+          echo "" >> comparison.md
+          echo "**Current**: ${{ github.sha }}" >> comparison.md
+          echo "**Baseline**: ${{ github.event.inputs.compare_with }}" >> comparison.md
+          echo "" >> comparison.md
+          echo "## Current Results" >> comparison.md
+          cat current/benchmark-results.md >> comparison.md
+          echo "" >> comparison.md
+          echo "## Baseline Results" >> comparison.md
+          cat baseline/zig-benchmark.txt >> comparison.md
+          echo "" >> comparison.md
+          echo "---" >> comparison.md
+          echo "*Note: Detailed regression analysis coming in future updates*" >> comparison.md
+
+      - name: Upload comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-comparison
+          path: comparison.md
+          retention-days: 90
+
+  check-regressions:
+    name: Check for Performance Regressions
+    needs: [benchmark-zig, benchmark-rust]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+
+    steps:
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: zig-benchmark-results
+
+      - name: Download Rust benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-benchmark-results
+
+      - name: Basic regression check
+        run: |
+          echo "# Performance Check" > performance-check.md
+          echo "" >> performance-check.md
+          echo "Benchmarks completed successfully." >> performance-check.md
+          echo "" >> performance-check.md
+          echo "To perform regression analysis:" >> performance-check.md
+          echo "1. Store baseline metrics in a dedicated branch or artifact" >> performance-check.md
+          echo "2. Compare against historical data" >> performance-check.md
+          echo "3. Alert if >10% regression detected" >> performance-check.md
+          echo "" >> performance-check.md
+          echo "## Current Results" >> performance-check.md
+          cat benchmark-results.md >> performance-check.md
+          cat rust-benchmark-results.md >> performance-check.md
+
+      - name: Store benchmark baseline
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # In production, you would store these results in a database or artifact storage
+          # for historical comparison
+          echo "Storing baseline for commit ${{ github.sha }}"
+          mkdir -p benchmark-history
+          cp benchmark-results.md benchmark-history/zig-${GITHUB_SHA:0:8}.md
+          cp rust-benchmark-results.md benchmark-history/rust-${GITHUB_SHA:0:8}.md
+
+      - name: Upload benchmark history
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-history-${{ github.sha }}
+          path: benchmark-history/
+          retention-days: 365
+
+  report:
+    name: Generate Benchmark Report
+    needs: [benchmark-zig, benchmark-rust]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate summary
+        run: |
+          echo "# 🚀 Ananke Performance Benchmarks" > BENCHMARK_REPORT.md
+          echo "" >> BENCHMARK_REPORT.md
+          echo "**Run Date**: $(date -u)" >> BENCHMARK_REPORT.md
+          echo "**Commit**: ${{ github.sha }}" >> BENCHMARK_REPORT.md
+          echo "**Trigger**: ${{ github.event_name }}" >> BENCHMARK_REPORT.md
+          echo "" >> BENCHMARK_REPORT.md
+          echo "---" >> BENCHMARK_REPORT.md
+          echo "" >> BENCHMARK_REPORT.md
+
+          if [ -f zig-benchmark-results/benchmark-results.md ]; then
+            cat zig-benchmark-results/benchmark-results.md >> BENCHMARK_REPORT.md
+          else
+            echo "⚠️ Zig benchmarks did not complete" >> BENCHMARK_REPORT.md
+          fi
+
+          echo "" >> BENCHMARK_REPORT.md
+
+          if [ -f rust-benchmark-results/rust-benchmark-results.md ]; then
+            cat rust-benchmark-results/rust-benchmark-results.md >> BENCHMARK_REPORT.md
+          else
+            echo "⚠️ Rust benchmarks did not complete" >> BENCHMARK_REPORT.md
+          fi
+
+          echo "" >> BENCHMARK_REPORT.md
+          echo "---" >> BENCHMARK_REPORT.md
+          echo "" >> BENCHMARK_REPORT.md
+          echo "## Performance Targets" >> BENCHMARK_REPORT.md
+          echo "" >> BENCHMARK_REPORT.md
+          echo "| Operation | Target | Status |" >> BENCHMARK_REPORT.md
+          echo "|-----------|--------|--------|" >> BENCHMARK_REPORT.md
+          echo "| Constraint validation | <50μs | 🔄 |" >> BENCHMARK_REPORT.md
+          echo "| Extraction | <2s (with Claude) | 🔄 |" >> BENCHMARK_REPORT.md
+          echo "| Compilation | <50ms | 🔄 |" >> BENCHMARK_REPORT.md
+          echo "| Generation | <5s | 🔄 |" >> BENCHMARK_REPORT.md
+          echo "" >> BENCHMARK_REPORT.md
+          echo "*Automated regression detection coming soon*" >> BENCHMARK_REPORT.md
+
+      - name: Upload final report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: BENCHMARK_REPORT.md
+          retention-days: 90
+
+      - name: Comment on commit (scheduled runs)
+        if: github.event_name == 'schedule' && github.ref == 'refs/heads/main'
+        run: |
+          echo "Weekly benchmark completed for commit ${{ github.sha }}"
+          echo "Results available in workflow artifacts"

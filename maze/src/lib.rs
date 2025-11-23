@@ -42,6 +42,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::collections::HashMap;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
 pub use modal_client::{ModalClient, ModalConfig};
 pub use ffi::{ConstraintIR, Intent, GenerationResult};
@@ -53,8 +55,9 @@ pub struct MazeOrchestrator {
     /// Client for communicating with Modal inference service
     modal_client: ModalClient,
 
-    /// Cache for compiled constraints to avoid re-compilation
-    constraint_cache: Arc<Mutex<HashMap<String, CompiledConstraint>>>,
+    /// LRU cache for compiled constraints to avoid re-compilation
+    /// Uses LRU eviction policy for O(1) cache operations
+    constraint_cache: Arc<Mutex<LruCache<String, CompiledConstraint>>>,
 
     /// Configuration
     config: MazeConfig,
@@ -208,11 +211,15 @@ impl MazeOrchestrator {
     /// Create a new Maze orchestrator
     pub fn new(modal_config: ModalConfig) -> Result<Self> {
         let modal_client = ModalClient::new(modal_config)?;
+        let default_config = MazeConfig::default();
+
+        let cache_size = NonZeroUsize::new(default_config.cache_size_limit)
+            .expect("Cache size must be non-zero");
 
         Ok(Self {
             modal_client,
-            constraint_cache: Arc::new(Mutex::new(HashMap::new())),
-            config: MazeConfig::default(),
+            constraint_cache: Arc::new(Mutex::new(LruCache::new(cache_size))),
+            config: default_config,
         })
     }
 
@@ -220,9 +227,12 @@ impl MazeOrchestrator {
     pub fn with_config(modal_config: ModalConfig, maze_config: MazeConfig) -> Result<Self> {
         let modal_client = ModalClient::new(modal_config)?;
 
+        let cache_size = NonZeroUsize::new(maze_config.cache_size_limit)
+            .expect("Cache size must be non-zero");
+
         Ok(Self {
             modal_client,
-            constraint_cache: Arc::new(Mutex::new(HashMap::new())),
+            constraint_cache: Arc::new(Mutex::new(LruCache::new(cache_size))),
             config: maze_config,
         })
     }
@@ -306,13 +316,14 @@ impl MazeOrchestrator {
     }
 
     /// Compile constraints to llguidance format with caching
-    async fn compile_constraints(&self, constraints_ir: &[ConstraintIR]) -> Result<CompiledConstraint> {
+    /// Uses LRU cache for O(1) eviction instead of O(n) linear scan
+    pub async fn compile_constraints(&self, constraints_ir: &[ConstraintIR]) -> Result<CompiledConstraint> {
         // Generate cache key from constraints
         let cache_key = self.generate_cache_key(constraints_ir)?;
 
         // Check cache if enabled
         if self.config.enable_cache {
-            let cache = self.constraint_cache.lock().await;
+            let mut cache = self.constraint_cache.lock().await;
             if let Some(cached) = cache.get(&cache_key) {
                 tracing::debug!("Cache hit for constraints: {}", cache_key);
                 return Ok(cached.clone());
@@ -329,36 +340,26 @@ impl MazeOrchestrator {
         };
 
         // Store in cache if enabled
+        // LRU cache automatically handles eviction with O(1) complexity
         if self.config.enable_cache {
             let mut cache = self.constraint_cache.lock().await;
-
-            // Check cache size limit
-            if cache.len() >= self.config.cache_size_limit {
-                // Simple eviction: remove oldest entry
-                if let Some((oldest_key, _)) = cache.iter()
-                    .min_by_key(|(_, v)| v.compiled_at)
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                {
-                    cache.remove(&oldest_key);
-                }
-            }
-
-            cache.insert(cache_key, compiled.clone());
+            cache.put(cache_key, compiled.clone());
         }
 
         Ok(compiled)
     }
 
     /// Generate cache key from constraint IR
-    fn generate_cache_key(&self, constraints_ir: &[ConstraintIR]) -> Result<String> {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+    /// Uses xxHash3 for high-performance hashing (2-3x faster than DefaultHasher)
+    pub fn generate_cache_key(&self, constraints_ir: &[ConstraintIR]) -> Result<String> {
+        use xxhash_rust::xxh3::Xxh3;
+        use std::hash::Hasher;
 
         let json = serde_json::to_string(constraints_ir)
             .context("Failed to serialize constraints for caching")?;
 
-        let mut hasher = DefaultHasher::new();
-        json.hash(&mut hasher);
+        let mut hasher = Xxh3::new();
+        hasher.write(json.as_bytes());
         Ok(format!("{:x}", hasher.finish()))
     }
 
@@ -442,7 +443,7 @@ impl MazeOrchestrator {
         let cache = self.constraint_cache.lock().await;
         CacheStats {
             size: cache.len(),
-            limit: self.config.cache_size_limit,
+            limit: cache.cap().get(),
         }
     }
 }
