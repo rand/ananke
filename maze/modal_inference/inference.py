@@ -156,8 +156,9 @@ class AnankeLLM:
 
     model_name: str = "meta-llama/Llama-3.1-8B-Instruct"
 
-    def __enter__(self):
-        """Initialize vLLM engine with llguidance support"""
+    @modal.enter()
+    def initialize_model(self):
+        """Initialize vLLM engine with llguidance support on container start"""
         import logging
         from vllm import LLM, SamplingParams
         from vllm.guided_decoding import GuidedDecodingMode
@@ -203,8 +204,6 @@ class AnankeLLM:
             logger.info(f"✓ Vocabulary size: {len(self.tokenizer)}")
             logger.info(f"✓ Max model length: 8192 tokens")
             logger.info(f"✓ Backend: llguidance (V0 architecture)")
-
-            return self
 
         except Exception as e:
             logger.error(f"✗ Model initialization failed: {e}", exc_info=True)
