@@ -88,10 +88,10 @@ pub const ClaudeClient = struct {
         conflicts: []const ConflictDescription,
     ) !ResolutionSuggestion {
         // Build conflict description
-        var conflict_desc = std.ArrayList(u8).init(self.allocator);
-        defer conflict_desc.deinit();
+        var conflict_desc = std.ArrayList(u8){};
+        defer conflict_desc.deinit(self.allocator);
 
-        const writer = conflict_desc.writer();
+        const writer = conflict_desc.writer(self.allocator);
         try writer.writeAll("The following constraint conflicts need resolution:\n\n");
 
         for (conflicts, 0..) |conflict, i| {
@@ -119,7 +119,7 @@ pub const ClaudeClient = struct {
             \\}
         );
 
-        const prompt = try conflict_desc.toOwnedSlice();
+        const prompt = try conflict_desc.toOwnedSlice(self.allocator);
         defer self.allocator.free(prompt);
 
         const response = try self.sendMessage(prompt);
@@ -283,7 +283,7 @@ pub const ClaudeClient = struct {
 
         const array = parsed.value.array;
         var constraints = try std.ArrayList(Constraint).initCapacity(self.allocator, array.items.len);
-        errdefer constraints.deinit();
+        errdefer constraints.deinit(self.allocator);
 
         for (array.items) |item| {
             const obj = item.object;
@@ -298,7 +298,7 @@ pub const ClaudeClient = struct {
             const description = try self.allocator.dupe(u8, obj.get("description").?.string);
             const confidence = if (obj.get("confidence")) |c| @as(f32, @floatCast(c.float)) else 0.8;
 
-            try constraints.append(Constraint{
+            try constraints.append(self.allocator, Constraint{
                 .kind = kind,
                 .severity = severity,
                 .name = name,
@@ -307,7 +307,7 @@ pub const ClaudeClient = struct {
             });
         }
 
-        return try constraints.toOwnedSlice();
+        return try constraints.toOwnedSlice(self.allocator);
     }
 
     /// Parse resolution suggestions from Claude response
@@ -325,7 +325,7 @@ pub const ClaudeClient = struct {
             self.allocator,
             resolutions_array.items.len,
         );
-        errdefer resolutions.deinit();
+        errdefer resolutions.deinit(self.allocator);
 
         for (resolutions_array.items) |item| {
             const obj = item.object;
@@ -334,11 +334,11 @@ pub const ClaudeClient = struct {
             const reasoning = try self.allocator.dupe(u8, obj.get("reasoning").?.string);
 
             const action = parseResolutionAction(action_str, conflict_index, reasoning);
-            try resolutions.append(action);
+            try resolutions.append(self.allocator, action);
         }
 
         return ResolutionSuggestion{
-            .actions = try resolutions.toOwnedSlice(),
+            .actions = try resolutions.toOwnedSlice(self.allocator),
         };
     }
 
