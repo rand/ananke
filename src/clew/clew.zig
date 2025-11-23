@@ -12,6 +12,11 @@ const Severity = root.types.constraint.Severity;
 // Import Claude API client
 const claude_api = @import("claude");
 
+// Tree-sitter support disabled pending Zig 0.15.x compatibility
+// TODO: Re-enable when z-tree-sitter upstream is fixed
+// const zts = @import("zts");
+const tree_sitter_enabled = false;
+
 /// Main Clew extraction engine
 pub const Clew = struct {
     allocator: std.mem.Allocator,
@@ -178,40 +183,177 @@ pub const Clew = struct {
         source: []const u8,
         language: []const u8,
     ) ![]Constraint {
+        // Tree-sitter integration disabled pending Zig 0.15.x compatibility
+        // Using fallback pattern matching for now
         _ = language;
+        return try self.extractSyntacticConstraintsFallback(source);
 
+        // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
+        // var constraints = std.ArrayList(Constraint){};
+        //
+        // // Get the appropriate language parser
+        // const lang = try self.getLanguageParser(language);
+        // if (lang == null) {
+        //     // Fall back to pattern matching for unsupported languages
+        //     return try self.extractSyntacticConstraintsFallback(source);
+        // }
+        //
+        // // Create parser and parse the source
+        // var parser = try zts.Parser.init();
+        // defer parser.deinit();
+        //
+        // try parser.setLanguage(lang.?);
+        // const tree = try parser.parseString(null, source);
+        // defer tree.deinit();
+        //
+        // const root_node = tree.rootNode();
+        //
+        // // Extract constraints from the syntax tree
+        // var func_count: u32 = 0;
+        // var typed_func_count: u32 = 0;
+        //
+        // try self.walkTreeForConstraints(
+        //     root_node,
+        //     &constraints,
+        //     &func_count,
+        //     &typed_func_count,
+        //     language,
+        // );
+        //
+        // // Generate high-level constraints based on analysis
+        // if (func_count > 0) {
+        //     const typed_ratio = @as(f32, @floatFromInt(typed_func_count)) / @as(f32, @floatFromInt(func_count));
+        //
+        //     if (typed_ratio > 0.8) {
+        //         try constraints.append(self.allocator, Constraint{
+        //             .kind = .type_safety,
+        //             .severity = .info,
+        //             .name = "explicit_function_types",
+        //             .description = "Most functions have explicit type annotations",
+        //             .source = .{ .static_analysis = {} },
+        //             .confidence = typed_ratio,
+        //         });
+        //     }
+        //
+        //     try constraints.append(self.allocator, Constraint{
+        //         .kind = .syntactic,
+        //         .severity = .info,
+        //         .name = "function_structure",
+        //         .description = std.fmt.allocPrint(
+        //             self.allocator,
+        //             "Code contains {d} function definitions",
+        //             .{func_count},
+        //         ) catch "Code contains function definitions",
+        //         .source = .{ .static_analysis = {} },
+        //     });
+        // }
+        //
+        // return try constraints.toOwnedSlice(self.allocator);
+    }
+
+    // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
+    // fn getLanguageParser(self: *Clew, language: []const u8) !?*const anyopaque {
+    //     _ = self;
+    //
+    //     // Map language names to Tree-sitter parsers
+    //     if (std.mem.eql(u8, language, "typescript")) {
+    //         return zts.loadLanguage("typescript");
+    //     } else if (std.mem.eql(u8, language, "python")) {
+    //         return zts.loadLanguage("python");
+    //     } else if (std.mem.eql(u8, language, "javascript")) {
+    //         return zts.loadLanguage("javascript");
+    //     } else if (std.mem.eql(u8, language, "rust")) {
+    //         return zts.loadLanguage("rust");
+    //     } else if (std.mem.eql(u8, language, "go")) {
+    //         return zts.loadLanguage("go");
+    //     } else if (std.mem.eql(u8, language, "java")) {
+    //         return zts.loadLanguage("java");
+    //     } else if (std.mem.eql(u8, language, "zig")) {
+    //         return zts.loadLanguage("zig");
+    //     }
+    //
+    //     return null;
+    // }
+    //
+    // fn walkTreeForConstraints(
+    //     self: *Clew,
+    //     node: zts.Node,
+    //     constraints: *std.ArrayList(Constraint),
+    //     func_count: *u32,
+    //     typed_func_count: *u32,
+    //     language: []const u8,
+    // ) !void {
+    //     _ = self;
+    //     _ = constraints;
+    //     _ = language;
+    //
+    //     // Get node type to identify syntactic constructs
+    //     const node_type = node.type();
+    //
+    //     // Identify function definitions (language-specific node types)
+    //     if (std.mem.eql(u8, node_type, "function_declaration") or
+    //         std.mem.eql(u8, node_type, "method_definition") or
+    //         std.mem.eql(u8, node_type, "function_definition") or
+    //         std.mem.eql(u8, node_type, "fn_item"))
+    //     {
+    //         func_count.* += 1;
+    //
+    //         // Check if function has explicit type annotations
+    //         var cursor = node.walk();
+    //         defer cursor.deinit();
+    //
+    //         if (cursor.gotoFirstChild()) {
+    //             while (true) {
+    //                 const child = cursor.node();
+    //                 const child_type = child.type();
+    //
+    //                 if (std.mem.indexOf(u8, child_type, "type") != null) {
+    //                     typed_func_count.* += 1;
+    //                     break;
+    //                 }
+    //
+    //                 if (!cursor.gotoNextSibling()) break;
+    //             }
+    //         }
+    //     }
+    //
+    //     // Recursively walk children
+    //     var cursor = node.walk();
+    //     defer cursor.deinit();
+    //
+    //     if (cursor.gotoFirstChild()) {
+    //         while (true) {
+    //             try self.walkTreeForConstraints(
+    //                 cursor.node(),
+    //                 constraints,
+    //                 func_count,
+    //                 typed_func_count,
+    //                 language,
+    //             );
+    //
+    //             if (!cursor.gotoNextSibling()) break;
+    //         }
+    //     }
+    // }
+
+    fn extractSyntacticConstraintsFallback(
+        self: *Clew,
+        source: []const u8,
+    ) ![]Constraint {
         var constraints = std.ArrayList(Constraint){};
 
-        // Simple pattern matching for now
-        // TODO: Integrate Tree-sitter for proper parsing
-
-        // Check for function signatures
+        // Simple pattern matching for unsupported languages
         if (std.mem.indexOf(u8, source, "function") != null or
             std.mem.indexOf(u8, source, "fn") != null or
             std.mem.indexOf(u8, source, "def") != null)
         {
-            const constraint = Constraint{
+            try constraints.append(self.allocator, Constraint{
                 .kind = .syntactic,
                 .severity = .info,
                 .name = "has_functions",
                 .description = "Code contains function definitions",
                 .source = .{ .static_analysis = {} },
-            };
-            try constraints.append(self.allocator, constraint);
-        }
-
-        // Check for explicit return types
-        if (std.mem.indexOf(u8, source, "->") != null or
-            std.mem.indexOf(u8, source, ": ") != null)
-        {
-            const constraint = Constraint{
-                .kind = .syntactic,
-                .severity = .info,
-                .name = "explicit_returns",
-                .description = "Functions have explicit return types",
-                .source = .{ .static_analysis = {} },
-            };
-            try constraints.append(self.allocator, constraint);
+            });
         }
 
         return try constraints.toOwnedSlice(self.allocator);
