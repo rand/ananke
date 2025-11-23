@@ -2,17 +2,18 @@ name: Maze Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - 'maze/**'
       - '.github/workflows/maze-tests.yml'
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - 'maze/**'
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
+  workflow_dispatch:
 
 env:
   RUST_BACKTRACE: 1
@@ -20,13 +21,17 @@ env:
 
 jobs:
   test:
-    name: Test on ${{ matrix.os }}
+    name: Test on ${{ matrix.os }} (Rust ${{ matrix.rust }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        rust: [stable]
+        rust: [stable, beta]
+        exclude:
+          # Only run beta on Ubuntu to save CI minutes
+          - os: macos-latest
+            rust: beta
     
     steps:
       - name: Checkout code
