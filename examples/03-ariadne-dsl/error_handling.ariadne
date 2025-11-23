@@ -1,0 +1,676 @@
+-- Error Handling and Resilience Constraints
+-- Defines patterns for robust error handling
+
+module errors.patterns
+
+import std.{clew, braid}
+
+-- All async functions must handle errors
+constraint require_error_handling {
+    id: "err-001",
+    name: "require_error_handling",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (function_declaration
+                async: "async"
+                body: (statement_block) @body
+            )
+            where not @body contains "try"
+            and not @body contains "catch"
+            and @body contains "await"
+        },
+        action: .Warn,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.85,
+        origin_artifact: "standards/error-handling.md",
+        created_by: "platform-team",
+        created_at: "2024-01-15T00:00:00Z"
+    },
+
+    failure_mode: .Warn({
+        message: "Async functions with await should have try-catch error handling",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            async function exampleFunction() {
+                try {
+                    const result = await someOperation();
+                    return result;
+                } catch (error) {
+                    logger.error('Operation failed:', error);
+                    throw new AppError('Operation failed', { cause: error });
+                }
+            }
+        """,
+        explanation: "Unhandled promise rejections can crash the application. Always wrap await in try-catch."
+    },
+
+    metadata: {
+        "category": "reliability",
+        "severity": "high"
+    }
+}
+
+-- Structured error types
+constraint use_structured_errors {
+    id: "err-002",
+    name: "use_structured_errors",
+
+    enforcement: .Type({
+        signature: {
+            classes: {
+                "Error": {
+                    extends: "Error",
+                    has_properties: ["code", "statusCode", "details"]
+                }
+            }
+        },
+        strictness: .Lenient,
+        system: .Structural
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "standards/error-classes.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Use structured error classes instead of generic Error",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            // Define error hierarchy
+            export class AppError extends Error {
+                constructor(
+                    message: string,
+                    public code: string,
+                    public statusCode: number = 500,
+                    public details?: any
+                ) {
+                    super(message);
+                    this.name = this.constructor.name;
+                    Error.captureStackTrace(this, this.constructor);
+                }
+            }
+
+            export class ValidationError extends AppError {
+                constructor(message: string, details?: any) {
+                    super(message, 'VALIDATION_ERROR', 400, details);
+                }
+            }
+
+            export class NotFoundError extends AppError {
+                constructor(resource: string) {
+                    super(`${resource} not found`, 'NOT_FOUND', 404);
+                }
+            }
+
+            export class UnauthorizedError extends AppError {
+                constructor(message: string = 'Unauthorized') {
+                    super(message, 'UNAUTHORIZED', 401);
+                }
+            }
+        """
+    },
+
+    metadata: {
+        "category": "error_handling",
+        "benefits": ["better_logging", "client_friendly", "debugging"]
+    }
+}
+
+-- Error context preservation
+constraint preserve_error_context {
+    id: "err-003",
+    name: "preserve_error_context",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "error_throw",
+            requires: ["error_cause"],
+            context: "exception_handling"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that when re-throwing or wrapping errors:
+                1. Original error is preserved as 'cause'
+                2. Stack trace is maintained
+                3. Additional context is added
+                4. Error chain is traversable for debugging
+
+                Pattern to enforce:
+                catch (error) {
+                    throw new AppError('Message', { cause: error });
+                }
+
+                Avoid:
+                catch (error) {
+                    throw new Error('Message');  // Loses original error!
+                }
+            """
+        })
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.85,
+        origin_artifact: "standards/error-context.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Preserve original error when re-throwing",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            try {
+                await operation();
+            } catch (error) {
+                // Good: Preserve original error
+                throw new AppError('Operation failed', {
+                    cause: error,
+                    context: { userId, operation: 'example' }
+                });
+
+                // Bad: Loses original error
+                // throw new Error('Operation failed');
+            }
+        """
+    }
+}
+
+-- Centralized error handler
+constraint require_error_middleware {
+    id: "err-004",
+    name: "require_error_middleware",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (call_expression
+                function: (member_expression
+                    object: (identifier) @app
+                    property: (property_identifier) @method
+                )
+            )
+            where @app matches "app|express"
+            and @method == "use"
+        },
+        action: .Require({
+            must_have: ["error_handler_middleware"],
+            message: "Express app must have centralized error handler"
+        }),
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "standards/express-error-handling.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Add centralized error handling middleware",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            // Centralized error handler (must be last middleware)
+            app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+                // Log error with context
+                logger.error('Request failed', {
+                    error: err.message,
+                    stack: err.stack,
+                    path: req.path,
+                    method: req.method,
+                    userId: req.user?.id
+                });
+
+                // Determine status code
+                const statusCode = err instanceof AppError
+                    ? err.statusCode
+                    : 500;
+
+                // Send error response
+                res.status(statusCode).json({
+                    error: {
+                        code: err instanceof AppError ? err.code : 'INTERNAL_ERROR',
+                        message: process.env.NODE_ENV === 'production'
+                            ? 'An error occurred'
+                            : err.message,
+                        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+                    }
+                });
+            });
+        """
+    }
+}
+
+-- Retry logic for transient failures
+constraint implement_retry_logic {
+    id: "err-005",
+    name: "implement_retry_logic",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "external_service_call",
+            suggests: ["retry_decorator"],
+            context: "http_client"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Identify calls to external services:
+                - HTTP requests to external APIs
+                - Database connections
+                - Message queue operations
+                - File system operations
+
+                Suggest retry logic with:
+                - Exponential backoff
+                - Maximum retry attempts
+                - Only retry transient errors (5xx, timeouts)
+                - Circuit breaker pattern for cascading failures
+            """
+        })
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.80,
+        origin_artifact: "patterns/resilience.md"
+    },
+
+    failure_mode: .Warn({
+        message: "External service calls should have retry logic",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            import { retry } from 'async-retry';
+
+            async function fetchExternalData(url: string) {
+                return retry(
+                    async (bail, attempt) => {
+                        try {
+                            const response = await fetch(url, {
+                                timeout: 5000
+                            });
+
+                            // Don't retry client errors
+                            if (response.status >= 400 && response.status < 500) {
+                                bail(new Error(`Client error: ${response.status}`));
+                                return;
+                            }
+
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+
+                            return response.json();
+                        } catch (error) {
+                            logger.warn(`Attempt ${attempt} failed:`, error);
+                            throw error;
+                        }
+                    },
+                    {
+                        retries: 3,
+                        factor: 2,  // Exponential backoff
+                        minTimeout: 1000,
+                        maxTimeout: 10000,
+                        onRetry: (error, attempt) => {
+                            logger.info(`Retry attempt ${attempt} for ${url}`);
+                        }
+                    }
+                );
+            }
+        """
+    },
+
+    metadata: {
+        "category": "resilience",
+        "pattern": "retry_with_exponential_backoff"
+    }
+}
+
+-- Circuit breaker pattern
+constraint use_circuit_breaker {
+    id: "err-006",
+    name: "use_circuit_breaker",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "critical_external_service",
+            requires: ["circuit_breaker"],
+            context: "service_integration"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                For critical external services, verify circuit breaker:
+                1. Tracks failure rate
+                2. Opens circuit after threshold
+                3. Attempts recovery with half-open state
+                4. Prevents cascading failures
+
+                Critical services include:
+                - Payment gateways
+                - Authentication providers
+                - Primary databases
+                - Essential third-party APIs
+            """
+        })
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.75,
+        origin_artifact: "patterns/circuit-breaker.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Critical services should use circuit breaker pattern",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            import CircuitBreaker from 'opossum';
+
+            const options = {
+                timeout: 3000,           // If function takes longer, trigger failure
+                errorThresholdPercentage: 50,  // Open circuit at 50% failure rate
+                resetTimeout: 30000      // Try again after 30 seconds
+            };
+
+            const breaker = new CircuitBreaker(asyncFunction, options);
+
+            breaker.fallback(() => {
+                // Fallback logic when circuit is open
+                return cachedResponse();
+            });
+
+            breaker.on('open', () => {
+                logger.warn('Circuit breaker opened for service');
+            });
+
+            breaker.on('halfOpen', () => {
+                logger.info('Circuit breaker attempting recovery');
+            });
+
+            // Usage
+            const result = await breaker.fire(params);
+        """
+    }
+}
+
+-- Timeout enforcement
+constraint enforce_timeouts {
+    id: "err-007",
+    name: "enforce_timeouts",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "async_operation",
+            requires: ["timeout_config"],
+            context: "io_operations"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that I/O operations have timeouts:
+                - HTTP requests
+                - Database queries
+                - External API calls
+                - File operations
+
+                Timeouts prevent:
+                - Resource exhaustion
+                - Hanging requests
+                - Cascading failures
+            """
+        })
+    }),
+
+    provenance: {
+        source: .PerformancePolicy,
+        confidence_score: 0.85,
+        origin_artifact: "performance/timeout-policy.md"
+    },
+
+    failure_mode: .Warn({
+        message: "I/O operations should have timeouts configured",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            // HTTP request with timeout
+            const response = await fetch(url, {
+                signal: AbortSignal.timeout(5000)  // 5 second timeout
+            });
+
+            // Database query with timeout
+            const result = await db.query(sql, params, {
+                timeout: 3000
+            });
+
+            // Promise with timeout wrapper
+            async function withTimeout<T>(
+                promise: Promise<T>,
+                timeoutMs: number
+            ): Promise<T> {
+                const timeout = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
+                );
+                return Promise.race([promise, timeout]) as Promise<T>;
+            }
+
+            const data = await withTimeout(longRunningOperation(), 10000);
+        """
+    }
+}
+
+-- Error logging with context
+constraint log_errors_with_context {
+    id: "err-008",
+    name: "log_errors_with_context",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (catch_clause
+                (statement_block) @body
+            )
+            where @body contains "logger" or @body contains "console"
+        },
+        action: .Require({
+            must_have: ["error_object", "context_object"],
+            message: "Error logs should include error and context"
+        }),
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.80,
+        origin_artifact: "observability/logging-standards.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Error logs should include structured context",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            try {
+                await operation();
+            } catch (error) {
+                // Good: Structured logging with context
+                logger.error('Operation failed', {
+                    error: {
+                        message: error.message,
+                        stack: error.stack,
+                        code: error.code
+                    },
+                    context: {
+                        userId: req.user?.id,
+                        operation: 'createUser',
+                        timestamp: new Date().toISOString(),
+                        requestId: req.id
+                    }
+                });
+
+                // Bad: Minimal logging
+                // console.error(error);
+            }
+        """,
+        explanation: "Structured logging with context enables better debugging and monitoring."
+    }
+}
+
+-- Graceful degradation
+constraint implement_graceful_degradation {
+    id: "err-009",
+    name: "implement_graceful_degradation",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "service_failure",
+            suggests: ["fallback_behavior"],
+            context: "user_experience"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                For non-critical failures, suggest graceful degradation:
+                - Return cached data instead of failing
+                - Provide default values
+                - Disable optional features
+                - Show user-friendly error messages
+                - Continue with reduced functionality
+
+                Examples:
+                - Recommendations service down → Show default items
+                - Image service down → Show placeholder images
+                - Analytics down → Continue without tracking
+            """
+        })
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.70,
+        origin_artifact: "patterns/graceful-degradation.md"
+    },
+
+    failure_mode: .Suggest({
+        message: "Consider graceful degradation for this failure",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            async function getRecommendations(userId: string): Promise<Item[]> {
+                try {
+                    return await recommendationService.getForUser(userId);
+                } catch (error) {
+                    logger.warn('Recommendation service unavailable, using fallback', error);
+
+                    // Graceful degradation: Return popular items
+                    return getPopularItems();
+                }
+            }
+
+            async function getUserProfile(userId: string): Promise<Profile> {
+                try {
+                    const [profile, avatar] = await Promise.allSettled([
+                        fetchProfile(userId),
+                        fetchAvatar(userId)
+                    ]);
+
+                    return {
+                        ...profile.value,
+                        avatar: avatar.status === 'fulfilled'
+                            ? avatar.value
+                            : defaultAvatar  // Graceful degradation
+                    };
+                } catch (error) {
+                    // Critical failure, cannot degrade
+                    throw error;
+                }
+            }
+        """
+    }
+}
+
+-- Error recovery documentation
+constraint document_error_recovery {
+    id: "err-010",
+    name: "document_error_recovery",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (catch_clause) @catch
+            where not (comment) before @catch
+        },
+        action: .Warn,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.70,
+        origin_artifact: "standards/code-documentation.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Document error recovery strategy in comments",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            try {
+                await criticalOperation();
+            } catch (error) {
+                /**
+                 * Error Recovery Strategy:
+                 * 1. Log error with full context
+                 * 2. Attempt to rollback transaction
+                 * 3. Notify monitoring system
+                 * 4. Return user-friendly error
+                 *
+                 * Do NOT retry automatically - requires manual intervention
+                 */
+                logger.error('Critical operation failed', { error, userId });
+                await rollbackTransaction();
+                await notifyOps(error);
+                throw new CriticalError('Operation failed', { cause: error });
+            }
+        """
+    }
+}
