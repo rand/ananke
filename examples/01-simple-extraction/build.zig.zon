@@ -1,6 +1,7 @@
 .{
-    .name = "simple-extraction-example",
+    .name = .simple_extraction_example,
     .version = "0.1.0",
+    .fingerprint = 0x7f1f230775c2d235,
     .dependencies = .{
         .ananke = .{
             .path = "../..",

@@ -18,7 +18,7 @@ pub fn main() !void {
 
     // Initialize Clew (constraint extraction engine)
     // No Claude client - pure static analysis
-    var clew = try ananke.Clew.init(allocator);
+    var clew = try ananke.clew.Clew.init(allocator);
     defer clew.deinit();
 
     std.debug.print("Extracting constraints (without Claude)...\n\n", .{});
