@@ -21,9 +21,9 @@ pub fn main() !void {
     defer allocator.free(perf_dsl);
 
     std.debug.print("=== Loaded Ariadne DSL Files ===\n\n", .{});
-    std.debug.print("1. api_security.ariadne ({} bytes)\n", .{security_dsl.len});
-    std.debug.print("2. type_safety.ariadne ({} bytes)\n", .{type_dsl.len});
-    std.debug.print("3. performance.ariadne ({} bytes)\n\n", .{perf_dsl.len});
+    std.debug.print("1. api_security.ariadne ({d} bytes)\n", .{security_dsl.len});
+    std.debug.print("2. type_safety.ariadne ({d} bytes)\n", .{type_dsl.len});
+    std.debug.print("3. performance.ariadne ({d} bytes)\n\n", .{perf_dsl.len});
 
     // Initialize Ariadne compiler
     std.debug.print("=== Compiling Ariadne to ConstraintIR ===\n\n", .{});
@@ -31,8 +31,37 @@ pub fn main() !void {
     var ariadne_compiler = try ananke.ariadne.AriadneCompiler.init(allocator);
     defer ariadne_compiler.deinit();
 
-    std.debug.print("Note: Ariadne parser is not yet implemented.\n", .{});
-    std.debug.print("This example shows what the DSL looks like and the expected workflow.\n\n", .{});
+    // Parse the DSL files
+    std.debug.print("Parsing type_safety.ariadne...\n", .{});
+    var type_ast = try ariadne_compiler.parse(type_dsl);
+    defer type_ast.deinit();
+
+    std.debug.print("  - Found {d} top-level declarations\n", .{type_ast.nodes.len});
+    for (type_ast.nodes) |node| {
+        switch (node) {
+            .module_decl => |m| std.debug.print("  - Module: {s}\n", .{m.name}),
+            .constraint_def => |c| std.debug.print("  - Constraint: {s}\n", .{c.name}),
+            .import_stmt => |i| std.debug.print("  - Import: {s}\n", .{i.path}),
+            else => {},
+        }
+    }
+
+    std.debug.print("\nParsing performance.ariadne...\n", .{});
+    var perf_ast = try ariadne_compiler.parse(perf_dsl);
+    defer perf_ast.deinit();
+
+    std.debug.print("  - Found {d} top-level declarations\n", .{perf_ast.nodes.len});
+    for (perf_ast.nodes) |node| {
+        switch (node) {
+            .module_decl => |m| std.debug.print("  - Module: {s}\n", .{m.name}),
+            .constraint_def => |c| std.debug.print("  - Constraint: {s}\n", .{c.name}),
+            .import_stmt => |i| std.debug.print("  - Import: {s}\n", .{i.path}),
+            else => {},
+        }
+    }
+
+    std.debug.print("\nNote: Full IR generation not yet implemented.\n", .{});
+    std.debug.print("Parser successfully extracts structure from DSL files.\n\n", .{});
 
     // Show what the compiled output would look like
     print_expected_constraint_ir();

@@ -1,0 +1,288 @@
+{
+  "constraints": [
+    {
+      "id": "valid-001",
+      "kind": "semantic",
+      "name": "validate_email_format",
+      "description": "Email addresses must match valid format pattern",
+      "severity": "error",
+      "pattern": {
+        "type": "syntactic",
+        "rule": "email must match regex: ^[^@]+@[^@]+\\.[^@]+$"
+      },
+      "examples": {
+        "good": [
+          "user@example.com",
+          "john.doe@company.co.uk",
+          "test+tag@domain.com"
+        ],
+        "bad": [
+          "invalid.email",
+          "@example.com",
+          "user@",
+          "user name@example.com"
+        ]
+      }
+    },
+    {
+      "id": "valid-002",
+      "kind": "semantic",
+      "name": "validate_uuid_format",
+      "description": "UUIDs must match v4 format",
+      "severity": "error",
+      "pattern": {
+        "type": "syntactic",
+        "rule": "UUID must match: ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      },
+      "examples": {
+        "good": [
+          "550e8400-e29b-41d4-a716-446655440000",
+          "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        ],
+        "bad": [
+          "not-a-uuid",
+          "550e8400-e29b-41d4",
+          "550e8400-e29b-51d4-a716-446655440000"
+        ]
+      }
+    },
+    {
+      "id": "valid-003",
+      "kind": "semantic",
+      "name": "validate_phone_format",
+      "description": "Phone numbers should follow E.164 format",
+      "severity": "warning",
+      "pattern": {
+        "type": "syntactic",
+        "rule": "phone should match: ^\\+[1-9]\\d{1,14}$"
+      },
+      "examples": {
+        "good": [
+          "+14155552671",
+          "+442071838750",
+          "+81312345678"
+        ],
+        "bad": [
+          "415-555-2671",
+          "(415) 555-2671",
+          "4155552671"
+        ]
+      }
+    },
+    {
+      "id": "valid-004",
+      "kind": "semantic",
+      "name": "validate_positive_numbers",
+      "description": "Quantities, prices, and counts must be positive",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "numeric fields representing quantities must be > 0"
+      },
+      "examples": {
+        "good": [
+          "quantity: 5",
+          "price: 19.99",
+          "count: 1"
+        ],
+        "bad": [
+          "quantity: -1",
+          "price: 0",
+          "count: -10"
+        ]
+      },
+      "applies_to": [
+        "quantity",
+        "price",
+        "amount",
+        "count",
+        "total"
+      ]
+    },
+    {
+      "id": "valid-005",
+      "kind": "semantic",
+      "name": "validate_date_range",
+      "description": "Dates must be within reasonable ranges",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "dates should not be in far future or distant past"
+      },
+      "examples": {
+        "good": [
+          "birthDate: '1990-01-01'",
+          "eventDate: '2024-12-31'"
+        ],
+        "bad": [
+          "birthDate: '1800-01-01'",
+          "eventDate: '2100-01-01'"
+        ]
+      },
+      "recommended_values": {
+        "min_birth_year": 1900,
+        "max_future_years": 10
+      }
+    },
+    {
+      "id": "valid-006",
+      "kind": "semantic",
+      "name": "validate_string_length",
+      "description": "Strings must have reasonable length limits",
+      "severity": "warning",
+      "pattern": {
+        "type": "syntactic",
+        "rule": "strings should have min/max length constraints"
+      },
+      "recommended_values": {
+        "username": { "min": 3, "max": 50 },
+        "password": { "min": 8, "max": 128 },
+        "email": { "min": 5, "max": 255 },
+        "name": { "min": 1, "max": 100 },
+        "description": { "min": 0, "max": 5000 },
+        "comment": { "min": 1, "max": 2000 }
+      }
+    },
+    {
+      "id": "valid-007",
+      "kind": "semantic",
+      "name": "validate_enum_values",
+      "description": "Enum fields must use predefined values",
+      "severity": "error",
+      "pattern": {
+        "type": "syntactic",
+        "rule": "values must be from allowed set"
+      },
+      "examples": {
+        "good": [
+          "status: 'pending' | 'active' | 'cancelled'",
+          "role: 'user' | 'admin' | 'moderator'"
+        ],
+        "bad": [
+          "status: 'unknown'  // Not in enum",
+          "role: string  // Too permissive"
+        ]
+      }
+    },
+    {
+      "id": "valid-008",
+      "kind": "semantic",
+      "name": "validate_url_format",
+      "description": "URLs must be valid and optionally from allowed domains",
+      "severity": "error",
+      "pattern": {
+        "type": "syntactic",
+        "rule": "URLs must start with http:// or https:// and be well-formed"
+      },
+      "examples": {
+        "good": [
+          "https://example.com",
+          "https://subdomain.example.com/path?query=value"
+        ],
+        "bad": [
+          "not a url",
+          "ftp://example.com  // Wrong protocol",
+          "//example.com  // Missing protocol"
+        ]
+      }
+    },
+    {
+      "id": "valid-009",
+      "kind": "semantic",
+      "name": "validate_json_structure",
+      "description": "JSON fields must be valid and follow schema",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "JSON fields must parse correctly and match expected structure"
+      },
+      "examples": {
+        "good": [
+          "metadata: { key: 'value', count: 123 }",
+          "settings: JSON.parse(validJsonString)"
+        ],
+        "bad": [
+          "metadata: '{invalid json}'",
+          "settings: undefined  // Not valid JSON"
+        ]
+      }
+    },
+    {
+      "id": "valid-010",
+      "kind": "semantic",
+      "name": "validate_array_bounds",
+      "description": "Arrays must have reasonable size limits",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "arrays should have max length to prevent memory issues"
+      },
+      "recommended_values": {
+        "tags": { "max": 20 },
+        "images": { "max": 10 },
+        "items": { "max": 100 },
+        "recipients": { "max": 50 }
+      },
+      "examples": {
+        "good": [
+          "tags: string[]; // .max(20)",
+          "items: Item[]; // .max(100)"
+        ],
+        "bad": [
+          "tags: string[];  // Unbounded",
+          "items: any[];  // Could be millions"
+        ]
+      }
+    },
+    {
+      "id": "valid-011",
+      "kind": "semantic",
+      "name": "validate_required_fields",
+      "description": "Required fields must not be null or undefined",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "required fields must be present and non-null"
+      },
+      "examples": {
+        "good": [
+          "email: string;  // Required",
+          "name: string;  // Not optional"
+        ],
+        "bad": [
+          "email?: string;  // Should be required",
+          "if (!data.email) { ... }  // Missing validation"
+        ]
+      }
+    },
+    {
+      "id": "valid-012",
+      "kind": "semantic",
+      "name": "validate_password_strength",
+      "description": "Passwords must meet complexity requirements",
+      "severity": "error",
+      "pattern": {
+        "type": "semantic",
+        "rule": "passwords must have minimum length and contain mixed character types"
+      },
+      "recommended_values": {
+        "min_length": 8,
+        "require_uppercase": true,
+        "require_lowercase": true,
+        "require_digit": true,
+        "require_special": false
+      },
+      "examples": {
+        "good": [
+          "Password123",
+          "MyP@ssw0rd"
+        ],
+        "bad": [
+          "pass",
+          "password",
+          "12345678"
+        ]
+      }
+    }
+  ]
+}

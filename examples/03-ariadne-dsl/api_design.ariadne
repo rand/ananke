@@ -1,0 +1,643 @@
+-- REST API Design Constraints
+-- Enforces consistent API patterns and best practices
+
+module api.design
+
+import std.{clew, braid}
+
+-- RESTful endpoint naming
+constraint restful_endpoint_naming {
+    id: "api-001",
+    name: "restful_endpoint_naming",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (call_expression
+                function: (member_expression
+                    object: (identifier) @router
+                    property: (property_identifier) @method
+                )
+                arguments: (arguments
+                    (string) @path
+                )
+            )
+            where @method in ["get", "post", "put", "delete", "patch"]
+            and not @path matches "^/[a-z][a-z0-9-]*((/:[a-zA-Z]+)|(/[a-z][a-z0-9-]*))*$"
+        },
+        action: .Warn,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "api/rest-conventions.md",
+        created_by: "api-team",
+        created_at: "2024-01-15T00:00:00Z"
+    },
+
+    failure_mode: .Warn({
+        message: "API paths should use kebab-case, lowercase, and resource-oriented naming",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            // Good RESTful paths:
+            router.get('/users', listUsers);
+            router.get('/users/:id', getUser);
+            router.post('/users', createUser);
+            router.put('/users/:id', updateUser);
+            router.delete('/users/:id', deleteUser);
+            router.get('/users/:id/posts', getUserPosts);
+
+            // Avoid:
+            router.get('/getUsers', ...);  // Not RESTful
+            router.post('/createUser', ...);  // Not RESTful
+            router.get('/Users', ...);  // Use lowercase
+        """,
+        explanation: "RESTful APIs use resource nouns, HTTP verbs, and consistent naming."
+    },
+
+    metadata: {
+        "category": "api_design",
+        "rest_level": "richardson_level_2"
+    }
+}
+
+-- Pagination for list endpoints
+constraint require_pagination {
+    id: "api-002",
+    name: "require_pagination",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "list_endpoint",
+            requires: ["pagination_params"],
+            context: "api_handlers"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that list/collection endpoints:
+                1. Accept pagination parameters (page, limit, or cursor)
+                2. Return paginated results with metadata
+                3. Have reasonable default and maximum limits
+                4. Include links to next/prev pages (HATEOAS)
+
+                Endpoints returning lists without pagination risk:
+                - Performance issues with large datasets
+                - Memory exhaustion
+                - Slow response times
+            """
+        })
+    }),
+
+    provenance: {
+        source: .PerformanceAnalysis,
+        confidence_score: 0.95,
+        origin_artifact: "api/pagination-requirements.md"
+    },
+
+    failure_mode: .Warn({
+        message: "List endpoints should implement pagination",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            router.get('/users', async (req, res) => {
+                const page = parseInt(req.query.page) || 1;
+                const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+                const offset = (page - 1) * limit;
+
+                const users = await db.query(
+                    'SELECT * FROM users LIMIT ? OFFSET ?',
+                    [limit, offset]
+                );
+
+                const total = await db.query('SELECT COUNT(*) FROM users');
+
+                res.json({
+                    data: users,
+                    pagination: {
+                        page,
+                        limit,
+                        total: total[0].count,
+                        pages: Math.ceil(total[0].count / limit)
+                    }
+                });
+            });
+        """
+    },
+
+    metadata: {
+        "category": "scalability",
+        "default_limit": 20,
+        "max_limit": 100
+    }
+}
+
+-- HTTP status code correctness
+constraint correct_http_status {
+    id: "api-003",
+    name: "correct_http_status",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "response_status",
+            validates: "status_code_semantics",
+            context: "http_responses"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Validate HTTP status code usage:
+                - 200 OK: Successful GET, PUT, PATCH
+                - 201 Created: Successful POST with resource creation
+                - 204 No Content: Successful DELETE
+                - 400 Bad Request: Invalid input
+                - 401 Unauthorized: Missing/invalid auth
+                - 403 Forbidden: Insufficient permissions
+                - 404 Not Found: Resource doesn't exist
+                - 409 Conflict: Resource conflict (e.g., duplicate)
+                - 422 Unprocessable Entity: Validation errors
+                - 500 Internal Server Error: Server errors
+
+                Warn on misuse like:
+                - Returning 200 for errors
+                - Using 404 for validation errors
+                - Using 500 for client errors
+            """
+        })
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.85,
+        origin_artifact: "api/http-status-guide.md"
+    },
+
+    failure_mode: .Warn({
+        message: "HTTP status code may not match operation semantics",
+        severity: .Medium
+    }),
+
+    repair: null,  -- Requires semantic understanding
+
+    metadata: {
+        "category": "http_semantics",
+        "rfc": "RFC-7231"
+    }
+}
+
+-- API versioning
+constraint require_api_versioning {
+    id: "api-004",
+    name: "require_api_versioning",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (call_expression
+                function: (member_expression
+                    object: (identifier) @router
+                    property: (property_identifier) @method
+                )
+                arguments: (arguments
+                    (string) @path
+                )
+            )
+            where @method in ["get", "post", "put", "delete", "patch"]
+            and not @path matches "^/v[0-9]/"
+            and not @path matches "^/api/v[0-9]/"
+        },
+        action: .Warn,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.80,
+        origin_artifact: "api/versioning-strategy.md"
+    },
+
+    failure_mode: .Warn({
+        message: "API endpoints should include version prefix (e.g., /v1/)",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            // Include version in path:
+            router.get('/v1/users', listUsers);
+            router.get('/v1/users/:id', getUser);
+
+            // Or use header-based versioning:
+            app.use('/users', versionMiddleware, listUsers);
+        """,
+        explanation: "API versioning enables backwards compatibility and gradual migration."
+    },
+
+    metadata: {
+        "category": "api_evolution",
+        "strategy": "url_versioning"
+    }
+}
+
+-- Request validation middleware
+constraint require_request_validation {
+    id: "api-005",
+    name: "require_request_validation",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "route_handler",
+            requires: ["input_validation"],
+            context: "request_processing"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that route handlers:
+                1. Validate request body against schema
+                2. Validate query parameters
+                3. Validate path parameters
+                4. Return 400 with clear error messages for invalid input
+
+                Look for validation middleware or schema validation (Joi, Zod, etc.)
+            """
+        })
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "api/input-validation.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Route handlers should validate input",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            import { z } from 'zod';
+
+            const userSchema = z.object({
+                email: z.string().email(),
+                username: z.string().min(3).max(50),
+                password: z.string().min(8)
+            });
+
+            router.post('/users', async (req, res) => {
+                const result = userSchema.safeParse(req.body);
+                if (!result.success) {
+                    return res.status(400).json({
+                        error: 'Validation failed',
+                        details: result.error.errors
+                    });
+                }
+                // Process validated data
+                const user = await createUser(result.data);
+                res.status(201).json(user);
+            });
+        """
+    }
+}
+
+-- Rate limiting
+constraint require_rate_limiting {
+    id: "api-006",
+    name: "require_rate_limiting",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "public_endpoint",
+            requires: ["rate_limit_middleware"],
+            context: "api_protection"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that public-facing endpoints have rate limiting:
+                1. Check for rate limit middleware
+                2. Verify limits are configured appropriately
+                3. Ensure rate limit headers are returned
+
+                Critical for:
+                - Authentication endpoints
+                - Resource creation endpoints
+                - Search/query endpoints
+            """
+        })
+    }),
+
+    provenance: {
+        source: .SecurityPolicy,
+        confidence_score: 0.85,
+        origin_artifact: "api/rate-limiting-policy.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Public endpoints should have rate limiting",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            import rateLimit from 'express-rate-limit';
+
+            const limiter = rateLimit({
+                windowMs: 15 * 60 * 1000,  // 15 minutes
+                max: 100,  // Limit each IP to 100 requests per window
+                message: 'Too many requests, please try again later',
+                standardHeaders: true,
+                legacyHeaders: false
+            });
+
+            // Apply to all routes
+            app.use('/api/', limiter);
+
+            // Or specific routes
+            router.post('/auth/login', strictLimiter, loginHandler);
+        """
+    },
+
+    metadata: {
+        "category": "security",
+        "owasp": "A04:2021-Insecure-Design"
+    }
+}
+
+-- CORS configuration
+constraint configure_cors {
+    id: "api-007",
+    name: "configure_cors",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (import_statement
+                source: (string) @pkg
+            )
+            where @pkg contains "cors"
+        },
+        action: .Require({
+            must_have: ["origin_configuration"],
+            message: "CORS must specify allowed origins, not use wildcard"
+        }),
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .SecurityPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "api/cors-policy.md"
+    },
+
+    failure_mode: .Warn({
+        message: "CORS should be configured with specific origins",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            import cors from 'cors';
+
+            // Good: Specific origins
+            app.use(cors({
+                origin: ['https://app.example.com', 'https://admin.example.com'],
+                credentials: true,
+                methods: ['GET', 'POST', 'PUT', 'DELETE'],
+                allowedHeaders: ['Content-Type', 'Authorization']
+            }));
+
+            // Bad: Wildcard (security risk)
+            // app.use(cors({ origin: '*' }));
+        """
+    },
+
+    metadata: {
+        "category": "security",
+        "owasp": "A05:2021-Security-Misconfiguration"
+    }
+}
+
+-- Response schema consistency
+constraint consistent_response_schema {
+    id: "api-008",
+    name: "consistent_response_schema",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "api_response",
+            requires: ["standard_envelope"],
+            context: "response_format"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify consistent response structure:
+
+                Success responses:
+                {
+                    "data": <payload>,
+                    "metadata": { ... }
+                }
+
+                Error responses:
+                {
+                    "error": {
+                        "code": "ERROR_CODE",
+                        "message": "Human readable message",
+                        "details": { ... }
+                    }
+                }
+
+                Consistency helps client code and documentation.
+            """
+        })
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.75,
+        origin_artifact: "api/response-format-guide.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Use consistent response envelope structure",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            // Success response helper
+            function successResponse(data: any, metadata?: any) {
+                return {
+                    data,
+                    metadata: metadata || {}
+                };
+            }
+
+            // Error response helper
+            function errorResponse(code: string, message: string, details?: any) {
+                return {
+                    error: {
+                        code,
+                        message,
+                        details: details || {}
+                    }
+                };
+            }
+
+            // Usage
+            res.json(successResponse(users, { page: 1, total: 100 }));
+            res.status(400).json(errorResponse('INVALID_INPUT', 'Email is required'));
+        """
+    }
+}
+
+-- API documentation
+constraint require_api_documentation {
+    id: "api-009",
+    name: "require_api_documentation",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (export_statement
+                declaration: (function_declaration
+                    name: (identifier) @fn_name
+                )
+            )
+            where not (comment
+                (jsdoc) @doc
+                where @doc contains "@api"
+                or @doc contains "@route"
+                or @doc contains "@openapi"
+            )
+        },
+        action: .Warn,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.70,
+        origin_artifact: "api/documentation-standards.md"
+    },
+
+    failure_mode: .Warn({
+        message: "API endpoints should have documentation comments",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            /**
+             * Create a new user
+             *
+             * @route POST /v1/users
+             * @param {CreateUserRequest} req.body - User creation data
+             * @returns {User} 201 - Created user object
+             * @returns {Error} 400 - Validation error
+             * @returns {Error} 409 - User already exists
+             *
+             * @example
+             * POST /v1/users
+             * {
+             *   "email": "user@example.com",
+             *   "username": "johndoe",
+             *   "password": "SecurePass123"
+             * }
+             */
+            export async function createUser(req: Request, res: Response) {
+                // Implementation
+            }
+        """
+    }
+}
+
+-- Idempotency for mutations
+constraint require_idempotency {
+    id: "api-010",
+    name: "require_idempotency",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "mutation_endpoint",
+            requires: ["idempotency_key"],
+            context: "post_put_patch"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that mutation endpoints (POST, PUT, PATCH):
+                1. Accept Idempotency-Key header
+                2. Track processed keys
+                3. Return same response for duplicate keys
+                4. Clean up old keys after TTL
+
+                Critical for:
+                - Payment processing
+                - Order creation
+                - Account modifications
+            """
+        })
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.80,
+        origin_artifact: "api/idempotency-guide.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Mutation endpoints should support idempotency keys",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            router.post('/orders', async (req, res) => {
+                const idempotencyKey = req.headers['idempotency-key'];
+
+                if (idempotencyKey) {
+                    // Check if we've seen this key
+                    const cached = await redis.get(`idempotency:${idempotencyKey}`);
+                    if (cached) {
+                        return res.json(JSON.parse(cached));
+                    }
+                }
+
+                // Process the request
+                const order = await createOrder(req.body);
+
+                if (idempotencyKey) {
+                    // Cache the result
+                    await redis.setex(
+                        `idempotency:${idempotencyKey}`,
+                        86400,  // 24 hour TTL
+                        JSON.stringify(order)
+                    );
+                }
+
+                res.status(201).json(order);
+            });
+        """
+    },
+
+    metadata: {
+        "category": "reliability",
+        "ttl": "24_hours"
+    }
+}

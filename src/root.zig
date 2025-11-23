@@ -27,7 +27,7 @@ pub const Ananke = struct {
             .allocator = allocator,
             .clew_engine = try clew.Clew.init(allocator),
             .braid_engine = try braid.Braid.init(allocator),
-            .ariadne_compiler = ariadne.AriadneCompiler.init(allocator),
+            .ariadne_compiler = try ariadne.AriadneCompiler.init(allocator),
         };
     }
 

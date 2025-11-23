@@ -149,35 +149,90 @@ result = await maze.generate(
 ## Installation
 
 ### Prerequisites
-- Zig 0.15.1+
+- Zig 0.15.1+ (for building from source)
+- Rust 1.70+ (for Maze library)
 - For generation: GPU infrastructure (Modal, RunPod, or local)
 - Optional: Claude API key for analysis enhancements
 
-### From Source
+### Option 1: Pre-built Binaries (Recommended)
+
+#### macOS (Homebrew)
+```bash
+# Add Ananke tap
+brew tap ananke-project/ananke
+
+# Install
+brew install ananke
+
+# Verify
+ananke --version
+```
+
+#### macOS/Linux (Direct Download)
+```bash
+# Download for your platform
+curl -L https://github.com/ananke-project/ananke/releases/latest/download/ananke-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).tar.gz | tar xz
+
+# Extract and install
+cd ananke-v*-*
+./install.sh
+
+# Or install to custom location
+PREFIX=~/.local ./install.sh
+```
+
+#### Windows
+1. Download the `.zip` file for your architecture from [releases](https://github.com/ananke-project/ananke/releases)
+2. Extract to your desired location
+3. Add the `bin` directory to your PATH
+
+### Option 2: From Source
 
 ```bash
 git clone https://github.com/ananke-ai/ananke.git
 cd ananke
 
-# Build all components
+# Build all components (Zig + Rust)
 zig build
+
+# Build Rust Maze library
+cd maze && cargo build --release && cd ..
 
 # Run tests
 zig build test
+cd maze && cargo test && cd ..
 
 # Build examples
 zig build examples
 ```
 
-### Using as a Library
+### Option 3: Using as a Library
 
-Add to your `build.zig.zon`:
-
+**Zig Library** - Add to your `build.zig.zon`:
 ```zig
 .ananke = .{
     .url = "https://github.com/ananke-ai/ananke/archive/refs/tags/v0.1.0.tar.gz",
     .hash = "12207...",
 },
+```
+
+**Rust Library (Maze)** - Add to your `Cargo.toml`:
+```toml
+[dependencies]
+maze = "0.1.0"
+```
+
+### Verifying Installation
+
+```bash
+# Check Ananke CLI
+ananke --version
+
+# Test constraint extraction
+ananke extract examples/sample.ts
+
+# Check available commands
+ananke help
 ```
 
 ---

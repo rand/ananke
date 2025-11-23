@@ -1,0 +1,493 @@
+-- Database Query and Transaction Constraints
+-- Defines patterns for safe database operations
+
+module database.patterns
+
+import std.{clew, braid}
+
+-- All database queries must use parameterized statements
+constraint require_parameterized_queries {
+    id: "db-001",
+    name: "require_parameterized_queries",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (call_expression
+                function: (member_expression
+                    property: (property_identifier) @method
+                )
+                arguments: (arguments
+                    (template_string) @query_str
+                )
+            )
+            where @method in ["query", "execute", "raw", "exec"]
+            and @query_str contains "${" or "${"
+        },
+        action: .Forbid,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "database/sql-injection-prevention.md",
+        created_by: "security-team",
+        created_at: "2024-01-15T00:00:00Z"
+    },
+
+    failure_mode: .HardBlock,
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            // Use parameterized query instead
+            const result = await db.query(
+                'SELECT * FROM users WHERE id = ?',
+                [userId]
+            );
+        """,
+        explanation: "String interpolation in SQL queries enables SQL injection. Use parameterized queries."
+    },
+
+    metadata: {
+        "category": "security",
+        "severity": "critical",
+        "owasp": "A03:2021-Injection"
+    }
+}
+
+-- Database transactions must handle rollback
+constraint require_transaction_rollback {
+    id: "db-002",
+    name: "require_transaction_rollback",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "transaction_block",
+            requires: ["error_handler", "rollback_call"],
+            context: "database_operations"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that database transactions:
+                1. Are wrapped in try-catch blocks
+                2. Call rollback() in error handlers
+                3. Call commit() on success
+                4. Have proper cleanup in finally blocks
+            """
+        })
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.95,
+        origin_artifact: "database/transaction-patterns.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Transaction missing rollback handler",
+        severity: .High
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            const transaction = await db.transaction();
+            try {
+                // Transaction operations
+                await transaction.commit();
+            } catch (error) {
+                await transaction.rollback();
+                throw error;
+            }
+        """
+    }
+}
+
+-- N+1 query prevention
+constraint prevent_n_plus_one {
+    id: "db-003",
+    name: "prevent_n_plus_one",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "loop_with_query",
+            forbids: ["database_query_in_loop"],
+            context: "performance"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Detect N+1 query patterns:
+                1. Database queries inside for/while loops
+                2. Queries inside map/forEach/filter operations
+                3. Repeated queries for related data
+
+                Suggest using:
+                - JOIN operations
+                - Eager loading with include/populate
+                - Batch loading with DataLoader
+            """
+        })
+    }),
+
+    provenance: {
+        source: .PerformanceAnalysis,
+        confidence_score: 0.90,
+        origin_artifact: "performance/query-optimization.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Potential N+1 query detected",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            // Instead of querying in loop:
+            // for (const user of users) {
+            //     const posts = await db.query('SELECT * FROM posts WHERE user_id = ?', [user.id]);
+            // }
+
+            // Use JOIN or eager loading:
+            const users = await db.query(`
+                SELECT u.*, p.*
+                FROM users u
+                LEFT JOIN posts p ON p.user_id = u.id
+            `);
+        """
+    },
+
+    metadata: {
+        "category": "performance",
+        "impact": "high",
+        "difficulty": "medium"
+    }
+}
+
+-- Connection pooling required
+constraint require_connection_pooling {
+    id: "db-004",
+    name: "require_connection_pooling",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (new_expression
+                constructor: (identifier) @class
+                arguments: (arguments
+                    (object) @config
+                )
+            )
+            where @class matches "Client|Connection|Database"
+            and not @config contains "pool"
+        },
+        action: .Warn,
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.85,
+        origin_artifact: "database/connection-management.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Database client should use connection pooling",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            const pool = new Pool({
+                host: process.env.DB_HOST,
+                database: process.env.DB_NAME,
+                max: 20,  // Maximum pool size
+                idleTimeoutMillis: 30000,
+                connectionTimeoutMillis: 2000,
+            });
+        """
+    }
+}
+
+-- Query timeout enforcement
+constraint enforce_query_timeout {
+    id: "db-005",
+    name: "enforce_query_timeout",
+
+    enforcement: .Type({
+        signature: {
+            functions: {
+                "query": fn(sql: string, params: any[], options?: { timeout: number }) -> Promise<Result>,
+                "execute": fn(sql: string, params: any[], options?: { timeout: number }) -> Promise<Result>
+            }
+        },
+        strictness: .Lenient,
+        system: .Structural
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "database/query-performance.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Long-running queries should have timeout configured",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            // Add timeout to prevent long-running queries
+            const result = await db.query(sql, params, {
+                timeout: 5000  // 5 second timeout
+            });
+        """
+    },
+
+    metadata: {
+        "category": "performance",
+        "recommended_timeout": "5000ms"
+    }
+}
+
+-- Migration versioning
+constraint require_migration_versioning {
+    id: "db-006",
+    name: "require_migration_versioning",
+
+    enforcement: .Structural({
+        pattern: query(typescript) {
+            (export_statement
+                declaration: (class_declaration
+                    name: (type_identifier) @class_name
+                )
+            )
+            where @class_name contains "Migration"
+        },
+        action: .Require({
+            must_have: ["up", "down", "version"],
+            message: "Migrations must have up(), down(), and version"
+        }),
+        language: "typescript"
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 1.0,
+        origin_artifact: "database/migration-standards.md"
+    },
+
+    failure_mode: .HardBlock,
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            export class Migration_YYYYMMDD_Description {
+                version = 'YYYYMMDD_HHMMSS';
+
+                async up(db: Database): Promise<void> {
+                    // Apply migration
+                }
+
+                async down(db: Database): Promise<void> {
+                    // Rollback migration
+                }
+            }
+        """
+    }
+}
+
+-- Index on foreign keys
+constraint require_foreign_key_indexes {
+    id: "db-007",
+    name: "require_foreign_key_indexes",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "foreign_key_definition",
+            requires: ["index_definition"],
+            context: "schema_definition"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Verify that all foreign key columns have indexes:
+                1. Check for FOREIGN KEY constraints
+                2. Ensure corresponding INDEX exists
+                3. Warn if foreign key lacks index (performance issue)
+
+                Foreign keys without indexes cause slow JOIN operations.
+            """
+        })
+    }),
+
+    provenance: {
+        source: .PerformanceAnalysis,
+        confidence_score: 0.85,
+        origin_artifact: "database/indexing-best-practices.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Foreign key column should have an index",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            -- Add index for foreign key
+            CREATE INDEX idx_table_foreign_key_id
+            ON table_name(foreign_key_id);
+        """
+    },
+
+    metadata: {
+        "category": "performance",
+        "impact": "high_on_joins"
+    }
+}
+
+-- Prevent SELECT *
+constraint discourage_select_star {
+    id: "db-008",
+    name: "discourage_select_star",
+
+    enforcement: .Structural({
+        pattern: query(sql) {
+            (select_statement
+                (select_clause
+                    (asterisk) @star
+                )
+            )
+        },
+        action: .Warn,
+        language: "sql"
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.75,
+        origin_artifact: "database/query-optimization.md"
+    },
+
+    failure_mode: .Warn({
+        message: "SELECT * is inefficient. Specify columns explicitly.",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Suggest,
+        template: """
+            -- Instead of:
+            -- SELECT * FROM users
+
+            -- Use explicit columns:
+            SELECT id, email, username, created_at FROM users
+        """,
+        explanation: "SELECT * fetches unnecessary data, wastes bandwidth, and breaks when schema changes."
+    },
+
+    metadata: {
+        "category": "best_practice",
+        "auto_fix": false
+    }
+}
+
+-- Soft delete pattern
+constraint enforce_soft_delete {
+    id: "db-009",
+    name: "enforce_soft_delete",
+
+    enforcement: .Semantic({
+        rule: {
+            pattern: "delete_operation",
+            transforms_to: "soft_delete",
+            context: "data_retention"
+        },
+        reasoning: .LLM({
+            model: "claude-3-5-sonnet-20241022",
+            prompt: """
+                Enforce soft delete pattern:
+                1. DELETE operations should set deleted_at timestamp
+                2. Queries should filter WHERE deleted_at IS NULL
+                3. Permanent deletion requires explicit force flag
+
+                This preserves data for auditing and recovery.
+            """
+        })
+    }),
+
+    provenance: {
+        source: .ManualPolicy,
+        confidence_score: 0.90,
+        origin_artifact: "database/data-retention-policy.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Consider using soft delete instead of hard delete",
+        severity: .Medium
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            // Instead of:
+            // await db.query('DELETE FROM users WHERE id = ?', [userId]);
+
+            // Use soft delete:
+            await db.query(
+                'UPDATE users SET deleted_at = NOW() WHERE id = ?',
+                [userId]
+            );
+        """
+    },
+
+    metadata: {
+        "category": "data_retention",
+        "gdpr_relevant": true
+    }
+}
+
+-- Timestamp columns required
+constraint require_timestamp_columns {
+    id: "db-010",
+    name: "require_timestamp_columns",
+
+    enforcement: .Structural({
+        pattern: query(sql) {
+            (create_table_statement
+                (table_name) @table
+                (column_definitions) @cols
+            )
+            where not @cols contains "created_at"
+            or not @cols contains "updated_at"
+        },
+        action: .Warn,
+        language: "sql"
+    }),
+
+    provenance: {
+        source: .BestPractice,
+        confidence_score: 0.85,
+        origin_artifact: "database/schema-standards.md"
+    },
+
+    failure_mode: .Warn({
+        message: "Tables should have created_at and updated_at columns",
+        severity: .Low
+    }),
+
+    repair: {
+        method: .Synthesize,
+        template: """
+            -- Add timestamp columns to table
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        """
+    }
+}
