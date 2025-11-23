@@ -1,0 +1,189 @@
+{
+  "constraints": [
+    {
+      "id": "perf-001",
+      "kind": "operational",
+      "name": "require_pagination",
+      "description": "List endpoints must implement pagination to prevent unbounded queries",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "endpoints returning collections must accept page/limit parameters"
+      },
+      "examples": {
+        "good": [
+          "const limit = Math.min(req.query.limit || 20, 100);",
+          "const offset = (page - 1) * limit;",
+          "SELECT * FROM users LIMIT ? OFFSET ?"
+        ],
+        "bad": [
+          "SELECT * FROM users  // No limit",
+          "return await db.users.findAll();  // Unbounded"
+        ]
+      },
+      "recommended_values": {
+        "default_limit": 20,
+        "max_limit": 100
+      }
+    },
+    {
+      "id": "perf-002",
+      "kind": "operational",
+      "name": "prevent_n_plus_one",
+      "description": "Avoid N+1 query patterns by using eager loading or joins",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "detect database queries inside loops and suggest batch loading"
+      },
+      "examples": {
+        "good": [
+          "const users = await db.query('SELECT u.*, p.* FROM users u LEFT JOIN posts p ON p.user_id = u.id');",
+          "const posts = await Post.findAll({ include: [User] });"
+        ],
+        "bad": [
+          "for (const user of users) { const posts = await db.query('SELECT * FROM posts WHERE user_id = ?', [user.id]); }",
+          "users.map(async u => await getPosts(u.id))"
+        ]
+      }
+    },
+    {
+      "id": "perf-003",
+      "kind": "operational",
+      "name": "use_connection_pooling",
+      "description": "Database clients should use connection pooling for efficiency",
+      "severity": "warning",
+      "pattern": {
+        "type": "structural",
+        "rule": "database initialization should configure connection pool"
+      },
+      "examples": {
+        "good": [
+          "const pool = new Pool({ max: 20, idleTimeoutMillis: 30000 });",
+          "const db = createConnection({ poolSize: 10 });"
+        ],
+        "bad": [
+          "const db = new Client({ ... });  // No pooling",
+          "await new Connection().connect();  // Single connection"
+        ]
+      },
+      "recommended_values": {
+        "min_pool_size": 5,
+        "max_pool_size": 20,
+        "idle_timeout_ms": 30000
+      }
+    },
+    {
+      "id": "perf-004",
+      "kind": "operational",
+      "name": "implement_caching",
+      "description": "Frequently accessed data should be cached to reduce database load",
+      "severity": "hint",
+      "pattern": {
+        "type": "semantic",
+        "rule": "hot paths should check cache before database"
+      },
+      "examples": {
+        "good": [
+          "const cached = await cache.get(key); if (cached) return cached;",
+          "const data = await cache.wrap(key, () => db.query(...));"
+        ],
+        "bad": [
+          "return await db.query(...);  // Always hits database"
+        ]
+      },
+      "recommended_values": {
+        "default_ttl_seconds": 300,
+        "hot_data_ttl_seconds": 60
+      }
+    },
+    {
+      "id": "perf-005",
+      "kind": "operational",
+      "name": "set_query_timeout",
+      "description": "Database queries should have timeouts to prevent hanging requests",
+      "severity": "warning",
+      "pattern": {
+        "type": "structural",
+        "rule": "long-running queries should specify timeout option"
+      },
+      "examples": {
+        "good": [
+          "db.query(sql, params, { timeout: 5000 })",
+          "await Promise.race([query(), timeout(5000)])"
+        ],
+        "bad": [
+          "await db.query(sql);  // No timeout",
+          "while (true) { await fetchData(); }  // Can hang forever"
+        ]
+      },
+      "recommended_values": {
+        "default_timeout_ms": 5000,
+        "max_timeout_ms": 30000
+      }
+    },
+    {
+      "id": "perf-006",
+      "kind": "operational",
+      "name": "batch_operations",
+      "description": "Multiple operations should be batched when possible",
+      "severity": "hint",
+      "pattern": {
+        "type": "semantic",
+        "rule": "multiple database operations can be combined into batch operations"
+      },
+      "examples": {
+        "good": [
+          "await db.query('INSERT INTO users VALUES ?', [users]);",
+          "await Promise.all(operations);"
+        ],
+        "bad": [
+          "for (const user of users) await db.insert(user);  // Individual inserts"
+        ]
+      }
+    },
+    {
+      "id": "perf-007",
+      "kind": "operational",
+      "name": "use_indexes",
+      "description": "Foreign keys and frequently queried columns should have indexes",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "columns used in WHERE clauses should have indexes"
+      },
+      "examples": {
+        "good": [
+          "CREATE INDEX idx_users_email ON users(email);",
+          "CREATE INDEX idx_orders_customer_id ON orders(customer_id);"
+        ],
+        "bad": [
+          "SELECT * FROM users WHERE email = ?;  // No index on email"
+        ]
+      }
+    },
+    {
+      "id": "perf-008",
+      "kind": "operational",
+      "name": "limit_payload_size",
+      "description": "API responses should limit payload size for large datasets",
+      "severity": "warning",
+      "pattern": {
+        "type": "semantic",
+        "rule": "large collections should use pagination, not return everything"
+      },
+      "examples": {
+        "good": [
+          "const data = results.slice(0, limit);",
+          "res.json({ data: page, hasMore: total > offset + limit });"
+        ],
+        "bad": [
+          "res.json(allUsers);  // Could be millions of records"
+        ]
+      },
+      "recommended_values": {
+        "max_response_size_kb": 1024
+      }
+    }
+  ]
+}
