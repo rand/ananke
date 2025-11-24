@@ -259,6 +259,51 @@ pub fn build(b: *std.Build) void {
 
     const run_pattern_tests = b.addRunArtifact(pattern_tests);
 
+    // Graph algorithm tests for Braid constraint compilation
+    const graph_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/graph_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_graph_tests = b.addRunArtifact(graph_tests);
+
+    // JSON Schema generation tests for Braid
+    const json_schema_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/json_schema_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_json_schema_tests = b.addRunArtifact(json_schema_tests);
+
+    // Grammar generation tests for Braid
+    const grammar_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/grammar_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_grammar_tests = b.addRunArtifact(grammar_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -267,6 +312,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_exe_tests.step);
     test_step.dependOn(&run_clew_tests.step);
     test_step.dependOn(&run_pattern_tests.step);
+    test_step.dependOn(&run_graph_tests.step);
+    test_step.dependOn(&run_json_schema_tests.step);
+    test_step.dependOn(&run_grammar_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
