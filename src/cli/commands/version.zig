@@ -5,8 +5,8 @@ const config_mod = @import("../config.zig");
 const output = @import("../output.zig");
 
 pub const VERSION = "0.1.0";
-pub const BUILD_DATE = "November 2025";
-pub const ZIG_VERSION = "0.15.1";
+pub const BUILD_DATE = "November 24, 2025";
+pub const ZIG_VERSION = "0.15.2";
 
 pub const usage =
     \\Usage: ananke version [options]
