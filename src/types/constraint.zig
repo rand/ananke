@@ -205,6 +205,19 @@ pub const Regex = struct {
     flags: []const u8 = "",
 };
 
+/// Individual token mask rule
+pub const TokenMaskRule = struct {
+    mask_type: MaskType,
+    pattern: []const u8,
+    description: []const u8,
+
+    pub const MaskType = enum {
+        allow_tokens,
+        deny_tokens,
+        require_tokens,
+    };
+};
+
 /// Token masking rules for llguidance
 pub const TokenMaskRules = struct {
     allowed_tokens: ?[]const u32 = null,

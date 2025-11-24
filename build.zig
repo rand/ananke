@@ -304,6 +304,51 @@ pub fn build(b: *std.Build) void {
 
     const run_grammar_tests = b.addRunArtifact(grammar_tests);
 
+    // Regex pattern extraction tests for Braid
+    const regex_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/regex_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_regex_tests = b.addRunArtifact(regex_tests);
+
+    // Constraint operations tests for Braid
+    const constraint_ops_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/constraint_ops_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_constraint_ops_tests = b.addRunArtifact(constraint_ops_tests);
+
+    // Token mask generation tests for Braid
+    const token_mask_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/token_mask_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_token_mask_tests = b.addRunArtifact(token_mask_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -315,6 +360,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_graph_tests.step);
     test_step.dependOn(&run_json_schema_tests.step);
     test_step.dependOn(&run_grammar_tests.step);
+    test_step.dependOn(&run_regex_tests.step);
+    test_step.dependOn(&run_constraint_ops_tests.step);
+    test_step.dependOn(&run_token_mask_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
