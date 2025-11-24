@@ -171,6 +171,41 @@ pub const ConstraintIR = struct {
     /// Priority for conflict resolution
     priority: u32 = 0,
 
+    /// Free all allocated memory in this ConstraintIR
+    pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
+        // Free grammar rules if present
+        if (self.grammar) |grammar| {
+            for (grammar.rules) |rule| {
+                allocator.free(rule.lhs);
+                for (rule.rhs) |rhs_item| {
+                    allocator.free(rhs_item);
+                }
+                allocator.free(rule.rhs);
+            }
+            allocator.free(grammar.rules);
+        }
+
+        // Free regex patterns if present
+        for (self.regex_patterns) |pattern| {
+            allocator.free(pattern.pattern);
+        }
+        if (self.regex_patterns.len > 0) {
+            allocator.free(self.regex_patterns);
+        }
+
+        // Free token masks if present
+        if (self.token_masks) |masks| {
+            if (masks.allowed_tokens) |tokens| {
+                allocator.free(tokens);
+            }
+            if (masks.forbidden_tokens) |tokens| {
+                allocator.free(tokens);
+            }
+        }
+
+        // Note: json_schema cleanup not implemented yet as structure is incomplete
+    }
+
     /// Serialize to format compatible with llguidance
     pub fn serialize(self: ConstraintIR, allocator: std.mem.Allocator) ![]u8 {
         // TODO: Implement serialization to llguidance format

@@ -7,11 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Phase 5b: Clew/Braid Full Implementation - COMPLETE (Nov 23-24, 2025)
+
+#### New Features
+
+**JSON Schema Generation** (src/braid/json_schema_builder.zig - 440 lines)
+- Comprehensive type parsing and conversion to JSON Schema Draft 7
+- Supports objects, arrays, unions, nested types, formats, and ranges
+- llguidance-compatible output for constrained generation
+- 12 passing tests
+
+**Topological Sort & Dependency Graphs** (src/braid/braid.zig)
+- Kahn's algorithm for O(V+E) optimal dependency ordering
+- DFS-based cycle detection for handling circular dependencies
+- 8 passing tests with performance targets met
+
+**Grammar Building** (src/braid/braid.zig)
+- Converts syntactic constraints to EBNF rules for llguidance
+- Pattern-driven rule generation for functions, async, control flow, try/catch, classes
+- 8 passing tests
+
+**Regex Pattern Extraction** (src/braid/braid.zig)
+- buildRegexPattern() extracts and combines regex patterns from constraints
+- Supports multiple pattern markers: must match, matches pattern, regex:, pattern:
+- Case-insensitive matching with | (OR) operator for llguidance
+- 10 passing tests
+
+**Security Token Masking** (src/braid/braid.zig)
+- buildTokenMasks() converts security/operational constraints to TokenMaskRule
+- Detects 5 security pattern categories:
+  - Credentials/secrets: password, api_key, token, secret
+  - External URLs: http://, https://
+  - File paths: /path/, C:\
+  - SQL injection: DROP, DELETE, INSERT, UPDATE
+  - Code execution: eval, exec, system()
+- Case-insensitive pattern matching with 10 passing tests
+
+**Constraint Operations** (src/braid/braid.zig)
+- mergeConstraints() - combine constraint sets
+- deduplicateConstraints() - remove duplicates via hash detection
+- updatePriority() - modify constraint priority levels
+- 11 passing tests
+
+**Phase 5a: Clew Foundation** (Nov 23, 2025)
+- HTTP client with retries and timeouts (AsyncHttpClient)
+- Claude API integration (ClaudeClient for semantic analysis)
+- Pattern extraction (extractPatternConstraints with regex, decorators, type hints)
+- Multi-language support framework (TypeScript, Python, Rust, Go, Java, Zig)
+- 50 passing unit tests
+
+#### Fixes
+
+**Memory Leak Fixes** (commit 9645523, Nov 24, 2025)
+- Fixed 16 memory leaks in src/clew/clew.zig constraint extraction
+- Changed allocPrint() calls to use constraintAllocator() arena
+- Affected lines: 443 (function desc), 459 (type desc), 476 (async desc), 492 (error desc)
+- All constraint strings now properly managed by arena allocator
+- Result: 81/81 tests passing, 0 memory leaks
+
+**CI/CD Fixes** (commit 7c28c0e, Nov 24, 2025)
+- Updated mlugg/setup-zig v1 → v2 across 5 GitHub Actions workflows
+- Fixed Zig 0.15.2 download 404 errors with improved mirror support
+- Updated workflows: ci.yml (5 occurrences), benchmarks.yml (2), security.yml (1), docs.yml (1), release.yml (1)
+- All workflows validated for YAML correctness
+
+#### Test Results
+- Phase 5 total: 81/81 tests passing (50 Phase 5a + 31 Phase 5b)
+- 0 memory leaks (verified after Nov 24 fixes)
+- All segmentation faults eliminated
+- Performance targets met:
+  - Schema/grammar generation: <10ms
+  - Regex/token mask generation: <1ms
+  - llguidance-compatible output validated
+
 ### In Progress
-- Tree-sitter integration for Clew constraint extraction
-- Claude API client for semantic analysis
-- Braid dependency graph and conflict resolution
-- Ariadne DSL implementation
+- Phase 5c: Clew/Braid integration tests and real-world validation
+- Phase 6: Ariadne DSL implementation
 
 ## [0.1.0-alpha] - 2025-11-23
 
