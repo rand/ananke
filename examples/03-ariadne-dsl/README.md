@@ -365,14 +365,80 @@ const result = try maze.generate(intent, constraints);
 
 ## Current Status
 
-Ariadne DSL specification is complete, but the parser/compiler is not yet implemented. This example shows:
+**Parser Implementation: Partial**
 
-- What the DSL looks like
-- How it would be used
-- What output it produces
-- Benefits over alternatives
+The Ariadne parser is under active development. This example demonstrates:
 
-See `/ananke_documentation/ariadne_language_spec.md` for the full language specification.
+- The DSL syntax and structure
+- How constraints are defined declaratively
+- The compilation process (with known limitations)
+- Benefits over alternative approaches
+
+### Expected Behavior
+
+When you run this example, you will see:
+
+```
+=== Ananke Example 03: Ariadne DSL ===
+
+=== Loaded Ariadne DSL Files ===
+1. api_security.ariadne (7020 bytes)
+2. type_safety.ariadne (3072 bytes)
+3. performance.ariadne (3364 bytes)
+
+=== Compiling Ariadne to ConstraintIR ===
+
+Parsing type_safety.ariadne...
+Parse error at line 4, col 13: Expected module, import, constraint, or pub declaration
+```
+
+**This is expected behavior**. The parser currently handles:
+- Module declarations
+- Import statements
+- Basic constraint structure
+- Some enforcement types
+
+The parser does not yet fully support:
+- Complex nested structures
+- All enforcement type variants
+- Full tree-sitter query syntax
+- Repair strategy definitions
+
+### Why Show a Partial Implementation?
+
+This example serves multiple purposes:
+
+1. **Language Preview**: Shows what the Ariadne DSL will look like when complete
+2. **Syntax Reference**: Demonstrates the declarative constraint definition style
+3. **Parser Progress**: Shows how far the implementation has progressed
+4. **Design Validation**: Lets users experiment with DSL syntax
+
+The `.ariadne` files in this directory are valid according to the specification and will parse correctly once the parser implementation is complete.
+
+### Workaround: Use JSON Instead
+
+While Ariadne parser development continues, you can use JSON constraint definitions:
+
+```json
+{
+  "id": "type-001",
+  "name": "no_any_type",
+  "enforcement": {
+    "type": "Type",
+    "forbidden_types": ["any", "unknown"]
+  },
+  "failure_mode": "AutoFix"
+}
+```
+
+See Example 05 (mixed-mode) for JSON constraint examples.
+
+### Full Specification
+
+For the complete Ariadne language specification, see:
+- `/ananke_documentation/ariadne_language_spec.md` - Full language reference
+- `/docs/ARCHITECTURE.md` - System architecture
+- Example 05 - Working JSON constraint definitions
 
 ## Next Steps
 

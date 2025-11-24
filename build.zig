@@ -365,6 +365,22 @@ pub fn build(b: *std.Build) void {
 
     const run_integration_tests = b.addRunArtifact(integration_tests);
 
+    // E2E integration tests for full Zig -> Rust -> Modal pipeline
+    const e2e_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/integration/e2e_pipeline_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_e2e_tests = b.addRunArtifact(e2e_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -380,6 +396,11 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_constraint_ops_tests.step);
     test_step.dependOn(&run_token_mask_tests.step);
     test_step.dependOn(&run_integration_tests.step);
+    test_step.dependOn(&run_e2e_tests.step);
+
+    // E2E test step (can be run separately)
+    const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
+    e2e_test_step.dependOn(&run_e2e_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
