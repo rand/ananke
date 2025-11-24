@@ -582,24 +582,34 @@ const zig_async_patterns = [_]PatternRule{
 
 const zig_error_patterns = [_]PatternRule{
     .{
+        .pattern = "error{",
+        .constraint_kind = .semantic,
+        .description = "error set definition",
+    },
+    .{
+        .pattern = "Error!",
+        .constraint_kind = .semantic,
+        .description = "error union type",
+    },
+    .{
         .pattern = "try ",
         .constraint_kind = .semantic,
-        .description = "Try expression",
+        .description = "try expression",
     },
     .{
         .pattern = "catch",
         .constraint_kind = .semantic,
-        .description = "Catch expression",
+        .description = "catch expression",
     },
     .{
         .pattern = "error.",
         .constraint_kind = .semantic,
-        .description = "Error value",
+        .description = "error value",
     },
     .{
         .pattern = "errdefer",
         .constraint_kind = .semantic,
-        .description = "Error defer",
+        .description = "errdefer statement",
     },
 };
 
