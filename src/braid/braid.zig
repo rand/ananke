@@ -339,17 +339,27 @@ pub const Braid = struct {
         const sorted_indices = try graph.topologicalSort();
         defer self.allocator.free(sorted_indices);
 
-        // Mark critical path constraints
+        // First, map constraint priority enum to u32 values
+        for (graph.nodes.items) |*node| {
+            node.priority = switch (node.constraint.priority) {
+                .Critical => 100,
+                .High => 75,
+                .Medium => 50,
+                .Low => 25,
+            };
+        }
+
+        // Then boost priority for error severity constraints
         for (graph.nodes.items) |*node| {
             if (node.constraint.severity == .err) {
-                node.priority = 1000;
+                node.priority += 1000;
             }
         }
 
         // Update node priorities based on topological order
         for (sorted_indices, 0..) |node_idx, order| {
             if (node_idx < graph.nodes.items.len) {
-                graph.nodes.items[node_idx].priority = @as(u32, @intCast(order));
+                graph.nodes.items[node_idx].priority += @as(u32, @intCast(order));
             }
         }
     }
