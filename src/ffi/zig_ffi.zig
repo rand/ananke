@@ -137,22 +137,39 @@ export fn ananke_extract_constraints(
 /// Compile constraints to ConstraintIR
 ///
 /// # Parameters
-/// - constraints: Array of constraint descriptions (JSON format)
-/// - constraints_len: Number of constraints
+/// - constraints_json: JSON string containing array of constraints
 /// - out_ir: Output pointer for ConstraintIR
 ///
 /// # Returns
 /// Error code (0 = success)
+///
+/// # JSON Format
+/// Expected format is an array of constraint objects:
+/// [
+///   {
+///     "id": 1,
+///     "kind": "type_safety",
+///     "name": "use_camelCase",
+///     "description": "Functions must use camelCase naming",
+///     "severity": "error",
+///     "priority": "high"
+///   }
+/// ]
 export fn ananke_compile_constraints(
-    constraints: [*:0]const u8,
+    constraints_json: [*:0]const u8,
     out_ir: *?*ConstraintIRFFI,
 ) callconv(.c) c_int {
     if (out_ir.* != null) {
         return @intFromEnum(AnankeError.InvalidInput);
     }
 
-    const constraints_slice = std.mem.span(constraints);
-    _ = constraints_slice;
+    const json_slice = std.mem.span(constraints_json);
+
+    // Parse JSON constraints
+    var constraint_set = parseConstraintsJson(gpa, json_slice) catch {
+        return @intFromEnum(AnankeError.InvalidInput);
+    };
+    defer constraint_set.deinit();
 
     // Initialize Braid
     var braid = Braid.init(gpa) catch {
@@ -160,33 +177,233 @@ export fn ananke_compile_constraints(
     };
     defer braid.deinit();
 
-    // TODO: Parse JSON constraints and compile
-    // For now, return a placeholder IR
-
-    const ir_ffi = gpa.create(ConstraintIRFFI) catch {
-        return @intFromEnum(AnankeError.AllocationFailure);
+    // Use the public compile method which handles all compilation steps
+    const ir = braid.compile(constraint_set.constraints.items) catch {
+        return @intFromEnum(AnankeError.CompilationFailed);
     };
 
-    const name_buf = gpa.allocSentinel(u8, 32, 0) catch {
-        gpa.destroy(ir_ffi);
-        return @intFromEnum(AnankeError.AllocationFailure);
+    // Convert ConstraintIR to FFI-compatible format
+    const ir_ffi = convertIRToFFI(gpa, ir) catch |err| {
+        // Clean up IR before returning error
+        var mutable_ir = ir;
+        mutable_ir.deinit(gpa);
+        return switch (err) {
+            error.OutOfMemory => @intFromEnum(AnankeError.AllocationFailure),
+            else => @intFromEnum(AnankeError.CompilationFailed),
+        };
     };
 
-    _ = std.fmt.bufPrint(name_buf, "compiled_ir", .{}) catch "compiled";
-
-    ir_ffi.* = .{
-        .json_schema = null,
-        .grammar = null,
-        .regex_patterns = null,
-        .regex_patterns_len = 0,
-        .token_masks = null,
-        .priority = 100,
-        .name = name_buf.ptr,
-    };
+    // Clean up original IR (data has been copied to FFI struct)
+    var mutable_ir = ir;
+    mutable_ir.deinit(gpa);
 
     out_ir.* = ir_ffi;
     return @intFromEnum(AnankeError.Success);
 }
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Parse JSON constraint array into ConstraintSet
+fn parseConstraintsJson(
+    allocator: std.mem.Allocator,
+    json_str: []const u8,
+) !ConstraintSet {
+    const parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        allocator,
+        json_str,
+        .{},
+    );
+    defer parsed.deinit();
+
+    // JSON can be either an array or an object with "constraints" field
+    const constraints_array = if (parsed.value == .array)
+        parsed.value.array
+    else if (parsed.value == .object)
+        if (parsed.value.object.get("constraints")) |c|
+            c.array
+        else
+            return error.InvalidJson
+    else
+        return error.InvalidJson;
+
+    var constraint_set = ConstraintSet.init(
+        allocator,
+        try allocator.dupe(u8, "ffi_constraints"),
+    );
+
+    for (constraints_array.items) |constraint_value| {
+        const constraint_obj = constraint_value.object;
+
+        const kind_str = constraint_obj.get("kind").?.string;
+        const severity_str = constraint_obj.get("severity").?.string;
+        const constraint_name = constraint_obj.get("name").?.string;
+        const description = constraint_obj.get("description").?.string;
+
+        const id = if (constraint_obj.get("id")) |id_val|
+            switch (id_val) {
+                .integer => |i| @as(u64, @intCast(i)),
+                else => 0,
+            }
+        else
+            0;
+
+        const kind = parseConstraintKind(kind_str);
+        const severity = parseSeverity(severity_str);
+        const priority = if (constraint_obj.get("priority")) |p|
+            parsePriority(p.string)
+        else
+            root.types.constraint.ConstraintPriority.Medium;
+
+        const constraint = Constraint{
+            .id = id,
+            .kind = kind,
+            .severity = severity,
+            .name = try allocator.dupe(u8, constraint_name),
+            .description = try allocator.dupe(u8, description),
+            .source = .User_Defined,
+            .priority = priority,
+            .confidence = if (constraint_obj.get("confidence")) |c| @floatCast(c.float) else 1.0,
+        };
+
+        try constraint_set.add(constraint);
+    }
+
+    return constraint_set;
+}
+
+fn parseConstraintKind(s: []const u8) root.types.constraint.ConstraintKind {
+    if (std.mem.eql(u8, s, "syntactic")) return .syntactic;
+    if (std.mem.eql(u8, s, "type_safety")) return .type_safety;
+    if (std.mem.eql(u8, s, "semantic")) return .semantic;
+    if (std.mem.eql(u8, s, "architectural")) return .architectural;
+    if (std.mem.eql(u8, s, "operational")) return .operational;
+    if (std.mem.eql(u8, s, "security")) return .security;
+    return .semantic;
+}
+
+fn parseSeverity(s: []const u8) root.types.constraint.Severity {
+    if (std.mem.eql(u8, s, "error") or std.mem.eql(u8, s, "err")) return .err;
+    if (std.mem.eql(u8, s, "warning")) return .warning;
+    if (std.mem.eql(u8, s, "info")) return .info;
+    if (std.mem.eql(u8, s, "hint")) return .hint;
+    return .err;
+}
+
+fn parsePriority(s: []const u8) root.types.constraint.ConstraintPriority {
+    if (std.mem.eql(u8, s, "low")) return .Low;
+    if (std.mem.eql(u8, s, "medium")) return .Medium;
+    if (std.mem.eql(u8, s, "high")) return .High;
+    if (std.mem.eql(u8, s, "critical")) return .Critical;
+    return .Medium;
+}
+
+/// Convert ConstraintIR to C-compatible ConstraintIRFFI
+fn convertIRToFFI(
+    allocator: std.mem.Allocator,
+    ir: ConstraintIR,
+) !*ConstraintIRFFI {
+    const ir_ffi = try allocator.create(ConstraintIRFFI);
+    errdefer allocator.destroy(ir_ffi);
+
+    // Allocate and copy JSON schema if present
+    const json_schema_ptr = if (ir.json_schema) |schema| blk: {
+        const schema_str = try serializeJsonSchema(allocator, schema);
+        errdefer allocator.free(schema_str);
+        break :blk try allocator.dupeZ(u8, schema_str);
+    } else null;
+
+    // Allocate and copy grammar if present
+    const grammar_ptr = if (ir.grammar) |grammar| blk: {
+        const grammar_str = try serializeGrammar(allocator, grammar);
+        errdefer allocator.free(grammar_str);
+        break :blk try allocator.dupeZ(u8, grammar_str);
+    } else null;
+
+    // Allocate and copy regex patterns
+    var regex_ptrs: ?[*][*:0]const u8 = null;
+    var regex_len: usize = 0;
+    if (ir.regex_patterns.len > 0) {
+        const patterns = try allocator.alloc([*:0]const u8, ir.regex_patterns.len);
+        errdefer allocator.free(patterns);
+
+        for (ir.regex_patterns, 0..) |regex, i| {
+            patterns[i] = (try allocator.dupeZ(u8, regex.pattern)).ptr;
+        }
+        regex_ptrs = patterns.ptr;
+        regex_len = patterns.len;
+    }
+
+    // Generate a name for this IR
+    const name_buf = try allocator.allocSentinel(u8, 64, 0);
+    errdefer allocator.free(name_buf);
+    _ = try std.fmt.bufPrint(name_buf, "compiled_ir_p{d}", .{ir.priority});
+
+    ir_ffi.* = .{
+        .json_schema = if (json_schema_ptr) |ptr| ptr.ptr else null,
+        .grammar = if (grammar_ptr) |ptr| ptr.ptr else null,
+        .regex_patterns = regex_ptrs,
+        .regex_patterns_len = regex_len,
+        .token_masks = null, // Token masks not yet implemented for FFI
+        .priority = ir.priority,
+        .name = name_buf.ptr,
+    };
+
+    return ir_ffi;
+}
+
+/// Serialize JsonSchema to JSON string
+fn serializeJsonSchema(
+    allocator: std.mem.Allocator,
+    schema: root.types.constraint.JsonSchema,
+) ![]const u8 {
+    var buf = std.ArrayList(u8){};
+    defer buf.deinit(allocator);
+
+    const writer = buf.writer(allocator);
+    try writer.writeAll("{\"type\":\"");
+    try writer.writeAll(schema.type);
+    try writer.writeAll("\"}");
+
+    return try buf.toOwnedSlice(allocator);
+}
+
+/// Serialize Grammar to JSON string
+fn serializeGrammar(
+    allocator: std.mem.Allocator,
+    grammar: root.types.constraint.Grammar,
+) ![]const u8 {
+    var buf = std.ArrayList(u8){};
+    defer buf.deinit(allocator);
+
+    const writer = buf.writer(allocator);
+    try writer.writeAll("{\"start_symbol\":\"");
+    try writer.writeAll(grammar.start_symbol);
+    try writer.writeAll("\",\"rules\":[");
+
+    for (grammar.rules, 0..) |rule, i| {
+        if (i > 0) try writer.writeAll(",");
+        try writer.writeAll("{\"lhs\":\"");
+        try writer.writeAll(rule.lhs);
+        try writer.writeAll("\",\"rhs\":[");
+        for (rule.rhs, 0..) |rhs_item, j| {
+            if (j > 0) try writer.writeAll(",");
+            try writer.writeAll("\"");
+            try writer.writeAll(rhs_item);
+            try writer.writeAll("\"");
+        }
+        try writer.writeAll("]}");
+    }
+
+    try writer.writeAll("]}");
+    return try buf.toOwnedSlice(allocator);
+}
+
+// ============================================================================
+// Exported Functions
+// ============================================================================
 
 /// Free a ConstraintIR structure
 ///
@@ -248,4 +465,131 @@ test "FFI basic operations" {
 
     // Cleanup
     ananke_deinit();
+}
+
+test "FFI constraint compilation" {
+    const testing = std.testing;
+
+    // Test JSON with constraints
+    const json_constraints =
+        \\[
+        \\  {
+        \\    "id": 1,
+        \\    "kind": "syntactic",
+        \\    "name": "use_camelCase",
+        \\    "description": "Functions must use camelCase naming",
+        \\    "severity": "error",
+        \\    "priority": "high"
+        \\  },
+        \\  {
+        \\    "id": 2,
+        \\    "kind": "type_safety",
+        \\    "name": "explicit_types",
+        \\    "description": "All function parameters must have explicit types",
+        \\    "severity": "error",
+        \\    "priority": "medium"
+        \\  }
+        \\]
+    ;
+
+    // Initialize
+    _ = ananke_init();
+    defer ananke_deinit();
+
+    // Compile constraints
+    var ir_ptr: ?*ConstraintIRFFI = null;
+    const result = ananke_compile_constraints(json_constraints.ptr, &ir_ptr);
+
+    // Check compilation succeeded
+    try testing.expectEqual(@intFromEnum(AnankeError.Success), result);
+    try testing.expect(ir_ptr != null);
+
+    // Verify IR fields
+    if (ir_ptr) |ir| {
+        try testing.expect(ir.name != null);
+        try testing.expect(ir.priority > 0);
+
+        // Clean up
+        ananke_free_constraint_ir(ir);
+    }
+}
+
+test "FFI constraint compilation with invalid JSON" {
+    const testing = std.testing;
+
+    const invalid_json = "{ invalid json }";
+
+    // Initialize
+    _ = ananke_init();
+    defer ananke_deinit();
+
+    // Try to compile invalid JSON
+    var ir_ptr: ?*ConstraintIRFFI = null;
+    const result = ananke_compile_constraints(invalid_json.ptr, &ir_ptr);
+
+    // Should fail with InvalidInput error
+    try testing.expectEqual(@intFromEnum(AnankeError.InvalidInput), result);
+    try testing.expect(ir_ptr == null);
+}
+
+test "FFI constraint compilation produces valid IR components" {
+    const testing = std.testing;
+
+    // Test with constraints that should produce grammar and patterns
+    const json_constraints =
+        \\[
+        \\  {
+        \\    "id": 1,
+        \\    "kind": "syntactic",
+        \\    "name": "function_style",
+        \\    "description": "Functions should use arrow function syntax",
+        \\    "severity": "warning",
+        \\    "priority": "low"
+        \\  },
+        \\  {
+        \\    "id": 2,
+        \\    "kind": "syntactic",
+        \\    "name": "naming",
+        \\    "description": "Variables must match regex: ^[a-z][a-zA-Z0-9]*$",
+        \\    "severity": "error",
+        \\    "priority": "high"
+        \\  }
+        \\]
+    ;
+
+    // Initialize
+    _ = ananke_init();
+    defer ananke_deinit();
+
+    // Compile constraints
+    var ir_ptr: ?*ConstraintIRFFI = null;
+    const result = ananke_compile_constraints(json_constraints.ptr, &ir_ptr);
+
+    try testing.expectEqual(@intFromEnum(AnankeError.Success), result);
+
+    if (ir_ptr) |ir| {
+        defer ananke_free_constraint_ir(ir);
+
+        // Verify we got a name
+        try testing.expect(ir.name != null);
+        if (ir.name) |name| {
+            const name_str = std.mem.span(name);
+            try testing.expect(name_str.len > 0);
+        }
+
+        // Check priority was computed
+        try testing.expect(ir.priority > 0);
+
+        // Grammar should be generated for syntactic constraints
+        if (ir.grammar) |grammar| {
+            const grammar_str = std.mem.span(grammar);
+            try testing.expect(grammar_str.len > 0);
+            try testing.expect(std.mem.indexOf(u8, grammar_str, "start_symbol") != null);
+        }
+
+        // Regex patterns should be extracted
+        if (ir.regex_patterns_len > 0) {
+            try testing.expect(ir.regex_patterns != null);
+        }
+    }
 }

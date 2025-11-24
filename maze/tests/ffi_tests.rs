@@ -3,8 +3,8 @@
 //! Tests the C-compatible FFI layer between Rust and Zig
 
 use maze::ffi::{
-    ConstraintIR, Intent, GenerationResult, RegexPattern, TokenMaskRules,
-    JsonSchema, Grammar, GrammarRule,
+    ConstraintIR, GenerationResult, Grammar, GrammarRule, Intent, JsonSchema, RegexPattern,
+    TokenMaskRules,
 };
 use std::collections::HashMap;
 
@@ -54,9 +54,18 @@ fn test_constraint_ir_ffi_with_regex() {
     unsafe {
         let restored = ConstraintIR::from_ffi(ffi).unwrap();
         assert_eq!(constraint.name, restored.name);
-        assert_eq!(constraint.regex_patterns.len(), restored.regex_patterns.len());
-        assert_eq!(constraint.regex_patterns[0].pattern, restored.regex_patterns[0].pattern);
-        assert_eq!(constraint.regex_patterns[1].pattern, restored.regex_patterns[1].pattern);
+        assert_eq!(
+            constraint.regex_patterns.len(),
+            restored.regex_patterns.len()
+        );
+        assert_eq!(
+            constraint.regex_patterns[0].pattern,
+            restored.regex_patterns[0].pattern
+        );
+        assert_eq!(
+            constraint.regex_patterns[1].pattern,
+            restored.regex_patterns[1].pattern
+        );
         maze::ffi::free_constraint_ir_ffi(ffi);
     }
 }
@@ -173,12 +182,10 @@ fn test_constraint_ir_ffi_complex() {
             rules: vec![],
             start_symbol: "S".to_string(),
         }),
-        regex_patterns: vec![
-            RegexPattern {
-                pattern: r".*".to_string(),
-                flags: String::new(),
-            },
-        ],
+        regex_patterns: vec![RegexPattern {
+            pattern: r".*".to_string(),
+            flags: String::new(),
+        }],
         token_masks: Some(TokenMaskRules {
             allowed_tokens: Some(vec![10, 20]),
             forbidden_tokens: None,
@@ -200,19 +207,19 @@ fn test_constraint_ir_ffi_complex() {
 
 #[test]
 fn test_intent_from_ffi_minimal() {
-    use std::ffi::CString;
     use maze::ffi::IntentFFI;
-    
+    use std::ffi::CString;
+
     let raw_input = CString::new("implement auth").unwrap();
     let prompt = CString::new("implement auth handler").unwrap();
-    
+
     let intent_ffi = IntentFFI {
         raw_input: raw_input.as_ptr(),
         prompt: prompt.as_ptr(),
         current_file: std::ptr::null(),
         language: std::ptr::null(),
     };
-    
+
     unsafe {
         let intent = Intent::from_ffi(&intent_ffi).unwrap();
         assert_eq!(intent.raw_input, "implement auth");
@@ -224,21 +231,21 @@ fn test_intent_from_ffi_minimal() {
 
 #[test]
 fn test_intent_from_ffi_complete() {
-    use std::ffi::CString;
     use maze::ffi::IntentFFI;
-    
+    use std::ffi::CString;
+
     let raw_input = CString::new("implement auth").unwrap();
     let prompt = CString::new("implement auth handler").unwrap();
     let current_file = CString::new("src/auth.rs").unwrap();
     let language = CString::new("rust").unwrap();
-    
+
     let intent_ffi = IntentFFI {
         raw_input: raw_input.as_ptr(),
         prompt: prompt.as_ptr(),
         current_file: current_file.as_ptr(),
         language: language.as_ptr(),
     };
-    
+
     unsafe {
         let intent = Intent::from_ffi(&intent_ffi).unwrap();
         assert_eq!(intent.raw_input, "implement auth");
@@ -264,10 +271,10 @@ fn test_generation_result_to_ffi_success() {
         assert_eq!((*ffi).tokens_generated, 10);
         assert_eq!((*ffi).generation_time_ms, 100);
         assert!((*ffi).error.is_null());
-        
+
         let code_str = std::ffi::CStr::from_ptr((*ffi).code);
         assert_eq!(code_str.to_str().unwrap(), "fn main() {}");
-        
+
         maze::ffi::free_generation_result_ffi(ffi);
     }
 }
@@ -287,10 +294,10 @@ fn test_generation_result_to_ffi_failure() {
         assert!(!(*ffi).success);
         assert_eq!((*ffi).tokens_generated, 0);
         assert!(!(*ffi).error.is_null());
-        
+
         let error_str = std::ffi::CStr::from_ptr((*ffi).error);
         assert_eq!(error_str.to_str().unwrap(), "Generation failed: timeout");
-        
+
         maze::ffi::free_generation_result_ffi(ffi);
     }
 }
@@ -326,7 +333,7 @@ fn test_multiple_constraints_array() {
 
     // Convert all to FFI
     let ffi_ptrs: Vec<_> = constraints.iter().map(|c| c.to_ffi()).collect();
-    
+
     unsafe {
         // Verify all conversions
         for (i, &ffi_ptr) in ffi_ptrs.iter().enumerate() {
@@ -334,7 +341,7 @@ fn test_multiple_constraints_array() {
             assert_eq!(restored.name, constraints[i].name);
             assert_eq!(restored.priority, constraints[i].priority);
         }
-        
+
         // Cleanup
         for &ffi_ptr in &ffi_ptrs {
             maze::ffi::free_constraint_ir_ffi(ffi_ptr);
@@ -348,23 +355,24 @@ fn test_constraint_ir_serialization() {
         name: "test".to_string(),
         json_schema: None,
         grammar: None,
-        regex_patterns: vec![
-            RegexPattern {
-                pattern: "test".to_string(),
-                flags: "g".to_string(),
-            },
-        ],
+        regex_patterns: vec![RegexPattern {
+            pattern: "test".to_string(),
+            flags: "g".to_string(),
+        }],
         token_masks: None,
         priority: 1,
     };
-    
+
     // Test JSON serialization
     let json = serde_json::to_string(&constraint).unwrap();
     let deserialized: ConstraintIR = serde_json::from_str(&json).unwrap();
-    
+
     assert_eq!(constraint.name, deserialized.name);
     assert_eq!(constraint.priority, deserialized.priority);
-    assert_eq!(constraint.regex_patterns.len(), deserialized.regex_patterns.len());
+    assert_eq!(
+        constraint.regex_patterns.len(),
+        deserialized.regex_patterns.len()
+    );
 }
 
 #[test]
@@ -375,10 +383,10 @@ fn test_intent_serialization() {
         current_file: Some("test.rs".to_string()),
         language: Some("rust".to_string()),
     };
-    
+
     let json = serde_json::to_string(&intent).unwrap();
     let deserialized: Intent = serde_json::from_str(&json).unwrap();
-    
+
     assert_eq!(intent.raw_input, deserialized.raw_input);
     assert_eq!(intent.prompt, deserialized.prompt);
     assert_eq!(intent.current_file, deserialized.current_file);

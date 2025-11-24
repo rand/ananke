@@ -8,8 +8,8 @@
 
 use anyhow::Result;
 use maze::{
-    MazeOrchestrator, ModalConfig, GenerationRequest, GenerationContext,
     ffi::{ConstraintIR, RegexPattern, TokenMaskRules},
+    GenerationContext, GenerationRequest, MazeOrchestrator, ModalConfig,
 };
 use std::collections::HashMap;
 
@@ -77,14 +77,26 @@ async fn main() -> Result<()> {
 
             println!("Metadata:");
             println!("  Tokens: {}", response.metadata.tokens_generated);
-            println!("  Generation time: {}ms", response.metadata.generation_time_ms);
-            println!("  Avg token time: {}μs", response.metadata.avg_token_time_us);
-            println!("  Constraint compile time: {}ms\n", response.metadata.constraint_compile_time_ms);
+            println!(
+                "  Generation time: {}ms",
+                response.metadata.generation_time_ms
+            );
+            println!(
+                "  Avg token time: {}μs",
+                response.metadata.avg_token_time_us
+            );
+            println!(
+                "  Constraint compile time: {}ms\n",
+                response.metadata.constraint_compile_time_ms
+            );
 
             println!("Provenance:");
             println!("  Model: {}", response.provenance.model);
             println!("  Timestamp: {}", response.provenance.timestamp);
-            println!("  Constraints applied: {}", response.provenance.constraints_applied.len());
+            println!(
+                "  Constraints applied: {}",
+                response.provenance.constraints_applied.len()
+            );
 
             println!("\nValidation:");
             println!("  All satisfied: {}", response.validation.all_satisfied);
@@ -119,16 +131,13 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             name: "type_safety".to_string(),
             json_schema: None,
             grammar: None,
-            regex_patterns: vec![
-                RegexPattern {
-                    pattern: r"Result<.*>".to_string(),
-                    flags: String::new(),
-                }
-            ],
+            regex_patterns: vec![RegexPattern {
+                pattern: r"Result<.*>".to_string(),
+                flags: String::new(),
+            }],
             token_masks: None,
             priority: 1,
         },
-
         // Constraint 2: Security - forbid dangerous operations
         ConstraintIR {
             name: "security".to_string(),
@@ -145,33 +154,27 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             }),
             priority: 2,
         },
-
         // Constraint 3: Code style - require documentation
         ConstraintIR {
             name: "documentation".to_string(),
             json_schema: None,
             grammar: None,
-            regex_patterns: vec![
-                RegexPattern {
-                    pattern: r"///.*".to_string(),  // Require doc comments
-                    flags: String::new(),
-                }
-            ],
+            regex_patterns: vec![RegexPattern {
+                pattern: r"///.*".to_string(), // Require doc comments
+                flags: String::new(),
+            }],
             token_masks: None,
             priority: 0,
         },
-
         // Constraint 4: Async handling
         ConstraintIR {
             name: "async_handling".to_string(),
             json_schema: None,
             grammar: None,
-            regex_patterns: vec![
-                RegexPattern {
-                    pattern: r"async\s+fn".to_string(),
-                    flags: String::new(),
-                }
-            ],
+            regex_patterns: vec![RegexPattern {
+                pattern: r"async\s+fn".to_string(),
+                flags: String::new(),
+            }],
             token_masks: None,
             priority: 1,
         },

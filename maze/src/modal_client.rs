@@ -2,7 +2,7 @@
 //!
 //! Handles communication with Modal-hosted vLLM + llguidance inference service
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use url::Url;
@@ -150,8 +150,7 @@ impl ModalClient {
     /// Create a new Modal client
     pub fn new(config: ModalConfig) -> Result<Self> {
         // Parse and validate endpoint URL
-        let base_url = Url::parse(&config.endpoint_url)
-            .context("Invalid Modal endpoint URL")?;
+        let base_url = Url::parse(&config.endpoint_url).context("Invalid Modal endpoint URL")?;
 
         // Build HTTP client with timeout
         let client = reqwest::Client::builder()
@@ -167,7 +166,10 @@ impl ModalClient {
     }
 
     /// Generate code with constraints
-    pub async fn generate_constrained(&self, request: InferenceRequest) -> Result<InferenceResponse> {
+    pub async fn generate_constrained(
+        &self,
+        request: InferenceRequest,
+    ) -> Result<InferenceResponse> {
         let mut attempts = 0;
         let max_attempts = if self.config.enable_retry {
             self.config.max_retries
@@ -182,17 +184,10 @@ impl ModalClient {
                 Ok(response) => return Ok(response),
                 Err(e) => {
                     if attempts >= max_attempts {
-                        return Err(e).context(format!(
-                            "Failed after {} attempts",
-                            attempts
-                        ));
+                        return Err(e).context(format!("Failed after {} attempts", attempts));
                     }
 
-                    tracing::warn!(
-                        "Generation attempt {} failed: {}. Retrying...",
-                        attempts,
-                        e
-                    );
+                    tracing::warn!("Generation attempt {} failed: {}. Retrying...", attempts, e);
 
                     // Exponential backoff
                     let backoff = Duration::from_millis(100 * 2_u64.pow(attempts as u32 - 1));
@@ -205,7 +200,9 @@ impl ModalClient {
     /// Internal generation method
     async fn generate_internal(&self, request: &InferenceRequest) -> Result<InferenceResponse> {
         // Build request URL
-        let url = self.base_url.join("/generate")
+        let url = self
+            .base_url
+            .join("/generate")
             .context("Failed to build request URL")?;
 
         // Build request body
@@ -219,7 +216,8 @@ impl ModalClient {
         });
 
         // Build HTTP request
-        let mut http_request = self.client
+        let mut http_request = self
+            .client
             .post(url)
             .header("Content-Type", "application/json")
             .json(&body);
@@ -239,7 +237,9 @@ impl ModalClient {
         // Check response status
         let status = response.status();
         if !status.is_success() {
-            let error_text = response.text().await
+            let error_text = response
+                .text()
+                .await
                 .unwrap_or_else(|_| "Unable to read error response".to_string());
             return Err(anyhow!(
                 "Modal inference failed with status {}: {}",
@@ -265,10 +265,13 @@ impl ModalClient {
 
     /// Health check for Modal service
     pub async fn health_check(&self) -> Result<bool> {
-        let url = self.base_url.join("/health")
+        let url = self
+            .base_url
+            .join("/health")
             .context("Failed to build health check URL")?;
 
-        let response = self.client
+        let response = self
+            .client
             .get(url)
             .send()
             .await
@@ -279,17 +282,23 @@ impl ModalClient {
 
     /// Get available models from Modal service
     pub async fn list_models(&self) -> Result<Vec<String>> {
-        let url = self.base_url.join("/models")
+        let url = self
+            .base_url
+            .join("/models")
             .context("Failed to build models URL")?;
 
-        let response = self.client
+        let response = self
+            .client
             .get(url)
             .send()
             .await
             .context("Models request failed")?;
 
         if !response.status().is_success() {
-            return Err(anyhow!("Models request failed with status {}", response.status()));
+            return Err(anyhow!(
+                "Models request failed with status {}",
+                response.status()
+            ));
         }
 
         let models: Vec<String> = response

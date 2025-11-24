@@ -4,11 +4,11 @@
 //! Rust Maze orchestration and Zig constraint engines (Clew/Braid)
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
-use std::collections::HashMap;
 
 /// C-compatible ConstraintIR matching Zig definition
 ///
@@ -201,8 +201,10 @@ impl ConstraintIR {
             let schema_str = CStr::from_ptr(ffi_ref.json_schema)
                 .to_str()
                 .map_err(|e| format!("Invalid UTF-8 in JSON schema: {}", e))?;
-            Some(serde_json::from_str(schema_str)
-                .map_err(|e| format!("Invalid JSON schema: {}", e))?)
+            Some(
+                serde_json::from_str(schema_str)
+                    .map_err(|e| format!("Invalid JSON schema: {}", e))?,
+            )
         } else {
             None
         };
@@ -212,18 +214,16 @@ impl ConstraintIR {
             let grammar_str = CStr::from_ptr(ffi_ref.grammar)
                 .to_str()
                 .map_err(|e| format!("Invalid UTF-8 in grammar: {}", e))?;
-            Some(serde_json::from_str(grammar_str)
-                .map_err(|e| format!("Invalid grammar: {}", e))?)
+            Some(serde_json::from_str(grammar_str).map_err(|e| format!("Invalid grammar: {}", e))?)
         } else {
             None
         };
 
         // Convert regex patterns
-        let regex_patterns = if !ffi_ref.regex_patterns.is_null() && ffi_ref.regex_patterns_len > 0 {
-            let patterns_slice = slice::from_raw_parts(
-                ffi_ref.regex_patterns,
-                ffi_ref.regex_patterns_len,
-            );
+        let regex_patterns = if !ffi_ref.regex_patterns.is_null() && ffi_ref.regex_patterns_len > 0
+        {
+            let patterns_slice =
+                slice::from_raw_parts(ffi_ref.regex_patterns, ffi_ref.regex_patterns_len);
 
             patterns_slice
                 .iter()
@@ -248,23 +248,29 @@ impl ConstraintIR {
         let token_masks = if !ffi_ref.token_masks.is_null() {
             let masks_ref = &*ffi_ref.token_masks;
 
-            let allowed_tokens = if !masks_ref.allowed_tokens.is_null() && masks_ref.allowed_tokens_len > 0 {
-                Some(slice::from_raw_parts(
-                    masks_ref.allowed_tokens,
-                    masks_ref.allowed_tokens_len,
-                ).to_vec())
+            let allowed_tokens = if !masks_ref.allowed_tokens.is_null()
+                && masks_ref.allowed_tokens_len > 0
+            {
+                Some(
+                    slice::from_raw_parts(masks_ref.allowed_tokens, masks_ref.allowed_tokens_len)
+                        .to_vec(),
+                )
             } else {
                 None
             };
 
-            let forbidden_tokens = if !masks_ref.forbidden_tokens.is_null() && masks_ref.forbidden_tokens_len > 0 {
-                Some(slice::from_raw_parts(
-                    masks_ref.forbidden_tokens,
-                    masks_ref.forbidden_tokens_len,
-                ).to_vec())
-            } else {
-                None
-            };
+            let forbidden_tokens =
+                if !masks_ref.forbidden_tokens.is_null() && masks_ref.forbidden_tokens_len > 0 {
+                    Some(
+                        slice::from_raw_parts(
+                            masks_ref.forbidden_tokens,
+                            masks_ref.forbidden_tokens_len,
+                        )
+                        .to_vec(),
+                    )
+                } else {
+                    None
+                };
 
             Some(TokenMaskRules {
                 allowed_tokens,
@@ -303,7 +309,8 @@ impl ConstraintIR {
 
         // Allocate regex patterns
         let (regex_patterns, regex_patterns_len) = if !self.regex_patterns.is_empty() {
-            let patterns: Vec<*const c_char> = self.regex_patterns
+            let patterns: Vec<*const c_char> = self
+                .regex_patterns
                 .iter()
                 .map(|p| CString::new(p.pattern.clone()).unwrap().into_raw() as *const c_char)
                 .collect();
@@ -315,18 +322,30 @@ impl ConstraintIR {
         };
 
         // Allocate token masks
-        let token_masks = self.token_masks.as_ref().map(|masks| {
-            Box::into_raw(Box::new(TokenMaskRulesFFI {
-                allowed_tokens: masks.allowed_tokens.as_ref()
-                    .map(|v| Box::into_raw(v.clone().into_boxed_slice()) as *const u32)
-                    .unwrap_or(ptr::null()),
-                allowed_tokens_len: masks.allowed_tokens.as_ref().map(|v| v.len()).unwrap_or(0),
-                forbidden_tokens: masks.forbidden_tokens.as_ref()
-                    .map(|v| Box::into_raw(v.clone().into_boxed_slice()) as *const u32)
-                    .unwrap_or(ptr::null()),
-                forbidden_tokens_len: masks.forbidden_tokens.as_ref().map(|v| v.len()).unwrap_or(0),
-            }))
-        }).unwrap_or(ptr::null_mut());
+        let token_masks = self
+            .token_masks
+            .as_ref()
+            .map(|masks| {
+                Box::into_raw(Box::new(TokenMaskRulesFFI {
+                    allowed_tokens: masks
+                        .allowed_tokens
+                        .as_ref()
+                        .map(|v| Box::into_raw(v.clone().into_boxed_slice()) as *const u32)
+                        .unwrap_or(ptr::null()),
+                    allowed_tokens_len: masks.allowed_tokens.as_ref().map(|v| v.len()).unwrap_or(0),
+                    forbidden_tokens: masks
+                        .forbidden_tokens
+                        .as_ref()
+                        .map(|v| Box::into_raw(v.clone().into_boxed_slice()) as *const u32)
+                        .unwrap_or(ptr::null()),
+                    forbidden_tokens_len: masks
+                        .forbidden_tokens
+                        .as_ref()
+                        .map(|v| v.len())
+                        .unwrap_or(0),
+                }))
+            })
+            .unwrap_or(ptr::null_mut());
 
         Box::into_raw(Box::new(ConstraintIRFFI {
             name: name.into_raw(),
@@ -371,19 +390,23 @@ impl Intent {
         };
 
         let current_file = if !ffi_ref.current_file.is_null() {
-            Some(CStr::from_ptr(ffi_ref.current_file)
-                .to_str()
-                .map_err(|e| format!("Invalid UTF-8 in current_file: {}", e))?
-                .to_string())
+            Some(
+                CStr::from_ptr(ffi_ref.current_file)
+                    .to_str()
+                    .map_err(|e| format!("Invalid UTF-8 in current_file: {}", e))?
+                    .to_string(),
+            )
         } else {
             None
         };
 
         let language = if !ffi_ref.language.is_null() {
-            Some(CStr::from_ptr(ffi_ref.language)
-                .to_str()
-                .map_err(|e| format!("Invalid UTF-8 in language: {}", e))?
-                .to_string())
+            Some(
+                CStr::from_ptr(ffi_ref.language)
+                    .to_str()
+                    .map_err(|e| format!("Invalid UTF-8 in language: {}", e))?
+                    .to_string(),
+            )
         } else {
             None
         };
@@ -401,7 +424,10 @@ impl GenerationResult {
     /// Convert to C FFI representation
     pub fn to_ffi(&self) -> *mut GenerationResultFFI {
         let code = CString::new(self.code.clone()).unwrap();
-        let error = self.error.as_ref().map(|e| CString::new(e.clone()).unwrap());
+        let error = self
+            .error
+            .as_ref()
+            .map(|e| CString::new(e.clone()).unwrap());
 
         Box::into_raw(Box::new(GenerationResultFFI {
             code: code.into_raw(),
@@ -459,10 +485,16 @@ pub unsafe extern "C" fn free_constraint_ir_ffi(ptr: *mut ConstraintIRFFI) {
     if !ffi.token_masks.is_null() {
         let masks = Box::from_raw(ffi.token_masks as *mut TokenMaskRulesFFI);
         if !masks.allowed_tokens.is_null() {
-            let _ = Box::from_raw(slice::from_raw_parts(masks.allowed_tokens, masks.allowed_tokens_len) as *const [u32] as *mut [u32]);
+            let _ = Box::from_raw(core::ptr::slice_from_raw_parts_mut(
+                masks.allowed_tokens as *mut u32,
+                masks.allowed_tokens_len,
+            ));
         }
         if !masks.forbidden_tokens.is_null() {
-            let _ = Box::from_raw(slice::from_raw_parts(masks.forbidden_tokens, masks.forbidden_tokens_len) as *const [u32] as *mut [u32]);
+            let _ = Box::from_raw(core::ptr::slice_from_raw_parts_mut(
+                masks.forbidden_tokens as *mut u32,
+                masks.forbidden_tokens_len,
+            ));
         }
     }
 }
@@ -500,12 +532,10 @@ mod tests {
             name: "test_constraint".to_string(),
             json_schema: None,
             grammar: None,
-            regex_patterns: vec![
-                RegexPattern {
-                    pattern: r"\d+".to_string(),
-                    flags: "g".to_string(),
-                }
-            ],
+            regex_patterns: vec![RegexPattern {
+                pattern: r"\d+".to_string(),
+                flags: "g".to_string(),
+            }],
             token_masks: None,
             priority: 1,
         };
@@ -514,7 +544,10 @@ mod tests {
         unsafe {
             let restored = ConstraintIR::from_ffi(ffi).unwrap();
             assert_eq!(constraint.name, restored.name);
-            assert_eq!(constraint.regex_patterns.len(), restored.regex_patterns.len());
+            assert_eq!(
+                constraint.regex_patterns.len(),
+                restored.regex_patterns.len()
+            );
             free_constraint_ir_ffi(ffi);
         }
     }
