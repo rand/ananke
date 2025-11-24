@@ -12,8 +12,21 @@ cd examples/01-simple-extraction
 zig build run
 
 # Or from the ananke root
-zig build -p examples/01-simple-extraction run
+cd ananke
+./run-example.sh 01-simple-extraction
 ```
+
+**First time?** Start with Example 01 - it requires no setup and runs in under 100ms.
+
+## Quick Reference Table
+
+| Example | Time | Prerequisites | Demonstrates | Complexity | Status |
+|---------|------|---------------|--------------|------------|--------|
+| **01-simple-extraction** | ~100ms | None | Static analysis only | Beginner | Complete |
+| **02-claude-analysis** | ~2s | Claude API key | Semantic understanding | Intermediate | Complete |
+| **03-ariadne-dsl** | ~50ms | None | DSL constraint definitions | Intermediate | Partial |
+| **04-full-pipeline** | ~100ms | None | Extract + Compile pipeline | Advanced | Partial |
+| **05-mixed-mode** | ~200ms | None | Multi-source composition | Advanced | Complete |
 
 ## Examples Overview
 
