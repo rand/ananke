@@ -228,12 +228,45 @@ pub fn build(b: *std.Build) void {
     // A run step that will run the second test executable.
     const run_exe_tests = b.addRunArtifact(exe_tests);
 
+    // Creates test executable for Clew Claude integration tests
+    const clew_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/claude_integration_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "claude", .module = claude_mod },
+            },
+        }),
+    });
+
+    const run_clew_tests = b.addRunArtifact(clew_tests);
+
+    // Pattern extraction tests
+    const pattern_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/pattern_extraction_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+            },
+        }),
+    });
+
+    const run_pattern_tests = b.addRunArtifact(pattern_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
+    test_step.dependOn(&run_clew_tests.step);
+    test_step.dependOn(&run_pattern_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

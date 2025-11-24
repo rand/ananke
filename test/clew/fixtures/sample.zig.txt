@@ -1,0 +1,146 @@
+// Zig Sample File
+// This file tests various Zig patterns for constraint extraction
+
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+// Struct definition
+pub const User = struct {
+    id: u64,
+    name: []const u8,
+    email: []const u8,
+    is_active: bool,
+
+    pub fn init(id: u64, name: []const u8, email: []const u8) User {
+        return .{
+            .id = id,
+            .name = name,
+            .email = email,
+            .is_active = true,
+        };
+    }
+
+    pub fn deinit(self: *User, allocator: Allocator) void {
+        allocator.free(self.name);
+        allocator.free(self.email);
+    }
+};
+
+// Enum definition
+pub const DatabaseError = error{
+    ConnectionFailed,
+    QueryFailed,
+    NotFound,
+    OutOfMemory,
+};
+
+// Union definition
+pub const QueryResult = union(enum) {
+    user: User,
+    users: []User,
+    count: usize,
+    none: void,
+};
+
+// Error union return type
+pub fn getUser(allocator: Allocator, id: u64) !User {
+    if (id == 0) {
+        return DatabaseError.NotFound;
+    }
+
+    const name = try allocator.dupe(u8, "Test User");
+    errdefer allocator.free(name);
+
+    const email = try allocator.dupe(u8, "test@example.com");
+    errdefer allocator.free(email);
+
+    return User.init(id, name, email);
+}
+
+// Optional type
+pub fn findUserByEmail(users: []const User, email: []const u8) ?*const User {
+    for (users) |*user| {
+        if (std.mem.eql(u8, user.email, email)) {
+            return user;
+        }
+    }
+    return null;
+}
+
+// Function with try/catch
+pub fn createUser(allocator: Allocator, name: []const u8, email: []const u8) !User {
+    const name_copy = try allocator.dupe(u8, name);
+    errdefer allocator.free(name_copy);
+
+    const email_copy = try allocator.dupe(u8, email);
+    errdefer allocator.free(email_copy);
+
+    return User{
+        .id = 1,
+        .name = name_copy,
+        .email = email_copy,
+        .is_active = true,
+    };
+}
+
+// Comptime function
+pub fn comptimeMax(comptime a: u32, comptime b: u32) u32 {
+    return if (a > b) a else b;
+}
+
+// Generic function with comptime
+pub fn ArrayList(comptime T: type) type {
+    return struct {
+        items: []T,
+        allocator: Allocator,
+
+        pub fn init(allocator: Allocator) @This() {
+            return .{
+                .items = &.{},
+                .allocator = allocator,
+            };
+        }
+
+        pub fn deinit(self: *@This()) void {
+            self.allocator.free(self.items);
+        }
+
+        pub fn append(self: *@This(), item: T) !void {
+            const new_items = try self.allocator.realloc(self.items, self.items.len + 1);
+            new_items[new_items.len - 1] = item;
+            self.items = new_items;
+        }
+    };
+}
+
+// Public function with defer
+pub fn processUsers(allocator: Allocator, count: usize) ![]User {
+    const users = try allocator.alloc(User, count);
+    errdefer allocator.free(users);
+
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        users[i] = try getUser(allocator, i + 1);
+    }
+
+    return users;
+}
+
+// Function with suspend/resume (async)
+pub fn asyncFetchUser(id: u64) callconv(.Async) !User {
+    suspend {
+        // Simulate async work
+        resume @frame();
+    }
+    return try getUser(std.heap.page_allocator, id);
+}
+
+// Const byte slice patterns
+pub fn parseJson(data: []const u8) !std.json.Parsed(User) {
+    return try std.json.parseFromSlice(User, std.heap.page_allocator, data, .{});
+}
+
+// Mutable byte slice
+pub fn writeUserData(buffer: []u8, user: *const User) ![]u8 {
+    return try std.fmt.bufPrint(buffer, "User: {s} ({s})", .{ user.name, user.email });
+}
