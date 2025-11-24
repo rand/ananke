@@ -93,6 +93,92 @@ pub fn build(b: *std.Build) void {
     ananke_mod.addImport("http", http_mod);
     ananke_mod.addImport("claude", claude_mod);
 
+    // CLI modules (dependent on ananke)
+    const cli_args_mod = b.addModule("cli_args", .{
+        .root_source_file = b.path("src/cli/args.zig"),
+        .target = target,
+    });
+
+    const cli_output_mod = b.addModule("cli_output", .{
+        .root_source_file = b.path("src/cli/output.zig"),
+        .target = target,
+    });
+    cli_output_mod.addImport("ananke", ananke_mod);
+
+    const cli_config_mod = b.addModule("cli_config", .{
+        .root_source_file = b.path("src/cli/config.zig"),
+        .target = target,
+    });
+
+    const cli_error_mod = b.addModule("cli_error", .{
+        .root_source_file = b.path("src/cli/error.zig"),
+        .target = target,
+    });
+    cli_error_mod.addImport("cli_output", cli_output_mod);
+
+    // CLI command modules
+    const cli_extract_mod = b.addModule("cli_extract", .{
+        .root_source_file = b.path("src/cli/commands/extract.zig"),
+        .target = target,
+    });
+    cli_extract_mod.addImport("ananke", ananke_mod);
+    cli_extract_mod.addImport("cli_args", cli_args_mod);
+    cli_extract_mod.addImport("cli_output", cli_output_mod);
+    cli_extract_mod.addImport("cli_config", cli_config_mod);
+    cli_extract_mod.addImport("cli_error", cli_error_mod);
+
+    const cli_compile_mod = b.addModule("cli_compile", .{
+        .root_source_file = b.path("src/cli/commands/compile.zig"),
+        .target = target,
+    });
+    cli_compile_mod.addImport("ananke", ananke_mod);
+    cli_compile_mod.addImport("cli_args", cli_args_mod);
+    cli_compile_mod.addImport("cli_output", cli_output_mod);
+    cli_compile_mod.addImport("cli_config", cli_config_mod);
+    cli_compile_mod.addImport("cli_error", cli_error_mod);
+
+    const cli_generate_mod = b.addModule("cli_generate", .{
+        .root_source_file = b.path("src/cli/commands/generate.zig"),
+        .target = target,
+    });
+    cli_generate_mod.addImport("cli_args", cli_args_mod);
+    cli_generate_mod.addImport("cli_config", cli_config_mod);
+    cli_generate_mod.addImport("cli_error", cli_error_mod);
+
+    const cli_validate_mod = b.addModule("cli_validate", .{
+        .root_source_file = b.path("src/cli/commands/validate.zig"),
+        .target = target,
+    });
+    cli_validate_mod.addImport("ananke", ananke_mod);
+    cli_validate_mod.addImport("cli_args", cli_args_mod);
+    cli_validate_mod.addImport("cli_output", cli_output_mod);
+    cli_validate_mod.addImport("cli_config", cli_config_mod);
+    cli_validate_mod.addImport("cli_error", cli_error_mod);
+
+    const cli_init_mod = b.addModule("cli_init", .{
+        .root_source_file = b.path("src/cli/commands/init.zig"),
+        .target = target,
+    });
+    cli_init_mod.addImport("cli_args", cli_args_mod);
+    cli_init_mod.addImport("cli_config", cli_config_mod);
+    cli_init_mod.addImport("cli_error", cli_error_mod);
+
+    const cli_version_mod = b.addModule("cli_version", .{
+        .root_source_file = b.path("src/cli/commands/version.zig"),
+        .target = target,
+    });
+    cli_version_mod.addImport("cli_args", cli_args_mod);
+    cli_version_mod.addImport("cli_config", cli_config_mod);
+    cli_version_mod.addImport("cli_output", cli_output_mod);
+
+    const cli_help_mod = b.addModule("cli_help", .{
+        .root_source_file = b.path("src/cli/commands/help.zig"),
+        .target = target,
+    });
+    cli_help_mod.addImport("cli_args", cli_args_mod);
+    cli_help_mod.addImport("cli_config", cli_config_mod);
+    cli_help_mod.addImport("cli_output", cli_output_mod);
+
     // Build static library for FFI integration with Rust Maze
     const lib = b.addLibrary(.{
         .name = "ananke",
@@ -146,6 +232,17 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "clew", .module = clew_mod },
                 .{ .name = "braid", .module = braid_mod },
                 .{ .name = "ariadne", .module = ariadne_mod },
+                .{ .name = "cli/args", .module = cli_args_mod },
+                .{ .name = "cli/output", .module = cli_output_mod },
+                .{ .name = "cli/config", .module = cli_config_mod },
+                .{ .name = "cli/error", .module = cli_error_mod },
+                .{ .name = "cli/commands/extract", .module = cli_extract_mod },
+                .{ .name = "cli/commands/compile", .module = cli_compile_mod },
+                .{ .name = "cli/commands/generate", .module = cli_generate_mod },
+                .{ .name = "cli/commands/validate", .module = cli_validate_mod },
+                .{ .name = "cli/commands/init", .module = cli_init_mod },
+                .{ .name = "cli/commands/version", .module = cli_version_mod },
+                .{ .name = "cli/commands/help", .module = cli_help_mod },
             },
         }),
     });
@@ -381,6 +478,38 @@ pub fn build(b: *std.Build) void {
 
     const run_e2e_tests = b.addRunArtifact(e2e_tests);
 
+    // CLI tests
+    const cli_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/cli/cli_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{},
+        }),
+    });
+
+    // Add CLI module imports to CLI tests
+    cli_tests.root_module.addImport("args", b.addModule("cli_args", .{
+        .root_source_file = b.path("src/cli/args.zig"),
+        .target = target,
+    }));
+    cli_tests.root_module.addImport("output", b.addModule("cli_output", .{
+        .root_source_file = b.path("src/cli/output.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "types/constraint", .module = b.addModule("constraint_types", .{
+                .root_source_file = b.path("src/types/constraint.zig"),
+                .target = target,
+            }) },
+        },
+    }));
+    cli_tests.root_module.addImport("config", b.addModule("cli_config", .{
+        .root_source_file = b.path("src/cli/config.zig"),
+        .target = target,
+    }));
+
+    const run_cli_tests = b.addRunArtifact(cli_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -397,10 +526,15 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_token_mask_tests.step);
     test_step.dependOn(&run_integration_tests.step);
     test_step.dependOn(&run_e2e_tests.step);
+    test_step.dependOn(&run_cli_tests.step);
 
     // E2E test step (can be run separately)
     const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
     e2e_test_step.dependOn(&run_e2e_tests.step);
+
+    // CLI test step (can be run separately)
+    const cli_test_step = b.step("test-cli", "Run CLI tests");
+    cli_test_step.dependOn(&run_cli_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
