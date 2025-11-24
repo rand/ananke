@@ -384,6 +384,15 @@ pub const Clew = struct {
         var seen_patterns = std.StringHashMap(void).init(self.allocator);
         defer seen_patterns.deinit();
 
+        // Track allocated keys to free them later
+        var pattern_keys = std.ArrayList([]const u8){};
+        defer {
+            for (pattern_keys.items) |key| {
+                self.allocator.free(key);
+            }
+            pattern_keys.deinit(self.allocator);
+        }
+
         // Convert matches to constraints
         for (matches) |match| {
             // Create unique key for this pattern
@@ -392,13 +401,14 @@ pub const Clew = struct {
                 "{s}_{s}",
                 .{ match.rule.description, @tagName(match.rule.constraint_kind) },
             );
-            defer self.allocator.free(key);
 
             // Skip if we've already seen this pattern type
             if (seen_patterns.contains(key)) {
+                self.allocator.free(key);  // Free immediately if duplicate
                 continue;
             }
             try seen_patterns.put(key, {});
+            try pattern_keys.append(self.allocator, key);  // Track for later cleanup
 
             // Create constraint from pattern match
             const name = try self.constraintAllocator().dupe(u8, match.rule.description);

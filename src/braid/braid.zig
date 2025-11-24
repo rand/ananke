@@ -8,6 +8,8 @@ const Constraint = root.types.constraint.Constraint;
 const ConstraintIR = root.types.constraint.ConstraintIR;
 const ConstraintSet = root.types.constraint.ConstraintSet;
 const ConstraintKind = root.types.constraint.ConstraintKind;
+const ConstraintSource = root.types.constraint.ConstraintSource;
+const ConstraintPriority = root.types.constraint.ConstraintPriority;
 const JsonSchema = root.types.constraint.JsonSchema;
 const Grammar = root.types.constraint.Grammar;
 const GrammarRule = root.types.constraint.GrammarRule;
@@ -944,6 +946,131 @@ pub const Braid = struct {
     }
 };
 
+/// Build token mask rules from security and operational constraints
+pub fn buildTokenMasks(
+    allocator: std.mem.Allocator,
+    constraints: []const Constraint,
+) ![]root.types.constraint.TokenMaskRule {
+    var rules = std.ArrayList(root.types.constraint.TokenMaskRule){};
+
+    // Scan constraints for security or operational kinds
+    for (constraints) |constraint| {
+        if (constraint.kind != .security and constraint.kind != .operational) {
+            continue;
+        }
+
+        const desc_lower = constraint.description;
+
+        // Detect "no credentials" / "no secrets" pattern
+        if (containsAny(desc_lower, &.{ "credential", "secret", "password", "api key", "api_key" })) {
+            // Block common credential patterns
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "password"),
+                .description = try allocator.dupe(u8, "Blocked: password credential"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "api_key"),
+                .description = try allocator.dupe(u8, "Blocked: API key credential"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "token"),
+                .description = try allocator.dupe(u8, "Blocked: token credential"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "secret"),
+                .description = try allocator.dupe(u8, "Blocked: secret credential"),
+            });
+        }
+
+        // Detect "no external URLs" pattern
+        if (containsAny(desc_lower, &.{ "external url", "url", "http" })) {
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "http://"),
+                .description = try allocator.dupe(u8, "Blocked: HTTP URL"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "https://"),
+                .description = try allocator.dupe(u8, "Blocked: HTTPS URL"),
+            });
+        }
+
+        // Detect "no file paths" pattern
+        if (containsAny(desc_lower, &.{ "file path", "path", "filesystem" })) {
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "/path/"),
+                .description = try allocator.dupe(u8, "Blocked: Unix file path"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "C:\\"),
+                .description = try allocator.dupe(u8, "Blocked: Windows file path"),
+            });
+        }
+
+        // Detect "no SQL injection" pattern
+        if (containsAny(desc_lower, &.{ "sql", "injection" })) {
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "DROP"),
+                .description = try allocator.dupe(u8, "Blocked: SQL DROP statement"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "DELETE"),
+                .description = try allocator.dupe(u8, "Blocked: SQL DELETE statement"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "INSERT"),
+                .description = try allocator.dupe(u8, "Blocked: SQL INSERT statement"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "UPDATE"),
+                .description = try allocator.dupe(u8, "Blocked: SQL UPDATE statement"),
+            });
+        }
+
+        // Detect "no code execution" pattern
+        if (containsAny(desc_lower, &.{ "code execution", "exec", "eval" })) {
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "eval"),
+                .description = try allocator.dupe(u8, "Blocked: eval() code execution"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "exec"),
+                .description = try allocator.dupe(u8, "Blocked: exec() code execution"),
+            });
+            try rules.append(allocator, .{
+                .mask_type = .deny_tokens,
+                .pattern = try allocator.dupe(u8, "system("),
+                .description = try allocator.dupe(u8, "Blocked: system() code execution"),
+            });
+        }
+    }
+
+    return try rules.toOwnedSlice(allocator);
+}
+
+/// Helper to check if a string contains any of the given substrings (case-insensitive)
+fn containsAny(haystack: []const u8, needles: []const []const u8) bool {
+    for (needles) |needle| {
+        if (std.ascii.indexOfIgnoreCase(haystack, needle) != null) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Constraint dependency graph
 pub const ConstraintGraph = struct {
     allocator: std.mem.Allocator,
@@ -1152,4 +1279,156 @@ pub fn buildGrammarFromConstraints(
     var braid = try Braid.init(allocator);
     defer braid.deinit();
     return try braid.buildGrammar(constraints);
+}
+
+/// Build a combined regex pattern from constraints containing regex patterns
+/// Returns null if no regex constraints found
+pub fn buildRegexPattern(allocator: std.mem.Allocator, constraints: []const Constraint) !?[]const u8 {
+    var patterns = std.ArrayList([]const u8){};
+    defer patterns.deinit(allocator);
+
+    // Common regex pattern delimiters and markers
+    const regex_markers = [_][]const u8{
+        "must match regex: ",
+        "matches pattern ",
+        "regex: ",
+        "pattern: ",
+    };
+
+    for (constraints) |constraint| {
+        const desc = constraint.description;
+
+        // Try to find and extract regex patterns from the description
+        for (regex_markers) |marker| {
+            if (std.mem.indexOf(u8, desc, marker)) |marker_pos| {
+                const start = marker_pos + marker.len;
+
+                // Find the end of the regex pattern
+                // End at: newline, end of string, or quote marks
+                // Don't break on comma/semicolon as they're part of regex syntax
+                var end = desc.len;
+
+                for (desc[start..], 0..) |char, offset| {
+                    if (char == '\n' or char == '"' or char == '\'' or char == '`') {
+                        end = start + offset;
+                        break;
+                    }
+                }
+
+                if (end > start) {
+                    const raw_pattern = desc[start..end];
+                    // Trim whitespace
+                    const trimmed = std.mem.trim(u8, raw_pattern, " \t\r\n");
+                    if (trimmed.len > 0) {
+                        const pattern_copy = try allocator.dupe(u8, trimmed);
+                        try patterns.append(allocator, pattern_copy);
+                    }
+                }
+                break; // Found pattern in this constraint, move to next
+            }
+        }
+    }
+
+    if (patterns.items.len == 0) {
+        return null;
+    }
+
+    // Combine multiple patterns with | (OR operator)
+    var combined = std.ArrayList(u8){};
+    for (patterns.items, 0..) |pattern, i| {
+        try combined.appendSlice(allocator, pattern);
+        if (i < patterns.items.len - 1) {
+            try combined.append(allocator, '|');
+        }
+        allocator.free(pattern);
+    }
+
+    return try combined.toOwnedSlice(allocator);
+}
+
+// ============================================================================
+// Constraint Manipulation Functions
+// ============================================================================
+
+/// Merge two constraint sets into a new combined set
+pub fn mergeConstraints(
+    allocator: std.mem.Allocator,
+    set1: ConstraintSet,
+    set2: ConstraintSet,
+) !ConstraintSet {
+    // Create new set with combined name
+    var merged_name = std.ArrayList(u8){};
+    defer merged_name.deinit(allocator);
+    try merged_name.writer(allocator).print("{s}_merged_{s}", .{ set1.name, set2.name });
+
+    const combined_name = try allocator.dupe(u8, merged_name.items);
+    var merged = ConstraintSet.init(allocator, combined_name);
+
+    // Add all constraints from set1
+    for (set1.constraints.items) |constraint| {
+        try merged.add(constraint);
+    }
+
+    // Add all constraints from set2 (ConstraintSet.add() handles deduplication)
+    for (set2.constraints.items) |constraint| {
+        try merged.add(constraint);
+    }
+
+    return merged;
+}
+
+/// Remove duplicate/redundant constraints from an array
+pub fn deduplicateConstraints(
+    allocator: std.mem.Allocator,
+    constraints: []const Constraint,
+) ![]Constraint {
+    // Use a struct to represent constraint key for hashing
+    const ConstraintKey = struct {
+        kind: ConstraintKind,
+        description: []const u8,
+        source: ConstraintSource,
+
+        pub fn hash(self: @This()) u64 {
+            var hasher = std.hash.Wyhash.init(0);
+            hasher.update(@tagName(self.kind));
+            hasher.update(self.description);
+            hasher.update(@tagName(self.source));
+            return hasher.final();
+        }
+
+        pub fn eql(self: @This(), other: @This()) bool {
+            return self.kind == other.kind and
+                   std.mem.eql(u8, self.description, other.description) and
+                   self.source == other.source;
+        }
+    };
+
+    // Track seen constraints using a HashMap
+    var seen = std.AutoHashMap(u64, void).init(allocator);
+    defer seen.deinit();
+
+    var unique = std.ArrayList(Constraint){};
+
+    for (constraints) |constraint| {
+        const key = ConstraintKey{
+            .kind = constraint.kind,
+            .description = constraint.description,
+            .source = constraint.source,
+        };
+
+        const hash_value = key.hash();
+
+        // Only add if we haven't seen this constraint before
+        if (!seen.contains(hash_value)) {
+            try seen.put(hash_value, {});
+            try unique.append(allocator, constraint);
+        }
+    }
+
+    return try unique.toOwnedSlice(allocator);
+}
+
+/// Update constraint priority (setter function for clarity)
+pub fn updatePriority(constraint: *Constraint, new_priority: ConstraintPriority) void {
+    constraint.priority = new_priority;
 }
