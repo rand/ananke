@@ -17,16 +17,73 @@ This example compares constraint extraction with and without Claude, demonstrati
 - `build.zig` - Build configuration
 - `build.zig.zon` - Dependencies
 
+## Prerequisites
+
+### Required
+- Zig 0.15.2 or later
+
+### Optional (for Claude analysis)
+- Anthropic API key (get one at https://console.anthropic.com/settings/keys)
+- Internet connection
+
+### Cost Estimate
+
+If using Claude:
+- API calls: ~$0.01-0.05 per run (depending on file size)
+- Free tier: 5 free API calls available for new accounts
+
+## Setup
+
+### Option 1: Run Without Claude (Free)
+
+```bash
+# No setup needed - just run
+zig build run
+```
+
+This will demonstrate what Claude analysis would find, using static analysis only.
+
+### Option 2: Run With Claude (Requires API Key)
+
+1. Copy the environment template:
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and add your API key:
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-your-actual-key-here
+```
+
+3. Load the environment:
+```bash
+export ANTHROPIC_API_KEY=$(grep ANTHROPIC_API_KEY .env | cut -d '=' -f2)
+```
+
+4. Verify it's set:
+```bash
+echo $ANTHROPIC_API_KEY
+```
+
+5. Run the example:
+```bash
+zig build run
+```
+
 ## Building and Running
 
 ```bash
-# Without Claude (static analysis only)
+# From this directory
 zig build run
 
-# With Claude (requires API key)
-export ANTHROPIC_API_KEY='your-key-here'
+# Or from the ananke root
+cd examples/02-claude-analysis
 zig build run
 ```
+
+Expected build time: ~5 seconds
+Expected run time (without Claude): ~100ms
+Expected run time (with Claude): ~2-3 seconds
 
 ## What Gets Extracted
 
@@ -180,3 +237,148 @@ const result = try maze.generate(intent, ir);
 ```
 
 This hybrid approach gives you the speed of static analysis with the intelligence of semantic understanding, only paying for LLM calls when they provide value.
+
+## Common Issues
+
+### Issue: API key not recognized
+
+**Symptom:**
+```
+ANTHROPIC_API_KEY not set - skipping Claude analysis
+```
+
+**Cause:** Environment variable not exported or incorrectly formatted.
+
+**Solution:**
+```bash
+# Check if variable is set
+echo $ANTHROPIC_API_KEY
+
+# If empty, export it
+export ANTHROPIC_API_KEY='sk-ant-api03-...'
+
+# Verify again
+echo $ANTHROPIC_API_KEY
+
+# Run example
+zig build run
+```
+
+### Issue: API authentication failed
+
+**Symptom:**
+```
+Error: Claude API authentication failed
+```
+
+**Cause:** Invalid or expired API key.
+
+**Solution:**
+1. Verify your API key at https://console.anthropic.com/settings/keys
+2. Generate a new key if needed
+3. Update your .env file
+4. Re-export the environment variable
+
+### Issue: Rate limit exceeded
+
+**Symptom:**
+```
+Error: Rate limit exceeded
+```
+
+**Cause:** Too many API calls in a short time.
+
+**Solution:**
+- Wait 60 seconds and try again
+- Upgrade your Anthropic API plan for higher limits
+- Run without Claude using static analysis only
+
+### Issue: Network timeout
+
+**Symptom:**
+```
+Error: Request timeout
+```
+
+**Cause:** Slow internet connection or API service issues.
+
+**Solution:**
+- Check your internet connection
+- Try again in a few minutes
+- Check Anthropic status page: https://status.anthropic.com
+- Run without Claude for offline operation
+
+### Issue: Cost concerns
+
+**Symptom:**
+You're worried about API costs accumulating.
+
+**Solution:**
+- Use static analysis only (free) for development
+- Reserve Claude analysis for production/critical code
+- Set up billing alerts in Anthropic console
+- Run Example 01 instead for cost-free extraction
+
+## Files Structure
+
+```
+02-claude-analysis/
+├── README.md                    # This file
+├── .env.example                 # Environment template
+├── main.zig                     # Comparison program (80 lines)
+├── sample.py                    # Payment processing code
+├── sample_complex_logic.py      # Complex business logic
+├── sample_security.ts           # Security-focused code
+├── build.zig                    # Build configuration
+└── build.zig.zon                # Dependencies
+```
+
+## Analyzing Different Files
+
+The example includes multiple sample files to test different patterns:
+
+### Payment Processing (sample.py)
+- Rich business logic
+- Compliance requirements
+- Rate limiting
+- Refund policies
+
+```bash
+# Modify main.zig to use this file (already default)
+const file_path = "sample.py";
+```
+
+### Complex Logic (sample_complex_logic.py)
+- Intricate algorithms
+- State machines
+- Performance requirements
+
+```bash
+# Modify main.zig
+const file_path = "sample_complex_logic.py";
+const constraints = try clew.extractFromCode(source_code, "python");
+```
+
+### Security Focus (sample_security.ts)
+- Authentication patterns
+- Input validation
+- Cryptography usage
+
+```bash
+# Modify main.zig
+const file_path = "sample_security.ts";
+const constraints = try clew.extractFromCode(source_code, "typescript");
+```
+
+## Performance Comparison
+
+| Operation              | Without Claude | With Claude |
+|------------------------|----------------|-------------|
+| File reading           | ~1ms           | ~1ms        |
+| Static analysis        | ~50ms          | ~50ms       |
+| Semantic analysis      | N/A            | ~1500ms     |
+| Total                  | ~51ms          | ~1551ms     |
+| Constraints found      | 5-10           | 15-25       |
+| Cost                   | $0.00          | ~$0.02      |
+
+The 30x slowdown with Claude is offset by 2-3x more constraints and much richer semantic understanding.
