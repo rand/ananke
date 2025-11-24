@@ -1,583 +1,729 @@
 # Ananke Troubleshooting Guide
 
-Solutions to common problems and how to debug them.
+**Version**: 1.0  
+**Last Updated**: 2025-11-24
+
+## Table of Contents
+
+1. [Build Errors](#build-errors)
+2. [Runtime Errors](#runtime-errors)
+3. [Performance Issues](#performance-issues)
+4. [Modal Deployment Problems](#modal-deployment-problems)
+5. [Memory Leak Debugging](#memory-leak-debugging)
+6. [FFI Issues](#ffi-issues)
+7. [Common Error Messages](#common-error-messages)
 
 ---
 
-## Installation Issues
+## Build Errors
 
-### Problem: `ModuleNotFoundError: No module named 'ananke'`
+### Error: `zig: command not found`
 
-**Cause**: Ananke not installed or wrong Python environment
-
-**Solutions**:
-
-```bash
-# Check Python version
-python --version  # Should be 3.8+
-
-# Reinstall
-pip install --upgrade ananke-ai
-
-# Or from source
-git clone https://github.com/ananke-ai/ananke.git
-cd ananke
-pip install -e .
-
-# Verify
-python -c "import ananke; print(ananke.__version__)"
-```
-
----
-
-### Problem: `zig: command not found`
+**Symptom**: Cannot run `zig build`
 
 **Cause**: Zig not installed or not in PATH
 
-**Solutions**:
-
+**Solution**:
 ```bash
-# Check installation
-which zig
-
-# Install from https://ziglang.org/download
-# Or using package manager:
-
-# macOS
+# macOS (Homebrew)
 brew install zig
 
-# Ubuntu/Debian
-sudo apt-get install zig
-
-# Arch
-sudo pacman -S zig
-
-# Verify
-zig version  # Should be 0.15.1+
-```
-
----
-
-### Problem: Permission denied building from source
-
-**Cause**: Insufficient permissions
-
-**Solutions**:
-
-```bash
-# Use virtual environment
-python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-
-# Then install
-pip install -e .
-
-# Or use --user flag
-pip install --user -e .
-```
-
----
-
-## Modal Service Issues
-
-### Problem: `modal token new` hangs or times out
-
-**Cause**: Network issues or Modal service down
-
-**Solutions**:
-
-```bash
-# Check Modal status
-curl https://modal.com
-
-# Try again with timeout
-timeout 30 modal token new
-
-# Or authenticate manually
-export MODAL_TOKEN_ID="your-token-id"
-export MODAL_TOKEN_SECRET="your-token-secret"
+# Linux (manual install)
+wget https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz
+tar -xf zig-linux-x86_64-0.15.2.tar.xz
+export PATH=$PATH:$(pwd)/zig-linux-x86_64-0.15.2
 
 # Verify
-modal token list
+zig version  # Should show 0.15.2 or higher
+```
+
+### Error: `error: dependency 'zts' not found`
+
+**Symptom**: Build fails on tree-sitter dependency
+
+**Cause**: Tree-sitter integration disabled but referenced
+
+**Solution**: Tree-sitter is intentionally disabled. If you see this error, check that `tree_sitter_enabled = false` in `src/clew/clew.zig`.
+
+**Workaround**: Pattern-based extraction provides ~80% coverage without tree-sitter.
+
+### Error: `error: use of undeclared identifier 'claude_api'`
+
+**Symptom**: Build fails referencing Claude module
+
+**Cause**: Claude API module not properly imported
+
+**Solution**:
+```bash
+# Check build.zig has Claude module
+grep -A 5 "claude" build.zig
+
+# Ensure the module is available
+zig build --help  # Should list all available steps
+```
+
+### Error: `lld: error: undefined symbol: ananke_init`
+
+**Symptom**: Rust FFI tests fail to link
+
+**Cause**: Zig library not built before Rust tests
+
+**Solution**:
+```bash
+# Build Zig library first
+zig build
+
+# Then run Rust tests
+cd maze && cargo test
+```
+
+### Error: `error: cyclic dependency detected`
+
+**Symptom**: Build warns about circular dependencies
+
+**Cause**: Known issue in Braid constraint graph (false positive)
+
+**Status**: Non-blocking, graph still compiles
+
+**Workaround**: Ignore warning (does not affect functionality)
+
+```bash
+# This is expected output:
+# Warning: Cyclic dependencies detected. Processed 0/3 constraints.
 ```
 
 ---
 
-### Problem: `401 Unauthorized` when deploying service
+## Runtime Errors
 
-**Cause**: Modal authentication failed
+### Error: `AllocationFailure` (error code 2)
 
-**Solutions**:
+**Symptom**: Extraction or compilation fails with allocation error
 
+**Cause**: Out of memory or allocator issue
+
+**Diagnosis**:
 ```bash
-# Check token
-modal token list
+# Check available memory
+free -h  # Linux
+vm_stat  # macOS
 
-# If empty, re-authenticate
-modal token new --force
-
-# Verify authentication
-modal account whoami
-
-# Try deployment again
-modal deploy modal_inference/inference.py
+# Run with leak detection
+zig build test -Doptimize=Debug
 ```
 
----
-
-### Problem: Model download fails with `401 Unauthorized`
-
-**Cause**: HuggingFace token not set or invalid
-
 **Solutions**:
+1. **Reduce input size**: Split large files into smaller chunks
+2. **Increase memory**: Ensure 2GB+ available RAM
+3. **Check for leaks**: Run tests with GPA allocator (default in debug)
 
+### Error: `ExtractionFailed` (error code 4)
+
+**Symptom**: Pattern extraction fails
+
+**Cause**: Unsupported language or malformed source code
+
+**Diagnosis**:
 ```bash
-# Check secret exists
-modal secret list
+# Check language support
+grep "getPatternsForLanguage" src/clew/patterns.zig
 
-# Create if missing
-modal secret create huggingface-secret \
-  HUGGING_FACE_HUB_TOKEN=hf_your_token
-
-# Verify token is valid
-# 1. Go to https://huggingface.co/settings/tokens
-# 2. Copy your access token
-# 3. Recreate secret:
-modal secret create huggingface-secret \
-  --force \
-  HUGGING_FACE_HUB_TOKEN=hf_your_new_token
-
-# Also accept model license
-# Go to https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct
-# Accept license agreement
-
-# Test by deploying
-modal deploy modal_inference/inference.py
+# Supported: typescript, python, rust, zig, go
+# Unsupported: java, c++, swift, kotlin (return null)
 ```
 
----
-
-### Problem: `Out of Memory (OOM)` on Modal
-
-**Cause**: Model too large for GPU or too many concurrent requests
-
 **Solutions**:
+1. **Verify language name**: Must be lowercase, exact match
+2. **Check encoding**: Must be UTF-8
+3. **Validate syntax**: Malformed code may cause unexpected matches
 
+### Error: `CompilationFailed` (error code 5)
+
+**Symptom**: Braid compilation fails
+
+**Cause**: Constraint conflicts or invalid graph
+
+**Diagnosis**:
 ```bash
-# Use smaller model
-export INFERENCE_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
-modal deploy modal_inference/inference.py
+# Enable debug logging
+zig build test -- --verbose
 
-# Or reduce GPU memory utilization
-# Edit modal_inference/inference.py:
-# Change: gpu_memory_utilization=0.90
-# To:     gpu_memory_utilization=0.75
-
-# Or reduce batch size
-ananke generate "feature" --batch-size 1
-
-# Or reduce max_tokens
-ananke generate "feature" --max-tokens 256
+# Check for conflict messages
+# "Warning: Cyclic dependencies detected"
 ```
 
----
-
-### Problem: Slow cold starts (>10 seconds)
-
-**Cause**: Model needs to load on GPU (normal for first request)
-
 **Solutions**:
+1. **Simplify constraints**: Reduce count to isolate issue
+2. **Check priorities**: Ensure no all constraints have same priority
+3. **Use Claude resolution**: Enable LLM-assisted conflict resolution
 
+### Error: `ANTHROPIC_API_KEY not set`
+
+**Symptom**: Claude integration fails
+
+**Cause**: Environment variable missing
+
+**Solution**:
 ```bash
-# Increase idle timeout to keep model warm
-# Edit modal_inference/inference.py:
-# Change: container_idle_timeout=60
-# To:     container_idle_timeout=300
+# Set API key
+export ANTHROPIC_API_KEY='sk-ant-...'
 
-# Or batch requests to avoid cold starts
-ananke generate --batch requests.yaml
+# Verify
+echo $ANTHROPIC_API_KEY
 
-# Or use model caching
-# This is automatic - subsequent requests are fast
+# Permanent (add to ~/.bashrc or ~/.zshrc)
+echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
+source ~/.bashrc
 ```
 
----
-
-### Problem: `Connection refused` calling Modal service
-
-**Cause**: Service not deployed or endpoint wrong
-
-**Solutions**:
-
-```bash
-# Verify service is deployed
-modal app list
-# Should show ananke-inference
-
-# If missing, deploy
-modal deploy modal_inference/inference.py
-
-# Check endpoint
-modal app list --detailed
-
-# Verify environment variable
-echo $MODAL_ENDPOINT
-
-# Set correct endpoint
-export MODAL_ENDPOINT="https://yourapp.modal.run"
-
-# Test connection
-curl $MODAL_ENDPOINT/health
-```
-
----
-
-## Constraint Issues
-
-### Problem: No constraints extracted
-
-**Cause**: Code doesn't contain extractable patterns
-
-**Solutions**:
-
-```bash
-# Check what Clew is looking for
-ananke extract sample.py --detailed --verbose
-
-# Make sure code has patterns:
-# - Type annotations
-# - Docstrings
-# - Error handling
-# - Decorators
-
-# If intentional, provide manual constraints
-cat > constraints.json << 'JSON'
-{
-  "constraints": {
-    "type_safety": {"require": ["explicit_returns"]}
-  }
-}
-JSON
-```
-
----
-
-### Problem: Constraint extraction too slow (>5 seconds)
-
-**Cause**: Large codebase or Claude analysis enabled
-
-**Solutions**:
-
-```bash
-# Extract only needed types
-ananke extract ./src \
-  --types "security,type_safety" \
-  --output constraints.json
-
-# Disable Claude
-ananke extract ./src \
-  --no-claude \
-  --output constraints.json
-
-# Extract from smaller subset
-ananke extract ./src/handlers ./src/models
-
-# Or parallelize
-find ./src -name "*.py" | \
-  parallel "ananke extract {} --output {}.json"
-```
-
----
-
-### Problem: Conflicting constraints
-
-**Cause**: Constraints contradict each other
-
-**Solutions**:
-
-```bash
-# Show conflicts
-ananke constraints validate constraints.json --details
-
-# Try auto-resolution with Claude
-ananke constraints validate constraints.json \
-  --use-claude \
-  --auto-resolve \
-  --output resolved.json
-
-# Or manually edit constraints.json
-
-# Or manually resolve
-ananke constraints resolve constraints.json \
-  --strategy "merge" \
-  --output resolved.json
-```
-
----
-
-### Problem: Generated code violates constraints
-
-**Cause**: Constraints not being enforced properly
-
-**Solutions**:
-
-```bash
-# Debug which constraint failed
-ananke validate generated.py \
-  --constraints compiled.cir \
-  --debug
-
-# Try with stricter settings
-ananke generate "feature" \
-  --constraints compiled.cir \
-  --temperature 0.1 \
-  --strict-mode
-
-# Or check constraint compilation
-ananke compile constraints.json \
-  --analyze \
-  --verbose
-
-# Report as bug with debug output
-ANANKE_LOG_LEVEL=debug ananke generate "feature" \
-  --constraints compiled.cir > debug.log 2>&1
-
-# Include debug.log in GitHub issue
-```
-
----
-
-## Generation Issues
-
-### Problem: Generation timeout (>30 seconds)
-
-**Cause**: Model is slow or service is overloaded
-
-**Solutions**:
-
-```bash
-# Reduce complexity
-ananke generate "feature" \
-  --max-tokens 128 \
-  --temperature 0.3
-
-# Check service health
-modal logs ananke-inference | tail -20
-
-# Try smaller model
-export INFERENCE_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
-
-# Or increase timeout
-ananke generate "feature" --timeout 60
-```
-
----
-
-### Problem: Very high token usage (>1000 tokens for simple code)
-
-**Cause**: Model generating verbose/repetitive code
-
-**Solutions**:
-
-```bash
-# Lower temperature (less random)
-ananke generate "feature" --temperature 0.3
-
-# Reduce max_tokens
-ananke generate "feature" --max-tokens 256
-
-# Be more specific in prompt
-ananke generate "Implement validation function. Keep it simple." \
-  --max-tokens 200
-
-# Check constraints aren't encouraging verbosity
-ananke constraints show constraints.json
-```
-
----
-
-### Problem: Generated code has errors or doesn't run
-
-**Cause**: Model produced invalid syntax
-
-**Solutions**:
-
-```bash
-# Use stricter constraints
-ananke constraints validate constraints.json --details
-
-# Regenerate with lower temperature
-ananke generate "feature" \
-  --constraints constraints.json \
-  --temperature 0.2
-
-# Use larger model
-export INFERENCE_MODEL="meta-llama/Meta-Llama-3.1-70B-Instruct"
-
-# Or provide more context
-ananke generate "Implement feature. Follow the pattern in auth.py" \
-  --max-tokens 500
-```
+**Alternative**: Disable Claude integration (system still works)
 
 ---
 
 ## Performance Issues
 
-### Problem: Constraint compilation too slow
+### Issue: Extraction taking >100ms
 
-**Cause**: Too many constraints or complex dependencies
+**Expected**: 4-7ms for typical files (75 lines)
 
-**Solutions**:
-
-```bash
-# Simplify constraints
-ananke constraints prune constraints.json \
-  --remove-redundant \
-  --output simplified.json
-
-# Check constraint count
-jq '.constraints | length' constraints.json
-
-# Split into multiple files
-ananke compile security-constraints.json
-ananke compile performance-constraints.json
-
-# Or use multiple passes
-ananke compile constraints.json --optimize
-```
-
----
-
-### Problem: Generation latency high (>10 seconds)
-
-**Cause**: Normal for constrained generation, check for issues
-
-**Expected**:
-- Cold start: 3-5 seconds
-- Generation (100 tokens): 3-5 seconds
-- Constraint overhead: <50ms
-
-**If higher**:
-```bash
-# Check network latency
-time curl $MODAL_ENDPOINT/health
-
-# Check logs for errors
-modal logs ananke-inference
-
-# Profile generation
-ANANKE_LOG_LEVEL=debug ananke generate "feature" \
-  --constraints compiled.cir
-
-# Consider using smaller model or batch requests
-```
-
----
-
-### Problem: High memory usage
-
-**Cause**: Large constraint cache or model loaded multiple times
+**Causes**:
+1. Very large files (>1000 lines)
+2. Complex nested structures
+3. Debug build (not optimized)
 
 **Solutions**:
 
+**Optimize build**:
 ```bash
-# Clear constraint cache
-rm -rf ~/.ananke/cache
+# Use ReleaseFast for production
+zig build -Doptimize=ReleaseFast
 
-# Or configure cache size
-export ANANKE_CACHE_SIZE="100"  # Smaller cache
+# Benchmark
+zig build test -Doptimize=ReleaseFast
+```
 
-# Check memory usage
-ps aux | grep ananke
+**Profile code**:
+```bash
+# Use perf on Linux
+perf record zig build test
+perf report
 
-# Reduce model size
-export INFERENCE_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
+# Use Instruments on macOS
+# (requires Xcode)
+```
+
+**Split large files**:
+```bash
+# For files >10K lines, split into modules
+# Ananke performs better on focused files
+```
+
+### Issue: Compilation taking >10ms
+
+**Expected**: 2ms for 10 constraints
+
+**Causes**:
+1. Many constraints (>100)
+2. Complex dependency graph
+3. Inefficient conflict detection
+
+**Solutions**:
+
+**Reduce constraint count**:
+```zig
+// Filter low-confidence constraints
+const filtered = try deduplicateConstraints(allocator, raw_constraints);
+```
+
+**Use caching**:
+```rust
+// Rust side: Maze has built-in LRU cache
+let config = MazeConfig {
+    enable_cache: true,
+    cache_size_limit: 1000,
+    ...
+};
+```
+
+**Profile graph operations**:
+```bash
+# Add timing instrumentation
+zig build test -- --timing
+```
+
+### Issue: High memory usage (>1GB)
+
+**Expected**: <100MB for typical workflows
+
+**Causes**:
+1. Memory leaks
+2. Large allocations not freed
+3. Cache growth unbounded
+
+**Solutions**:
+
+**Check for leaks**:
+```bash
+# Zig GPA detects leaks automatically
+zig build test -Doptimize=Debug
+# Output should show: "All allocations freed"
+
+# If leaks detected:
+# [gpa] (err): memory address 0x... leaked:
+```
+
+**Limit cache size**:
+```rust
+// Maze configuration
+let config = MazeConfig {
+    cache_size_limit: 100,  // Reduce from default 1000
+    ...
+};
+```
+
+**Use arena allocators**:
+```zig
+// For temporary data, use arena
+var arena = std.heap.ArenaAllocator.init(allocator);
+defer arena.deinit();  // Bulk free
+const temp_alloc = arena.allocator();
 ```
 
 ---
 
-## Debugging
+## Modal Deployment Problems
 
-### Enable Debug Logging
+### Issue: `MODAL_ENDPOINT not set`
 
+**Symptom**: Maze cannot connect to Modal
+
+**Cause**: Environment variable missing
+
+**Solution**:
 ```bash
-# All components
-export ANANKE_LOG_LEVEL=debug
-ananke extract ./src
+# Set Modal endpoint
+export MODAL_ENDPOINT='https://your-app.modal.run'
 
-# Or per-command
-ANANKE_LOG_LEVEL=debug ananke generate "feature"
+# Set API key (if required)
+export MODAL_API_KEY='your-key'
 
-# Save to file
-ANANKE_LOG_LEVEL=debug ananke generate "feature" > debug.log 2>&1
+# Set model (optional, defaults to Llama-3.1)
+export MODAL_MODEL='DeepSeek-Coder-V2-Lite-Instruct'
 ```
 
-### Get Detailed Reports
+### Issue: `Connection refused` to Modal
 
+**Symptom**: HTTP connection fails
+
+**Causes**:
+1. Modal service not deployed
+2. Wrong endpoint URL
+3. Network firewall
+
+**Diagnosis**:
 ```bash
-# Constraint analysis
-ananke constraints analyze constraints.json --detailed
+# Test endpoint directly
+curl -v $MODAL_ENDPOINT/health
 
-# Extraction report
-ananke extract ./src --detailed --report report.json
-
-# Generation debug info
-ananke generate "feature" --debug --constraints compiled.cir
+# Expected response:
+# HTTP/1.1 200 OK
 ```
 
-### Check System Health
+**Solutions**:
 
+**Deploy Modal service**:
 ```bash
-# Modal service
-modal app list
-modal logs ananke-inference
+# From modal_service directory
+modal deploy app.py
 
-# Environment variables
-env | grep -E 'ANANKE|MODAL|ANTHROPIC'
+# Note the endpoint URL
+# https://your-app--inference-endpoint.modal.run
+```
 
-# Python installation
-python -c "import ananke; print(ananke.__file__)"
+**Check URL format**:
+```bash
+# Should be HTTPS, not HTTP
+# Should end with .modal.run
+# Should NOT include /generate (that's added by client)
+```
 
-# Zig installation
-zig version
-zig build-exe --version
+**Test network**:
+```bash
+# Check DNS resolution
+nslookup your-app.modal.run
+
+# Check network connectivity
+ping your-app.modal.run
+```
+
+### Issue: `60s cold start delay`
+
+**Symptom**: First request takes 60+ seconds
+
+**Cause**: Modal scale-to-zero cold start
+
+**Solutions**:
+
+**Keep instance warm**:
+```python
+# In Modal deployment
+@app.function(
+    keep_warm=1,  # Keep 1 instance always running
+)
+def inference(...):
+    ...
+```
+
+**Use warm pool**:
+```bash
+# Ping endpoint every 30s
+while true; do
+    curl $MODAL_ENDPOINT/health
+    sleep 30
+done
+```
+
+**Accept cold starts**:
+- First request: ~60s
+- Subsequent requests: ~1-2s
+- Cost savings: Pay only for active time
+
+### Issue: `Generation timeout after 300s`
+
+**Symptom**: Long generations fail
+
+**Cause**: Request timeout exceeded
+
+**Solutions**:
+
+**Increase timeout**:
+```rust
+// Rust Maze configuration
+let config = ModalConfig::new(endpoint, model)
+    .with_timeout(600);  // 10 minutes
+```
+
+**Reduce generation length**:
+```rust
+let request = GenerationRequest {
+    max_tokens: 1024,  // Reduce from 2048
+    ...
+};
+```
+
+**Use streaming** (future):
+```rust
+// Coming in Phase 10
+let stream = client.generate_stream(request).await?;
+```
+
+---
+
+## Memory Leak Debugging
+
+### Detecting Leaks in Zig
+
+**Built-in GPA Leak Detection**:
+```bash
+# Debug build automatically uses GPA
+zig build test -Doptimize=Debug
+
+# Clean output:
+# "test suite passed. 100/100 tests passed. 0 leaked."
+
+# Leak detected:
+# [gpa] (err): memory address 0x12345678 leaked:
+# [gpa] (err): allocated by:
+# [gpa] (err):     at constraint.zig:123
+```
+
+**Manual Leak Check**:
+```zig
+test "check for memory leaks" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const leaked = gpa.deinit();
+        try testing.expect(leaked == .ok);
+    }
+    
+    const allocator = gpa.allocator();
+    
+    // Your code here
+    var clew = try Clew.init(allocator);
+    defer clew.deinit();
+    
+    const constraints = try clew.extractFromCode(source, "typescript");
+    defer constraints.deinit();
+}
+```
+
+### Common Leak Sources
+
+**1. Forgot `defer deinit()`**:
+```zig
+// BAD: Memory leak
+var list = std.ArrayList(u8).init(allocator);
+// ... use list ...
+// MISSING: defer list.deinit();
+
+// GOOD: Properly freed
+var list = std.ArrayList(u8).init(allocator);
+defer list.deinit();
+```
+
+**2. Early return without cleanup**:
+```zig
+// BAD: Leaks on error
+fn process() !void {
+    var data = try allocator.alloc(u8, 100);
+    // If error occurs here, data leaks
+    try doSomething();
+    allocator.free(data);
+}
+
+// GOOD: Cleanup on all paths
+fn process() !void {
+    var data = try allocator.alloc(u8, 100);
+    defer allocator.free(data);  // Runs on all paths
+    try doSomething();
+}
+```
+
+**3. Constraint strings not freed**:
+```zig
+// Clew uses arena allocator for constraint strings
+// Arena is freed in bulk on deinit()
+// No individual string cleanup needed
+```
+
+### Debugging Leaks in Rust
+
+**Valgrind (Linux)**:
+```bash
+# Build Rust in debug mode
+cd maze
+cargo build
+
+# Run with valgrind
+valgrind --leak-check=full \
+         --show-leak-kinds=all \
+         ./target/debug/maze_tests
+
+# Output shows leak sources:
+# 100 bytes in 1 blocks are definitely lost
+#    at malloc
+#    at alloc::vec::Vec::push
+#    at maze::orchestrator::generate
+```
+
+**AddressSanitizer**:
+```bash
+# Build with ASAN
+RUSTFLAGS="-Z sanitizer=address" \
+cargo +nightly build
+
+# Run tests
+ASAN_OPTIONS=detect_leaks=1 \
+./target/debug/maze_tests
+```
+
+---
+
+## FFI Issues
+
+### Issue: `Null pointer dereference`
+
+**Symptom**: Segfault or panic in FFI conversion
+
+**Cause**: Passing null pointer where value expected
+
+**Solution**:
+```rust
+// Always check for null before dereferencing
+unsafe {
+    if ir_ptr.is_null() {
+        return Err(anyhow!("Null ConstraintIR pointer"));
+    }
+    let ir = &*ir_ptr;
+    
+    // Check each nullable field
+    if !ir.json_schema.is_null() {
+        let schema = CStr::from_ptr(ir.json_schema)
+            .to_str()?;
+        // ... use schema
+    }
+}
+```
+
+### Issue: `String conversion failed (invalid UTF-8)`
+
+**Symptom**: Error converting C strings to Rust Strings
+
+**Cause**: Non-UTF-8 data in C string
+
+**Solutions**:
+
+**Validate before conversion**:
+```rust
+use std::ffi::CStr;
+
+unsafe {
+    let c_str = CStr::from_ptr(ptr);
+    
+    // Option 1: Fail on invalid UTF-8
+    let s = c_str.to_str()
+        .context("Invalid UTF-8 in C string")?;
+    
+    // Option 2: Lossy conversion (replace invalid bytes)
+    let s = c_str.to_string_lossy();
+}
+```
+
+**Check Zig side**:
+```zig
+// Ensure all strings are valid UTF-8
+const str = try allocator.dupeZ(u8, "valid UTF-8");
+```
+
+### Issue: `Use-after-free` in FFI
+
+**Symptom**: Corrupted data or segfault after FFI call
+
+**Cause**: Using Zig-allocated memory after freeing
+
+**Solution**:
+```rust
+// BAD: Using pointer after free
+let ir_ptr = extract_constraints(...);
+let ir = ConstraintIR::from_ffi(ir_ptr)?;  // Reads data
+unsafe { ananke_free_constraint_ir(ir_ptr); }  // Frees Zig memory
+// ir now contains dangling references!
+
+// GOOD: Deep copy before free
+let ir_ptr = extract_constraints(...);
+let ir = ConstraintIR::from_ffi(ir_ptr)?;  // Deep copies data
+unsafe { ananke_free_constraint_ir(ir_ptr); }  // Safe to free
+// ir owns all its data
+```
+
+---
+
+## Common Error Messages
+
+### `error: OutOfMemory`
+
+**Cause**: Allocation failed
+
+**Solutions**:
+1. Check available memory: `free -h`
+2. Reduce input size
+3. Check for memory leaks
+4. Increase swap space (last resort)
+
+### `error: FileNotFound`
+
+**Cause**: Test fixture or source file missing
+
+**Solutions**:
+```bash
+# Verify file exists
+ls -la test/fixtures/
+
+# Check @embedFile paths in tests
+grep -r "@embedFile" test/
+
+# Regenerate fixtures if needed
+cd test/fixtures && ./generate.sh
+```
+
+### `error: InvalidCharacter`
+
+**Cause**: Non-UTF-8 encoding in source file
+
+**Solutions**:
+```bash
+# Check file encoding
+file -bi source.ts
+
+# Convert to UTF-8
+iconv -f ISO-8859-1 -t UTF-8 source.ts > source_utf8.ts
+
+# Remove BOM if present
+sed -i '1s/^\xEF\xBB\xBF//' source.ts
+```
+
+### `error: Overflow`
+
+**Cause**: Integer overflow in calculation
+
+**Solutions**:
+```zig
+// Use checked arithmetic
+const result = std.math.add(u32, a, b) catch {
+    return error.Overflow;
+};
+
+// Or saturating arithmetic
+const result = std.math.saturatingAdd(u32, a, b);
+```
+
+### `panic: index out of bounds`
+
+**Cause**: Array access beyond length
+
+**Solutions**:
+```zig
+// Always bounds-check
+if (index >= array.len) {
+    return error.IndexOutOfBounds;
+}
+const element = array[index];
+
+// Or use get() which returns optional
+const element = array.get(index) orelse return error.NotFound;
 ```
 
 ---
 
 ## Getting Help
 
-### Before Opening an Issue
+### Diagnostic Information to Collect
 
-1. Check this troubleshooting guide
-2. Read the User Guide
-3. Enable debug logging: `ANANKE_LOG_LEVEL=debug`
-4. Try the minimal reproduction case
+When reporting issues, include:
 
-### Opening a GitHub Issue
-
-Include:
-- Ananke version: `ananke --version`
-- Python version: `python --version`
-- OS: `uname -a`
-- Error message (full traceback)
-- Steps to reproduce
-- Debug logs
-
+1. **System info**:
 ```bash
-# Minimal reproduction
-ANANKE_LOG_LEVEL=debug ananke extract minimal.py > debug.log 2>&1
-# Attach debug.log to issue
+uname -a  # OS version
+zig version  # Zig version
+rustc --version  # Rust version
 ```
 
-### Support Resources
+2. **Build output**:
+```bash
+zig build 2>&1 | tee build.log
+```
 
-- **GitHub Issues**: Bug reports and feature requests
-- **GitHub Discussions**: Questions and community help
-- **Documentation**: `/docs/` directory
-- **User Guide**: `/docs/USER_GUIDE.md`
-- **Email**: support@ananke-ai.dev (paid support)
+3. **Test output**:
+```bash
+zig build test 2>&1 | tee test.log
+cd maze && cargo test 2>&1 | tee rust_test.log
+```
+
+4. **Environment**:
+```bash
+env | grep -E 'ANTHROPIC|MODAL'
+```
+
+5. **Error messages**: Full stack trace, not just summary
+
+### Support Channels
+
+- GitHub Issues: https://github.com/ananke-ai/ananke/issues
+- Documentation: `/Users/rand/src/ananke/docs/`
+- FFI Contract: `/Users/rand/src/ananke/test/integration/FFI_CONTRACT.md`
 
 ---
 
-**Still stuck?** Open an issue with your debug logs!
+**Document Version**: 1.0  
+**Maintained By**: Claude Code (docs-writer subagent)  
+**Last Updated**: 2025-11-24
