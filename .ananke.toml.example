@@ -1,0 +1,40 @@
+# Ananke Configuration File Example
+# Copy this file to .ananke.toml and customize for your environment
+
+[modal]
+# Modal inference endpoint URL
+# Default: https://ananke--ananke-inference-inference.modal.run
+endpoint = "https://ananke--ananke-inference-inference.modal.run"
+
+# Modal API key (optional - can also use ANANKE_MODAL_API_KEY env var)
+# api_key = "your-modal-api-key"
+
+[defaults]
+# Default language for code generation
+language = "typescript"
+
+# Maximum tokens to generate
+max_tokens = 4096
+
+# Temperature for sampling (0.0 = deterministic, 1.0 = creative)
+temperature = 0.7
+
+# Confidence threshold for constraint validation
+confidence_threshold = 0.5
+
+# Output format (pretty, json, compact)
+output_format = "pretty"
+
+[extract]
+# Use Claude API for advanced extraction
+use_claude = false
+
+# Extraction patterns
+patterns = ["all"]
+
+[compile]
+# Compilation priority (low, medium, high)
+priority = "medium"
+
+# Output formats for compiled constraints
+formats = ["json-schema"]

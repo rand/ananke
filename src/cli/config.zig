@@ -8,6 +8,11 @@ pub const Config = struct {
     modal_endpoint: ?[]const u8 = null,
     modal_api_key: ?[]const u8 = null,
 
+    // Claude API configuration
+    claude_api_key: ?[]const u8 = null,
+    claude_endpoint: ?[]const u8 = null,
+    claude_model: []const u8 = "claude-sonnet-4-5-20250929",
+
     // Default settings
     default_language: []const u8 = "typescript",
     max_tokens: u32 = 4096,
@@ -35,6 +40,12 @@ pub const Config = struct {
         }
         if (self.modal_api_key) |key| {
             self.allocator.free(key);
+        }
+        if (self.claude_api_key) |key| {
+            self.allocator.free(key);
+        }
+        if (self.claude_endpoint) |endpoint| {
+            self.allocator.free(endpoint);
         }
         // Note: Other fields are string literals or owned by caller
     }
@@ -99,6 +110,32 @@ pub const Config = struct {
             self.modal_api_key = key;
         } else |_| {}
 
+        // Check for Claude API key with standard Anthropic environment variable
+        if (std.process.getEnvVarOwned(self.allocator, "ANTHROPIC_API_KEY")) |key| {
+            if (self.claude_api_key) |old| {
+                self.allocator.free(old);
+            }
+            self.claude_api_key = key;
+            // If API key is present, enable Claude by default
+            self.use_claude = true;
+        } else |_| {
+            // Also check for ANANKE-prefixed variable
+            if (std.process.getEnvVarOwned(self.allocator, "ANANKE_CLAUDE_API_KEY")) |key| {
+                if (self.claude_api_key) |old| {
+                    self.allocator.free(old);
+                }
+                self.claude_api_key = key;
+                self.use_claude = true;
+            } else |_| {}
+        }
+
+        if (std.process.getEnvVarOwned(self.allocator, "ANANKE_CLAUDE_ENDPOINT")) |endpoint| {
+            if (self.claude_endpoint) |old| {
+                self.allocator.free(old);
+            }
+            self.claude_endpoint = endpoint;
+        } else |_| {}
+
         if (std.process.getEnvVarOwned(self.allocator, "ANANKE_LANGUAGE")) |lang| {
             self.default_language = lang;
         } else |_| {}
@@ -144,6 +181,17 @@ pub const Config = struct {
                     self.modal_endpoint = try self.allocator.dupe(u8, value);
                 } else if (std.mem.eql(u8, key, "api_key")) {
                     self.modal_api_key = try self.allocator.dupe(u8, value);
+                }
+            } else if (std.mem.eql(u8, sec, "claude")) {
+                if (std.mem.eql(u8, key, "api_key")) {
+                    self.claude_api_key = try self.allocator.dupe(u8, value);
+                    self.use_claude = true; // Enable if API key is configured
+                } else if (std.mem.eql(u8, key, "endpoint")) {
+                    self.claude_endpoint = try self.allocator.dupe(u8, value);
+                } else if (std.mem.eql(u8, key, "model")) {
+                    self.claude_model = value;
+                } else if (std.mem.eql(u8, key, "enabled")) {
+                    self.use_claude = std.mem.eql(u8, value, "true");
                 }
             } else if (std.mem.eql(u8, sec, "defaults")) {
                 if (std.mem.eql(u8, key, "language")) {
@@ -193,6 +241,23 @@ pub const Config = struct {
         }
         try writer.interface.writeAll("\n");
 
+        // Claude section
+        try writer.interface.writeAll("[claude]\n");
+        try writer.interface.writeAll("# Claude API configuration for semantic analysis\n");
+        try writer.interface.writeAll("# API key should be stored in environment variable ANTHROPIC_API_KEY\n");
+        try writer.interface.writeAll("# or set here (not recommended for security)\n");
+        if (self.claude_api_key) |_| {
+            try writer.interface.writeAll("# api_key = \"sk-ant-...\"\n");
+        }
+        if (self.claude_endpoint) |endpoint| {
+            try writer.interface.print("endpoint = \"{s}\"\n", .{endpoint});
+        } else {
+            try writer.interface.writeAll("# endpoint = \"https://api.anthropic.com/v1/messages\"\n");
+        }
+        try writer.interface.print("model = \"{s}\"\n", .{self.claude_model});
+        try writer.interface.print("enabled = {s}\n", .{if (self.use_claude) "true" else "false"});
+        try writer.interface.writeAll("\n");
+
         // Defaults section
         try writer.interface.writeAll("[defaults]\n");
         try writer.interface.print("language = \"{s}\"\n", .{self.default_language});
@@ -232,6 +297,11 @@ test "config initialization" {
 
     try testing.expectEqualStrings("typescript", config.default_language);
     try testing.expectEqual(@as(u32, 4096), config.max_tokens);
+    try testing.expectEqual(@as(f32, 0.7), config.temperature);
+    try testing.expectEqual(@as(bool, false), config.use_claude);
+    try testing.expectEqual(@as(?[]const u8, null), config.claude_api_key);
+    try testing.expectEqual(@as(?[]const u8, null), config.claude_endpoint);
+    try testing.expectEqualStrings("claude-sonnet-4-5-20250929", config.claude_model);
 }
 
 test "parse simple toml" {
@@ -253,4 +323,47 @@ test "parse simple toml" {
     try testing.expectEqualStrings("python", config.default_language);
     try testing.expectEqual(@as(u32, 2048), config.max_tokens);
     try testing.expectEqual(@as(f32, 0.5), config.temperature);
+}
+
+test "config parse Claude section" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var config = Config.init(allocator);
+    defer config.deinit();
+
+    const toml =
+        \\[claude]
+        \\api_key = "test-api-key"
+        \\endpoint = "https://test.anthropic.com/v1/messages"
+        \\model = "claude-haiku-3-5-20241022"
+        \\enabled = true
+    ;
+
+    try config.parseToml(toml);
+
+    // Check Claude settings
+    try testing.expectEqualStrings("test-api-key", config.claude_api_key.?);
+    try testing.expectEqualStrings("https://test.anthropic.com/v1/messages", config.claude_endpoint.?);
+    try testing.expectEqualStrings("claude-haiku-3-5-20241022", config.claude_model);
+    try testing.expectEqual(true, config.use_claude);
+}
+
+test "config Claude API key auto-enables use_claude" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var config = Config.init(allocator);
+    defer config.deinit();
+
+    const toml =
+        \\[claude]
+        \\api_key = "sk-ant-test"
+    ;
+
+    try config.parseToml(toml);
+
+    // Setting API key should auto-enable use_claude
+    try testing.expectEqual(true, config.use_claude);
+    try testing.expectEqualStrings("sk-ant-test", config.claude_api_key.?);
 }

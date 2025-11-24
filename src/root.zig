@@ -9,6 +9,12 @@ pub const clew = @import("clew");
 pub const braid = @import("braid");
 pub const ariadne = @import("ariadne");
 
+// Re-export API modules
+pub const api = struct {
+    pub const http = @import("http");
+    pub const claude = @import("claude");
+};
+
 // Re-export types
 pub const types = struct {
     pub const constraint = @import("types/constraint.zig");
