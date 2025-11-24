@@ -12,6 +12,9 @@ const Severity = root.types.constraint.Severity;
 // Import Claude API client
 const claude_api = @import("claude");
 
+// Import pattern matching module
+const patterns = @import("patterns.zig");
+
 // Tree-sitter support disabled pending Zig 0.15.x compatibility
 // TODO: Re-enable when z-tree-sitter upstream is fixed
 // const zts = @import("zts");
@@ -20,18 +23,26 @@ const tree_sitter_enabled = false;
 /// Main Clew extraction engine
 pub const Clew = struct {
     allocator: std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
     claude_client: ?*claude_api.ClaudeClient = null,
     cache: ConstraintCache,
 
     pub fn init(allocator: std.mem.Allocator) !Clew {
         return .{
             .allocator = allocator,
+            .arena = std.heap.ArenaAllocator.init(allocator),
             .cache = try ConstraintCache.init(allocator),
         };
     }
 
     pub fn deinit(self: *Clew) void {
         self.cache.deinit();
+        self.arena.deinit(); // Frees all arena allocations
+    }
+
+    /// Get allocator for temporary constraint strings
+    fn constraintAllocator(self: *Clew) std.mem.Allocator {
+        return self.arena.allocator();
     }
 
     /// Set Claude client for semantic analysis
@@ -47,26 +58,36 @@ pub const Clew = struct {
     ) !ConstraintSet {
         var constraint_set = ConstraintSet.init(self.allocator, "code_constraints");
 
-        // Check cache first
-        if (self.cache.get(source)) |cached| {
-            return cached;
-        }
+        // TODO: Fix caching - currently disabled due to double-free issues
+        // Cache would need to store pointers or use refcounting
+        // const cache_key = try self.buildCacheKey(source, self.claude_client != null);
+        // defer self.allocator.free(cache_key);
+        // if (self.cache.get(cache_key)) |cached| {
+        //     return cached;
+        // }
 
         // 1. Tree-sitter parsing for syntactic constraints
         const syntax_constraints = try self.extractSyntacticConstraints(source, language);
+        defer self.allocator.free(syntax_constraints);
         for (syntax_constraints) |constraint| {
             try constraint_set.add(constraint);
         }
 
         // 2. Type-level constraint discovery
         const type_constraints = try self.extractTypeConstraints(source, language);
+        defer self.allocator.free(type_constraints);
         for (type_constraints) |constraint| {
             try constraint_set.add(constraint);
         }
 
         // 3. Optional: Use Claude for semantic understanding
         if (self.claude_client) |client| {
-            const claude_constraints = try client.analyzeCode(source, language);
+            const claude_constraints = client.analyzeCode(source, language) catch |err| {
+                // Log warning but continue with pattern-based extraction
+                std.log.warn("Claude analysis failed: {}, continuing with syntactic constraints only", .{err});
+                // Return without Claude constraints
+                return constraint_set;
+            };
             defer self.allocator.free(claude_constraints);
 
             for (claude_constraints) |claude_constraint| {
@@ -83,8 +104,8 @@ pub const Clew = struct {
             }
         }
 
-        // Cache the result
-        try self.cache.put(source, constraint_set);
+        // TODO: Cache the result once caching is fixed
+        // try self.cache.put(cache_key, constraint_set);
 
         return constraint_set;
     }
@@ -93,19 +114,26 @@ pub const Clew = struct {
     pub fn extractFromTests(self: *Clew, test_source: []const u8) !ConstraintSet {
         var constraint_set = ConstraintSet.init(self.allocator, "test_constraints");
 
-        // Parse test assertions to infer constraints
+        // Parse test assertions to infer constraints (syntactic extraction)
         const assertions = try self.parseTestAssertions(test_source);
+        defer self.allocator.free(assertions);
 
         for (assertions) |assertion| {
             const constraint = try self.assertionToConstraint(assertion);
             try constraint_set.add(constraint);
         }
 
-        // Use Claude to understand test intent if available
+        // Use Claude to understand test intent if available (semantic extraction)
         if (self.claude_client) |client| {
-            const analysis = try client.analyzeTestIntent(test_source);
+            const analysis = client.analyzeTestIntent(test_source) catch |err| {
+                // Log warning but continue with pattern-based extraction
+                std.log.warn("Claude test analysis failed: {}, continuing with assertion-based constraints only", .{err});
+                return constraint_set;
+            };
             defer self.allocator.free(analysis.constraints);
             defer self.allocator.free(analysis.intent_description);
+
+            std.log.info("Test intent from Claude: {s}", .{analysis.intent_description});
 
             for (analysis.constraints) |claude_constraint| {
                 const ananke_constraint = Constraint{
@@ -166,9 +194,8 @@ pub const Clew = struct {
         language: []const u8,
     ) ![]Constraint {
         // Tree-sitter integration disabled pending Zig 0.15.x compatibility
-        // Using fallback pattern matching for now
-        _ = language;
-        return try self.extractSyntacticConstraintsFallback(source);
+        // Using pattern-based extraction with language awareness
+        return try self.extractSyntacticConstraintsFallback(source, language);
 
         // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
         // var constraints = std.ArrayList(Constraint){};
@@ -321,20 +348,148 @@ pub const Clew = struct {
     fn extractSyntacticConstraintsFallback(
         self: *Clew,
         source: []const u8,
+        language: []const u8,
     ) ![]Constraint {
         var constraints = std.ArrayList(Constraint){};
+        defer constraints.deinit(self.allocator);
 
-        // Simple pattern matching for unsupported languages
-        if (std.mem.indexOf(u8, source, "function") != null or
-            std.mem.indexOf(u8, source, "fn") != null or
-            std.mem.indexOf(u8, source, "def") != null)
-        {
+        // Get patterns for the specified language
+        const lang_patterns = patterns.getPatternsForLanguage(language);
+        if (lang_patterns == null) {
+            // Fallback to simple detection for unsupported languages
+            if (std.mem.indexOf(u8, source, "function") != null or
+                std.mem.indexOf(u8, source, "fn") != null or
+                std.mem.indexOf(u8, source, "def") != null)
+            {
+                try constraints.append(self.allocator, Constraint{
+                    .kind = .syntactic,
+                    .severity = .info,
+                    .name = "has_functions",
+                    .description = "Code contains function definitions",
+                    .source = .AST_Pattern,
+                });
+            }
+            return try constraints.toOwnedSlice(self.allocator);
+        }
+
+        // Find all pattern matches
+        const matches = try patterns.findPatternMatches(
+            self.allocator,
+            source,
+            lang_patterns.?,
+        );
+        defer self.allocator.free(matches);
+
+        // Track unique constraint types to avoid duplicates
+        var seen_patterns = std.StringHashMap(void).init(self.allocator);
+        defer seen_patterns.deinit();
+
+        // Convert matches to constraints
+        for (matches) |match| {
+            // Create unique key for this pattern
+            const key = try std.fmt.allocPrint(
+                self.allocator,
+                "{s}_{s}",
+                .{ match.rule.description, @tagName(match.rule.constraint_kind) },
+            );
+            defer self.allocator.free(key);
+
+            // Skip if we've already seen this pattern type
+            if (seen_patterns.contains(key)) {
+                continue;
+            }
+            try seen_patterns.put(key, {});
+
+            // Create constraint from pattern match
+            const name = try self.constraintAllocator().dupe(u8, match.rule.description);
+            const description = try std.fmt.allocPrint(
+                self.constraintAllocator(),
+                "{s} detected at line {d} in {s} code",
+                .{ match.rule.description, match.line, language },
+            );
+
+            const constraint = Constraint{
+                .kind = match.rule.constraint_kind,
+                .severity = .info,
+                .name = name,
+                .description = description,
+                .source = .AST_Pattern,
+                .origin_line = match.line,
+                .confidence = 0.85, // Pattern-based matching has good but not perfect confidence
+            };
+
+            try constraints.append(self.allocator, constraint);
+        }
+
+        // Generate summary constraints based on pattern frequency
+        const function_count = countPatternOccurrences(matches, "function");
+        const type_count = countPatternOccurrences(matches, "type");
+        const async_count = countPatternOccurrences(matches, "async");
+        const error_count = countPatternOccurrences(matches, "error");
+
+        // Add high-level constraints based on analysis
+        if (function_count > 0) {
+            const func_desc = try std.fmt.allocPrint(
+                self.allocator,
+                "Code contains {d} function-related constructs",
+                .{function_count},
+            );
             try constraints.append(self.allocator, Constraint{
                 .kind = .syntactic,
                 .severity = .info,
-                .name = "has_functions",
-                .description = "Code contains function definitions",
+                .name = "function_structure",
+                .description = func_desc,
                 .source = .AST_Pattern,
+                .frequency = function_count,
+            });
+        }
+
+        if (type_count > 0) {
+            const type_desc = try std.fmt.allocPrint(
+                self.allocator,
+                "Strong type safety with {d} type annotations",
+                .{type_count},
+            );
+            try constraints.append(self.allocator, Constraint{
+                .kind = .type_safety,
+                .severity = .info,
+                .name = "type_annotations",
+                .description = type_desc,
+                .source = .Type_System,
+                .frequency = type_count,
+                .confidence = if (type_count > 5) 0.9 else 0.7,
+            });
+        }
+
+        if (async_count > 0) {
+            const async_desc = try std.fmt.allocPrint(
+                self.allocator,
+                "Asynchronous code with {d} async patterns",
+                .{async_count},
+            );
+            try constraints.append(self.allocator, Constraint{
+                .kind = .semantic,
+                .severity = .info,
+                .name = "async_patterns",
+                .description = async_desc,
+                .source = .Control_Flow,
+                .frequency = async_count,
+            });
+        }
+
+        if (error_count > 0) {
+            const error_desc = try std.fmt.allocPrint(
+                self.allocator,
+                "Explicit error handling with {d} error patterns",
+                .{error_count},
+            );
+            try constraints.append(self.allocator, Constraint{
+                .kind = .semantic,
+                .severity = .info,
+                .name = "error_handling",
+                .description = error_desc,
+                .source = .Control_Flow,
+                .frequency = error_count,
             });
         }
 
@@ -349,6 +504,7 @@ pub const Clew = struct {
         _ = language;
 
         var constraints = std.ArrayList(Constraint){};
+        defer constraints.deinit(self.allocator);
 
         // Check for any/unknown types (TypeScript specific)
         if (std.mem.indexOf(u8, source, ": any") != null or
@@ -382,6 +538,23 @@ pub const Clew = struct {
         return try constraints.toOwnedSlice(self.allocator);
     }
 
+    /// Build cache key that includes source content and Claude availability
+    fn buildCacheKey(self: *Clew, source: []const u8, claude_enabled: bool) ![]const u8 {
+        // Create a hash-based key to handle large source files efficiently
+        var hasher = std.hash.Wyhash.init(0);
+        hasher.update(source);
+        const source_hash = hasher.final();
+
+        // Include Claude availability in key to separate cached results
+        const prefix = if (claude_enabled) "claude_" else "syntactic_";
+
+        return try std.fmt.allocPrint(
+            self.allocator,
+            "{s}{x:0>16}",
+            .{ prefix, source_hash },
+        );
+    }
+
     fn parseTestAssertions(self: *Clew, test_source: []const u8) ![]TestAssertion {
         _ = self;
         _ = test_source;
@@ -392,8 +565,8 @@ pub const Clew = struct {
     fn assertionToConstraint(self: *Clew, assertion: TestAssertion) !Constraint {
         _ = self;
         _ = assertion;
-        // TODO: Convert test assertions to constraints
-        return Constraint.init(.semantic, "test_derived");
+        // TODO: Implement proper assertion-to-constraint conversion
+        return Constraint.init(0, "test_derived", "Constraint derived from test assertion");
     }
 };
 
@@ -464,3 +637,13 @@ const TestAssertion = struct {
     expected: []const u8,
 };
 
+/// Count how many pattern matches contain a keyword in their description
+fn countPatternOccurrences(matches: []const patterns.PatternMatch, keyword: []const u8) u32 {
+    var count: u32 = 0;
+    for (matches) |match| {
+        if (std.mem.indexOf(u8, match.rule.description, keyword) != null) {
+            count += 1;
+        }
+    }
+    return count;
+}
