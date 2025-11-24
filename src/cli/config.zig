@@ -105,7 +105,7 @@ pub const Config = struct {
     }
 
     /// Parse TOML configuration (simplified parser)
-    fn parseToml(self: *Config, content: []const u8) !void {
+    pub fn parseToml(self: *Config, content: []const u8) !void {
         var lines = std.mem.splitSequence(u8, content, "\n");
         var current_section: ?[]const u8 = null;
 
@@ -174,43 +174,46 @@ pub const Config = struct {
         const file = try std.fs.cwd().createFile(path, .{});
         defer file.close();
 
-        const writer = file.writer();
+        var buf: [4096]u8 = undefined;
+        var writer = file.writer(&buf);
 
-        try writer.writeAll("# Ananke Configuration File\n\n");
+        try writer.interface.writeAll("# Ananke Configuration File\n\n");
 
         // Modal section
-        try writer.writeAll("[modal]\n");
+        try writer.interface.writeAll("[modal]\n");
         if (self.modal_endpoint) |endpoint| {
-            try writer.print("endpoint = \"{s}\"\n", .{endpoint});
+            try writer.interface.print("endpoint = \"{s}\"\n", .{endpoint});
         } else {
-            try writer.writeAll("# endpoint = \"https://your-app.modal.run\"\n");
+            try writer.interface.writeAll("# endpoint = \"https://your-app.modal.run\"\n");
         }
-        try writer.writeAll("# API key should be stored in environment variable ANANKE_MODAL_API_KEY\n");
-        try writer.writeAll("# or set here (not recommended for security)\n");
+        try writer.interface.writeAll("# API key should be stored in environment variable ANANKE_MODAL_API_KEY\n");
+        try writer.interface.writeAll("# or set here (not recommended for security)\n");
         if (self.modal_api_key) |_| {
-            try writer.writeAll("# api_key = \"your-key-here\"\n");
+            try writer.interface.writeAll("# api_key = \"your-key-here\"\n");
         }
-        try writer.writeAll("\n");
+        try writer.interface.writeAll("\n");
 
         // Defaults section
-        try writer.writeAll("[defaults]\n");
-        try writer.print("language = \"{s}\"\n", .{self.default_language});
-        try writer.print("max_tokens = {d}\n", .{self.max_tokens});
-        try writer.print("temperature = {d:.1}\n", .{self.temperature});
-        try writer.print("confidence_threshold = {d:.1}\n", .{self.confidence_threshold});
-        try writer.print("output_format = \"{s}\"\n", .{self.output_format});
-        try writer.writeAll("\n");
+        try writer.interface.writeAll("[defaults]\n");
+        try writer.interface.print("language = \"{s}\"\n", .{self.default_language});
+        try writer.interface.print("max_tokens = {d}\n", .{self.max_tokens});
+        try writer.interface.print("temperature = {d:.1}\n", .{self.temperature});
+        try writer.interface.print("confidence_threshold = {d:.1}\n", .{self.confidence_threshold});
+        try writer.interface.print("output_format = \"{s}\"\n", .{self.output_format});
+        try writer.interface.writeAll("\n");
 
         // Extract section
-        try writer.writeAll("[extract]\n");
-        try writer.print("use_claude = {s}\n", .{if (self.use_claude) "true" else "false"});
-        try writer.writeAll("patterns = [\"all\"]\n");
-        try writer.writeAll("\n");
+        try writer.interface.writeAll("[extract]\n");
+        try writer.interface.print("use_claude = {s}\n", .{if (self.use_claude) "true" else "false"});
+        try writer.interface.writeAll("patterns = [\"all\"]\n");
+        try writer.interface.writeAll("\n");
 
         // Compile section
-        try writer.writeAll("[compile]\n");
-        try writer.print("priority = \"{s}\"\n", .{self.compile_priority});
-        try writer.writeAll("formats = [\"json-schema\"]\n");
+        try writer.interface.writeAll("[compile]\n");
+        try writer.interface.print("priority = \"{s}\"\n", .{self.compile_priority});
+        try writer.interface.writeAll("formats = [\"json-schema\"]\n");
+
+        try writer.interface.flush();
     }
 
     /// Create a default configuration file

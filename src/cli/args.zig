@@ -70,7 +70,7 @@ pub const Args = struct {
 };
 
 /// Parse command-line arguments
-pub fn parse(allocator: std.mem.Allocator, argv: []const [:0]u8) !Args {
+pub fn parse(allocator: std.mem.Allocator, argv: []const [:0]const u8) !Args {
     var args = Args.init(allocator);
     errdefer args.deinit();
 

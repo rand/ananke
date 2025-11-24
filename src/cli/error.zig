@@ -116,40 +116,44 @@ pub fn printErrorWithSuggestion(
 
 /// Print a formatted error box for critical errors
 pub fn printErrorBox(title: []const u8, message: []const u8) void {
-    const max_width = 70;
-
     if (output.use_colors) {
         std.debug.print("\n{s}", .{output.Color.red.code()});
     } else {
         std.debug.print("\n", .{});
     }
 
-    std.debug.print("╔{'═'}╗\n", .{'=' ** max_width});
+    // Simple box without fancy borders
+    std.debug.print("╔════════════════════════════════════════════════════════════════════╗\n", .{});
     std.debug.print("║ {s: <68} ║\n", .{title});
-    std.debug.print("╠{'═'}╣\n", .{'=' ** max_width});
+    std.debug.print("╠════════════════════════════════════════════════════════════════════╣\n", .{});
 
     // Word wrap the message
-    var words = std.mem.split(u8, message, " ");
-    var current_line = std.ArrayList(u8){};
-    defer current_line.deinit();
+    var words = std.mem.splitScalar(u8, message, ' ');
+    var line_buf: [68]u8 = undefined;
+    var line_len: usize = 0;
 
     while (words.next()) |word| {
-        if (current_line.items.len + word.len + 1 > 66) {
-            std.debug.print("║ {s: <68} ║\n", .{current_line.items});
-            current_line.clearRetainingCapacity();
+        if (line_len + word.len + 1 > 66) {
+            // Print current line
+            const line = line_buf[0..line_len];
+            std.debug.print("║ {s: <68} ║\n", .{line});
+            line_len = 0;
         }
 
-        if (current_line.items.len > 0) {
-            current_line.appendSlice(" ") catch {};
+        if (line_len > 0) {
+            line_buf[line_len] = ' ';
+            line_len += 1;
         }
-        current_line.appendSlice(word) catch {};
+        @memcpy(line_buf[line_len..][0..word.len], word);
+        line_len += word.len;
     }
 
-    if (current_line.items.len > 0) {
-        std.debug.print("║ {s: <68} ║\n", .{current_line.items});
+    if (line_len > 0) {
+        const line = line_buf[0..line_len];
+        std.debug.print("║ {s: <68} ║\n", .{line});
     }
 
-    std.debug.print("╚{'═'}╝", .{'=' ** max_width});
+    std.debug.print("╚════════════════════════════════════════════════════════════════════╝", .{});
 
     if (output.use_colors) {
         std.debug.print("{s}\n\n", .{output.Color.reset.code()});

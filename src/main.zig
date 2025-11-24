@@ -67,7 +67,8 @@ pub fn main() !void {
 
     // Route to appropriate command
     const exit_code = runCommand(allocator, parsed_args, config) catch |err| {
-        return cli_error.handleError(err);
+        const code = cli_error.handleError(err);
+        std.process.exit(code.toInt());
     };
 
     if (exit_code != .success) {

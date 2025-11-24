@@ -1,15 +1,15 @@
 // CLI tests for Ananke
 const std = @import("std");
 const testing = std.testing;
-const args_mod = @import("../../src/cli/args.zig");
-const output = @import("../../src/cli/output.zig");
-const config_mod = @import("../../src/cli/config.zig");
+const args_mod = @import("args");
+const output = @import("output");
+const config_mod = @import("config");
 
 test "args: parse basic command" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "extract", "file.ts" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "extract", "file.ts" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     try testing.expectEqualStrings("extract", args.command);
@@ -20,8 +20,8 @@ test "args: parse basic command" {
 test "args: parse flags with values" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "extract", "file.ts", "--format", "json", "--output", "out.json" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "extract", "file.ts", "--format", "json", "--output", "out.json" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     try testing.expectEqualStrings("extract", args.command);
@@ -32,8 +32,8 @@ test "args: parse flags with values" {
 test "args: parse boolean flags" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "extract", "--use-claude", "--verbose" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "extract", "--use-claude", "--verbose" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     try testing.expect(args.hasFlag("use-claude"));
@@ -44,8 +44,8 @@ test "args: parse boolean flags" {
 test "args: parse short flags" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "compile", "-o", "output.cir", "-v" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "compile", "-o", "output.cir", "-v" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     try testing.expectEqualStrings("output.cir", args.getFlag("o").?);
@@ -55,8 +55,8 @@ test "args: parse short flags" {
 test "args: parse flag with equals" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "compile", "--output=/tmp/out.cir", "--priority=high" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "compile", "--output=/tmp/out.cir", "--priority=high" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     try testing.expectEqualStrings("/tmp/out.cir", args.getFlag("output").?);
@@ -66,8 +66,8 @@ test "args: parse flag with equals" {
 test "args: get integer flag" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "generate", "--max-tokens", "2048" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "generate", "--max-tokens", "2048" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     const max_tokens = try args.getFlagInt("max-tokens", u32);
@@ -77,8 +77,8 @@ test "args: get integer flag" {
 test "args: get float flag" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "generate", "--temperature", "0.5" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "generate", "--temperature", "0.5" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     const temperature = try args.getFlagFloat("temperature", f32);
@@ -88,8 +88,8 @@ test "args: get float flag" {
 test "args: get flag with default" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "extract" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "extract" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     const format = args.getFlagOr("format", "pretty");
@@ -99,8 +99,8 @@ test "args: get flag with default" {
 test "args: missing positional argument" {
     const allocator = testing.allocator;
 
-    var argv = [_][:0]const u8{ "ananke", "extract" };
-    var args = try args_mod.parse(allocator, &argv);
+    const argv = [_][:0]const u8{ "ananke", "extract" };
+    var args = try args_mod.parse(allocator, argv[0..]);
     defer args.deinit();
 
     const result = args.getPositional(0);
