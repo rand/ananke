@@ -404,11 +404,11 @@ pub const Clew = struct {
 
             // Skip if we've already seen this pattern type
             if (seen_patterns.contains(key)) {
-                self.allocator.free(key);  // Free immediately if duplicate
+                self.allocator.free(key); // Free immediately if duplicate
                 continue;
             }
             try seen_patterns.put(key, {});
-            try pattern_keys.append(self.allocator, key);  // Track for later cleanup
+            try pattern_keys.append(self.allocator, key); // Track for later cleanup
 
             // Create constraint from pattern match
             const name = try self.constraintAllocator().dupe(u8, match.rule.description);

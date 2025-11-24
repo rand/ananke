@@ -33,7 +33,8 @@ test "TypeScript: Extract function declarations" {
             found_function = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "async") != null or
-            std.mem.indexOf(u8, constraint.name, "Async") != null) {
+            std.mem.indexOf(u8, constraint.name, "Async") != null)
+        {
             found_async = true;
         }
     }
@@ -62,11 +63,13 @@ test "TypeScript: Extract type annotations" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "type") != null or
-            std.mem.indexOf(u8, constraint.name, "Type") != null) {
+            std.mem.indexOf(u8, constraint.name, "Type") != null)
+        {
             found_type = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Interface") != null or
-            std.mem.indexOf(u8, constraint.name, "interface") != null) {
+            std.mem.indexOf(u8, constraint.name, "interface") != null)
+        {
             found_interface = true;
         }
     }
@@ -92,7 +95,8 @@ test "TypeScript: Extract async patterns" {
     for (constraint_set.constraints.items) |constraint| {
         if (constraint.kind == .semantic and
             (std.mem.indexOf(u8, constraint.name, "async") != null or
-             std.mem.indexOf(u8, constraint.name, "Async") != null)) {
+                std.mem.indexOf(u8, constraint.name, "Async") != null))
+        {
             found_async_pattern = true;
             break;
         }
@@ -122,11 +126,13 @@ test "Python: Extract function declarations" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "function") != null or
-            std.mem.indexOf(u8, constraint.name, "Function") != null) {
+            std.mem.indexOf(u8, constraint.name, "Function") != null)
+        {
             found_function = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Async") != null or
-            std.mem.indexOf(u8, constraint.name, "async") != null) {
+            std.mem.indexOf(u8, constraint.name, "async") != null)
+        {
             found_async_def = true;
         }
     }
@@ -179,12 +185,14 @@ test "Python: Extract decorators and error handling" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "Decorator") != null or
-            std.mem.indexOf(u8, constraint.name, "decorator") != null) {
+            std.mem.indexOf(u8, constraint.name, "decorator") != null)
+        {
             found_decorator = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "error") != null or
             std.mem.indexOf(u8, constraint.name, "Error") != null or
-            std.mem.indexOf(u8, constraint.name, "exception") != null) {
+            std.mem.indexOf(u8, constraint.name, "exception") != null)
+        {
             found_error = true;
         }
     }
@@ -214,7 +222,8 @@ test "Rust: Extract function declarations" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "function") != null or
-            std.mem.indexOf(u8, constraint.name, "Function") != null) {
+            std.mem.indexOf(u8, constraint.name, "Function") != null)
+        {
             found_function = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Public function") != null) {
@@ -272,12 +281,14 @@ test "Rust: Extract ownership patterns and traits" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "reference") != null or
-            std.mem.indexOf(u8, constraint.name, "Reference") != null) {
+            std.mem.indexOf(u8, constraint.name, "Reference") != null)
+        {
             found_reference = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Trait") != null or
             std.mem.indexOf(u8, constraint.name, "trait") != null or
-            std.mem.indexOf(u8, constraint.name, "impl") != null) {
+            std.mem.indexOf(u8, constraint.name, "impl") != null)
+        {
             found_trait = true;
         }
     }
@@ -307,7 +318,8 @@ test "Zig: Extract function declarations" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "function") != null or
-            std.mem.indexOf(u8, constraint.name, "Function") != null) {
+            std.mem.indexOf(u8, constraint.name, "Function") != null)
+        {
             found_function = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Public function") != null) {
@@ -339,11 +351,13 @@ test "Zig: Extract error union types" {
 
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "Error") != null or
-            std.mem.indexOf(u8, constraint.name, "error") != null) {
+            std.mem.indexOf(u8, constraint.name, "error") != null)
+        {
             found_error_union = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Try") != null or
-            std.mem.indexOf(u8, constraint.name, "try") != null) {
+            std.mem.indexOf(u8, constraint.name, "try") != null)
+        {
             found_try = true;
         }
     }
@@ -370,11 +384,13 @@ test "Zig: Extract memory management patterns" {
     for (constraint_set.constraints.items) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "Allocator") != null or
             std.mem.indexOf(u8, constraint.name, "allocator") != null or
-            std.mem.indexOf(u8, constraint.name, "alloc") != null) {
+            std.mem.indexOf(u8, constraint.name, "alloc") != null)
+        {
             found_allocator = true;
         }
         if (std.mem.indexOf(u8, constraint.name, "Defer") != null or
-            std.mem.indexOf(u8, constraint.name, "defer") != null) {
+            std.mem.indexOf(u8, constraint.name, "defer") != null)
+        {
             found_defer = true;
         }
     }
@@ -411,7 +427,7 @@ test "Pattern coverage: TypeScript achieves 80% constraint extraction" {
     }
 
     const coverage_ratio = @as(f32, @floatFromInt(kinds_found.count())) /
-                          @as(f32, @floatFromInt(expected_pattern_categories));
+        @as(f32, @floatFromInt(expected_pattern_categories));
 
     // Should achieve at least 80% coverage
     try testing.expect(coverage_ratio >= 0.8);

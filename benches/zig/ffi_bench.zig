@@ -14,7 +14,7 @@ pub fn main() !void {
     // Benchmark type conversions
     try benchmarkConstraintIRConversion(allocator, 1000);
     try benchmarkIntentConversion(allocator, 10000);
-    
+
     // Benchmark memory allocation/deallocation
     try benchmarkFFIMemoryLifecycle(allocator, 1000);
 
@@ -29,13 +29,13 @@ fn benchmarkConstraintIRConversion(
     iterations: usize,
 ) !void {
     _ = allocator;
-    
+
     var timer = try std.time.Timer.start();
     var total_ns: u64 = 0;
 
     // Create a sample ConstraintIR
     // TODO: Implement actual conversion when FFI types are complete
-    
+
     for (0..iterations) |_| {
         timer.reset();
         // Simulate conversion overhead
@@ -48,7 +48,7 @@ fn benchmarkConstraintIRConversion(
     std.debug.print("ConstraintIR Conversion (Zig → C):\n", .{});
     std.debug.print("  Iterations: {}\n", .{iterations});
     std.debug.print("  Average: {d:.2}μs\n", .{@as(f64, @floatFromInt(avg_us))});
-    
+
     if (avg_us > 100) {
         std.debug.print("  ⚠️  WARNING: Conversion overhead is high!\n", .{});
     } else {
@@ -62,7 +62,7 @@ fn benchmarkIntentConversion(
     iterations: usize,
 ) !void {
     _ = allocator;
-    
+
     var timer = try std.time.Timer.start();
     var total_ns: u64 = 0;
 
@@ -78,9 +78,7 @@ fn benchmarkIntentConversion(
     std.debug.print("Intent Conversion (C → Zig):\n", .{});
     std.debug.print("  Iterations: {}\n", .{iterations});
     std.debug.print("  Average: {d}ns\n", .{avg_ns});
-    std.debug.print("  Throughput: {d:.0} ops/sec\n", .{
-        1_000_000_000.0 / @as(f64, @floatFromInt(avg_ns))
-    });
+    std.debug.print("  Throughput: {d:.0} ops/sec\n", .{1_000_000_000.0 / @as(f64, @floatFromInt(avg_ns))});
     std.debug.print("\n", .{});
 }
 
@@ -119,7 +117,7 @@ fn benchmarkStringMarshaling(
     iterations: usize,
 ) !void {
     const test_string = "This is a test string for benchmarking FFI string marshaling overhead";
-    
+
     var timer = try std.time.Timer.start();
     var total_ns: u64 = 0;
 
@@ -135,9 +133,7 @@ fn benchmarkStringMarshaling(
     std.debug.print("String Marshaling ({} bytes):\n", .{test_string.len});
     std.debug.print("  Average: {d}ns\n", .{avg_ns});
     std.debug.print("  Per byte: {d:.2}ns\n", .{@as(f64, @floatFromInt(avg_ns)) / @as(f64, @floatFromInt(test_string.len))});
-    std.debug.print("  Bandwidth: {d:.2} MB/s\n", .{
-        (@as(f64, @floatFromInt(test_string.len)) * 1_000_000_000.0) / 
-        (@as(f64, @floatFromInt(avg_ns)) * 1_048_576.0)
-    });
+    std.debug.print("  Bandwidth: {d:.2} MB/s\n", .{(@as(f64, @floatFromInt(test_string.len)) * 1_000_000_000.0) /
+        (@as(f64, @floatFromInt(avg_ns)) * 1_048_576.0)});
     std.debug.print("\n", .{});
 }

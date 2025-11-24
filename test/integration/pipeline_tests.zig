@@ -390,12 +390,12 @@ test "integration: constraint sources are properly tracked" {
     // All extracted constraints should have a valid source
     for (constraint_set.constraints.items) |constraint| {
         // Source should be one of the extraction sources
-        const is_valid_source = 
+        const is_valid_source =
             constraint.source == .AST_Pattern or
             constraint.source == .Type_System or
             constraint.source == .Control_Flow or
             constraint.source == .LLM_Analysis;
-        
+
         try testing.expect(is_valid_source);
     }
 }

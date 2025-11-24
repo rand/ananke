@@ -99,9 +99,6 @@ test "buildGrammar - simple function grammar" {
 test "buildGrammar - async function grammar" {
     const allocator = testing.allocator;
 
-    
-    
-
     // Create constraints with async function
     var constraints = [_]Constraint{
         Constraint.init(1, "async_func", "async function declaration"),
@@ -128,9 +125,6 @@ test "buildGrammar - async function grammar" {
 
 test "buildGrammar - control flow grammar (if/for/while)" {
     const allocator = testing.allocator;
-
-    
-    
 
     // Create constraints with control flow patterns
     var constraints = [_]Constraint{
@@ -180,9 +174,6 @@ test "buildGrammar - control flow grammar (if/for/while)" {
 test "buildGrammar - try/catch grammar" {
     const allocator = testing.allocator;
 
-    
-    
-
     // Create constraints with try/catch
     var constraints = [_]Constraint{
         Constraint.init(1, "exception", "try catch exception handling"),
@@ -212,9 +203,6 @@ test "buildGrammar - try/catch grammar" {
 
 test "buildGrammar - multiple patterns combined" {
     const allocator = testing.allocator;
-
-    
-    
 
     // Create constraints with multiple patterns
     var constraints = [_]Constraint{
@@ -260,9 +248,6 @@ test "buildGrammar - multiple patterns combined" {
 
 test "buildGrammar - complex nested structures" {
     const allocator = testing.allocator;
-
-    
-    
 
     // Create constraints with complex nested patterns
     var constraints = [_]Constraint{
@@ -336,9 +321,6 @@ test "buildGrammar - complex nested structures" {
 test "buildGrammar - empty constraints produces minimal grammar" {
     const allocator = testing.allocator;
 
-    
-    
-
     // Empty constraints array
     const constraints = [_]Constraint{};
 
@@ -367,9 +349,6 @@ test "buildGrammar - empty constraints produces minimal grammar" {
 
 test "buildGrammar - non-syntactic constraints ignored" {
     const allocator = testing.allocator;
-
-    
-    
 
     // Mix of syntactic and non-syntactic constraints
     var constraints = [_]Constraint{
