@@ -82,11 +82,9 @@ fn benchmarkCompilation(
 
     std.debug.print("{s}:\n", .{name});
     std.debug.print("  Iterations: {}\n", .{iterations});
-    std.debug.print("  Average: {d:.2}ms ({d}μs)\n", .{@as(f64, @floatFromInt(avg_ms)), avg_us});
-    std.debug.print("  Throughput: {d:.0} constraints/sec\n", .{
-        @as(f64, @floatFromInt(constraint_count * iterations)) / (@as(f64, @floatFromInt(total_ns)) / 1_000_000_000.0)
-    });
-    
+    std.debug.print("  Average: {d:.2}ms ({d}μs)\n", .{ @as(f64, @floatFromInt(avg_ms)), avg_us });
+    std.debug.print("  Throughput: {d:.0} constraints/sec\n", .{@as(f64, @floatFromInt(constraint_count * iterations)) / (@as(f64, @floatFromInt(total_ns)) / 1_000_000_000.0)});
+
     // Check against target
     if (avg_ms > 50) {
         std.debug.print("  ⚠️  WARNING: Exceeds 50ms target!\n", .{});

@@ -5,14 +5,14 @@ const std = @import("std");
 const Clew = @import("clew").Clew;
 
 // Benchmark sample code of various sizes
-const SMALL_CODE = 
+const SMALL_CODE =
     \\pub fn main() !void {
     \\    const x = 42;
     \\    std.debug.print("{}\n", .{x});
     \\}
 ;
 
-const MEDIUM_CODE = 
+const MEDIUM_CODE =
     \\pub fn fib(n: usize) usize {
     \\    if (n <= 1) return n;
     \\    return fib(n - 1) + fib(n - 2);
@@ -40,10 +40,10 @@ pub fn main() !void {
 
     // Benchmark small file extraction
     try benchmarkExtraction(allocator, "Small file (50 bytes)", SMALL_CODE, "zig", 1000);
-    
+
     // Benchmark medium file extraction
     try benchmarkExtraction(allocator, "Medium file (200 bytes)", MEDIUM_CODE, "zig", 500);
-    
+
     // Benchmark large file extraction
     try benchmarkExtraction(allocator, "Large file (800 bytes)", LARGE_CODE, "zig", 100);
 
@@ -85,9 +85,9 @@ fn benchmarkExtraction(
 
     std.debug.print("{s}:\n", .{name});
     std.debug.print("  Iterations: {}\n", .{iterations});
-    std.debug.print("  Average: {d:.2}ms ({d}μs)\n", .{@as(f64, @floatFromInt(avg_ms)), avg_us});
+    std.debug.print("  Average: {d:.2}ms ({d}μs)\n", .{ @as(f64, @floatFromInt(avg_ms)), avg_us });
     std.debug.print("  Total: {d:.2}ms\n", .{@as(f64, @floatFromInt(total_ns)) / 1_000_000.0});
-    
+
     // Check against target
     if (avg_ms > 10) {
         std.debug.print("  ⚠️  WARNING: Exceeds 10ms target!\n", .{});
