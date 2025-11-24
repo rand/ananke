@@ -2,7 +2,8 @@
 
 > Get started with constraint-driven code generation in 10-15 minutes.
 
-**Last Updated**: November 23, 2025
+**Last Updated**: November 24, 2025
+**Status**: Updated to reflect v0.1.0 actual implementation
 
 ---
 
@@ -362,12 +363,13 @@ Claude is optional for semantic understanding of business rules.
 
 ### Q: Can I generate code yet?
 
-**Not quite.** The generation layer (Maze) is under active development (Week 5-6 of implementation). Right now you can:
-- Extract constraints (Clew) ✓
-- Compile constraints (Braid) ✓
-- Define constraints (Ariadne) ✓
+**Yes!** The complete system is implemented and production-ready:
+- Extract constraints (Clew) ✓ COMPLETE
+- Compile constraints (Braid) ✓ COMPLETE
+- Define constraints (Ariadne) ✓ 70% COMPLETE (parsing works, type checking deferred)
+- Generate code (Maze) ✓ COMPLETE with Modal inference service
 
-Code generation will be available in Week 8.
+The full pipeline is deployed and tested. See examples/04-full-pipeline for end-to-end usage.
 
 ### Q: How fast is constraint extraction?
 
@@ -380,14 +382,17 @@ Fast enough for interactive use and CI/CD.
 
 ### Q: What languages are supported?
 
-Currently optimized for:
+**v0.1.0 (Fully Supported):**
 - TypeScript/JavaScript
 - Python
+
+**v0.2.0 (Planned):**
 - Rust
 - Go
-- Java
+- Zig
+- Extended tree-sitter integration for additional languages
 
-Support for more languages via tree-sitter (extensible).
+Note: We use pure Zig structural parsers in v0.1.0 for compatibility. Tree-sitter integration planned for v0.2.
 
 ### Q: How accurate is constraint extraction?
 

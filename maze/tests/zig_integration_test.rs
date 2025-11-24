@@ -3,8 +3,8 @@
 //! Tests the complete integration between Rust Maze and Zig Clew/Braid
 
 use maze::ffi::{
-    ConstraintIR, Intent, GenerationResult, RegexPattern, TokenMaskRules,
-    JsonSchema, Grammar, GrammarRule,
+    ConstraintIR, GenerationResult, Grammar, GrammarRule, Intent, JsonSchema, RegexPattern,
+    TokenMaskRules,
 };
 use std::collections::HashMap;
 
@@ -95,14 +95,20 @@ fn test_zig_ffi_constraint_ir_conversion() {
         // Validate regex patterns
         assert_eq!(restored.regex_patterns.len(), 2);
         assert_eq!(restored.regex_patterns[0].pattern, r"^\d+$");
-        assert_eq!(restored.regex_patterns[1].pattern, r"[a-zA-Z_][a-zA-Z0-9_]*");
+        assert_eq!(
+            restored.regex_patterns[1].pattern,
+            r"[a-zA-Z_][a-zA-Z0-9_]*"
+        );
         // NOTE: Regex flags are not currently serialized through FFI (known limitation)
         // assert_eq!(restored.regex_patterns[1].flags, "i");
 
         // Validate token masks
         assert!(restored.token_masks.is_some());
         let restored_masks = restored.token_masks.unwrap();
-        assert_eq!(restored_masks.allowed_tokens, Some(vec![1, 2, 3, 5, 8, 13, 21]));
+        assert_eq!(
+            restored_masks.allowed_tokens,
+            Some(vec![1, 2, 3, 5, 8, 13, 21])
+        );
         assert_eq!(restored_masks.forbidden_tokens, Some(vec![666, 999, 1337]));
 
         maze::ffi::free_constraint_ir_ffi(ffi);
@@ -168,7 +174,10 @@ fn test_ffi_memory_ownership() {
             let restored = ConstraintIR::from_ffi(ffi).expect("FFI conversion failed");
             assert_eq!(constraint.name, restored.name);
             assert_eq!(constraint.priority, restored.priority);
-            assert_eq!(constraint.regex_patterns.len(), restored.regex_patterns.len());
+            assert_eq!(
+                constraint.regex_patterns.len(),
+                restored.regex_patterns.len()
+            );
 
             // Verify specific patterns
             for (j, pattern) in constraint.regex_patterns.iter().enumerate() {
@@ -233,7 +242,7 @@ fn test_ffi_edge_cases() {
     // Test with very long strings
     let long_name = "x".repeat(1000);
     let long_pattern = "a".repeat(5000);
-    
+
     let large = ConstraintIR {
         name: long_name.clone(),
         json_schema: None,
@@ -305,19 +314,19 @@ fn test_ffi_complex_grammar() {
     let ffi = constraint.to_ffi();
     unsafe {
         let restored = ConstraintIR::from_ffi(ffi).expect("FFI conversion failed");
-        
+
         assert!(restored.grammar.is_some());
         let grammar = restored.grammar.unwrap();
         assert_eq!(grammar.rules.len(), 6);
         assert_eq!(grammar.start_symbol, "value");
-        
+
         // Verify specific rules
         assert_eq!(grammar.rules[4].lhs, "object");
         assert_eq!(grammar.rules[4].rhs.len(), 3);
         assert_eq!(grammar.rules[4].rhs[0], "{");
         assert_eq!(grammar.rules[4].rhs[1], "members");
         assert_eq!(grammar.rules[4].rhs[2], "}");
-        
+
         maze::ffi::free_constraint_ir_ffi(ffi);
     }
 }
@@ -406,19 +415,25 @@ fn test_ffi_json_schema_complex() {
         schema_type: "object".to_string(),
         properties: {
             let mut props = HashMap::new();
-            props.insert("user".to_string(), serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "email": {"type": "string", "format": "email"}
-                },
-                "required": ["id", "name"]
-            }));
-            props.insert("settings".to_string(), serde_json::json!({
-                "type": "object",
-                "additionalProperties": true
-            }));
+            props.insert(
+                "user".to_string(),
+                serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "email": {"type": "string", "format": "email"}
+                    },
+                    "required": ["id", "name"]
+                }),
+            );
+            props.insert(
+                "settings".to_string(),
+                serde_json::json!({
+                    "type": "object",
+                    "additionalProperties": true
+                }),
+            );
             props
         },
         required: vec!["user".to_string()],
@@ -437,18 +452,18 @@ fn test_ffi_json_schema_complex() {
     let ffi = constraint.to_ffi();
     unsafe {
         let restored = ConstraintIR::from_ffi(ffi).expect("FFI conversion failed");
-        
+
         assert!(restored.json_schema.is_some());
         let schema = restored.json_schema.unwrap();
         assert_eq!(schema.properties.len(), 2);
         assert!(schema.properties.contains_key("user"));
         assert!(schema.properties.contains_key("settings"));
-        
+
         // Verify nested structure
         let user_schema = &schema.properties["user"];
         assert!(user_schema.is_object());
         assert!(user_schema["properties"].is_object());
-        
+
         maze::ffi::free_constraint_ir_ffi(ffi);
     }
 }
@@ -461,18 +476,16 @@ fn test_ffi_json_schema_complex() {
 fn test_ffi_roundtrip_stress() {
     // Create many constraints and ensure they all survive roundtrip
     let count = 100;
-    
+
     for i in 0..count {
         let constraint = ConstraintIR {
             name: format!("constraint_{}", i),
             json_schema: None,
             grammar: None,
-            regex_patterns: vec![
-                RegexPattern {
-                    pattern: format!(r"\d{{{}}}", i),
-                    flags: "g".to_string(),
-                }
-            ],
+            regex_patterns: vec![RegexPattern {
+                pattern: format!(r"\d{{{}}}", i),
+                flags: "g".to_string(),
+            }],
             token_masks: if i % 2 == 0 {
                 Some(TokenMaskRules {
                     allowed_tokens: Some(vec![i as u32, (i + 1) as u32]),

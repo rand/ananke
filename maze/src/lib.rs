@@ -38,15 +38,15 @@ pub mod ffi;
 pub mod modal_client;
 
 use anyhow::{Context, Result};
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::collections::HashMap;
-use lru::LruCache;
-use std::num::NonZeroUsize;
 
+pub use ffi::{ConstraintIR, GenerationResult, Intent};
 pub use modal_client::{ModalClient, ModalConfig};
-pub use ffi::{ConstraintIR, Intent, GenerationResult};
 
 /// Main orchestrator for constrained code generation
 ///
@@ -227,8 +227,8 @@ impl MazeOrchestrator {
     pub fn with_config(modal_config: ModalConfig, maze_config: MazeConfig) -> Result<Self> {
         let modal_client = ModalClient::new(modal_config)?;
 
-        let cache_size = NonZeroUsize::new(maze_config.cache_size_limit)
-            .expect("Cache size must be non-zero");
+        let cache_size =
+            NonZeroUsize::new(maze_config.cache_size_limit).expect("Cache size must be non-zero");
 
         Ok(Self {
             modal_client,
@@ -260,7 +260,10 @@ impl MazeOrchestrator {
 
         // Call Modal inference service
         let gen_start = std::time::Instant::now();
-        let modal_response = self.modal_client.generate_constrained(modal_request).await
+        let modal_response = self
+            .modal_client
+            .generate_constrained(modal_request)
+            .await
             .context("Failed to generate with Modal inference service")?;
         let generation_time_ms = gen_start.elapsed().as_millis() as u64;
 
@@ -268,15 +271,22 @@ impl MazeOrchestrator {
         let provenance = Provenance {
             model: modal_response.model.clone(),
             timestamp: chrono::Utc::now().timestamp(),
-            constraints_applied: request.constraints_ir
+            constraints_applied: request
+                .constraints_ir
                 .iter()
                 .map(|c| c.name.clone())
                 .collect(),
             original_intent: request.prompt.clone(),
             parameters: {
                 let mut params = HashMap::new();
-                params.insert("max_tokens".to_string(), serde_json::json!(request.max_tokens));
-                params.insert("temperature".to_string(), serde_json::json!(request.temperature));
+                params.insert(
+                    "max_tokens".to_string(),
+                    serde_json::json!(request.max_tokens),
+                );
+                params.insert(
+                    "temperature".to_string(),
+                    serde_json::json!(request.temperature),
+                );
                 params
             },
         };
@@ -284,7 +294,8 @@ impl MazeOrchestrator {
         // Build validation result (llguidance ensures satisfaction)
         let validation = ValidationResult {
             all_satisfied: true,
-            satisfied: request.constraints_ir
+            satisfied: request
+                .constraints_ir
                 .iter()
                 .map(|c| c.name.clone())
                 .collect(),
@@ -317,7 +328,10 @@ impl MazeOrchestrator {
 
     /// Compile constraints to llguidance format with caching
     /// Uses LRU cache for O(1) eviction instead of O(n) linear scan
-    pub async fn compile_constraints(&self, constraints_ir: &[ConstraintIR]) -> Result<CompiledConstraint> {
+    pub async fn compile_constraints(
+        &self,
+        constraints_ir: &[ConstraintIR],
+    ) -> Result<CompiledConstraint> {
         // Generate cache key from constraints
         let cache_key = self.generate_cache_key(constraints_ir)?;
 
@@ -352,8 +366,8 @@ impl MazeOrchestrator {
     /// Generate cache key from constraint IR
     /// Uses xxHash3 for high-performance hashing (2-3x faster than DefaultHasher)
     pub fn generate_cache_key(&self, constraints_ir: &[ConstraintIR]) -> Result<String> {
-        use xxhash_rust::xxh3::Xxh3;
         use std::hash::Hasher;
+        use xxhash_rust::xxh3::Xxh3;
 
         let json = serde_json::to_string(constraints_ir)
             .context("Failed to serialize constraints for caching")?;
@@ -384,7 +398,9 @@ impl MazeOrchestrator {
 
             // Add grammar constraints
             if let Some(ref grammar) = constraint.grammar {
-                if let Some(constraints) = schema.get_mut("constraints").and_then(|c| c.as_array_mut()) {
+                if let Some(constraints) =
+                    schema.get_mut("constraints").and_then(|c| c.as_array_mut())
+                {
                     constraints.push(serde_json::json!({
                         "type": "grammar",
                         "name": constraint.name,
@@ -396,7 +412,9 @@ impl MazeOrchestrator {
 
             // Add regex constraints
             if !constraint.regex_patterns.is_empty() {
-                if let Some(constraints) = schema.get_mut("constraints").and_then(|c| c.as_array_mut()) {
+                if let Some(constraints) =
+                    schema.get_mut("constraints").and_then(|c| c.as_array_mut())
+                {
                     for pattern in &constraint.regex_patterns {
                         constraints.push(serde_json::json!({
                             "type": "regex",
@@ -409,7 +427,9 @@ impl MazeOrchestrator {
 
             // Add token mask constraints
             if let Some(ref token_masks) = constraint.token_masks {
-                if let Some(constraints) = schema.get_mut("constraints").and_then(|c| c.as_array_mut()) {
+                if let Some(constraints) =
+                    schema.get_mut("constraints").and_then(|c| c.as_array_mut())
+                {
                     let mut mask_constraint = serde_json::json!({
                         "type": "token_mask",
                         "name": constraint.name

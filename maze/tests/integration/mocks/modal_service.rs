@@ -4,6 +4,7 @@ use serde_json::json;
 
 /// Mock scenario types
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum MockScenario {
     Success,
     Timeout,
@@ -53,10 +54,9 @@ impl MockModalService {
                 }
             }),
             MockScenario::LargeResponse => {
-                let large_code = "fn large_function() {\n".to_string() 
-                    + &"    // line\n".repeat(100) 
-                    + "}\n";
-                
+                let large_code =
+                    "fn large_function() {\n".to_string() + &"    // line\n".repeat(100) + "}\n";
+
                 json!({
                     "generated_text": large_code,
                     "tokens_generated": 500,
@@ -68,7 +68,7 @@ impl MockModalService {
                         "avg_constraint_check_us": 100
                     }
                 })
-            },
+            }
             _ => json!({
                 "generated_text": "fn example() {}",
                 "tokens_generated": 5,
@@ -82,18 +82,21 @@ impl MockModalService {
             }),
         }
     }
-    
+
     /// Get status code for scenario
+    #[allow(dead_code)]
     pub fn scenario_status(scenario: MockScenario) -> usize {
         match scenario {
-            MockScenario::Success | MockScenario::LargeResponse | MockScenario::PartialResponse => 200,
+            MockScenario::Success | MockScenario::LargeResponse | MockScenario::PartialResponse => {
+                200
+            }
             MockScenario::ConstraintViolation => 400,
             MockScenario::RateLimited => 429,
             MockScenario::ServerError => 500,
             MockScenario::Timeout => 504,
         }
     }
-    
+
     /// Convert custom response to JSON
     pub fn custom_response(response: MockResponse) -> serde_json::Value {
         json!({

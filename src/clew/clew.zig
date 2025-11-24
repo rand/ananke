@@ -15,10 +15,11 @@ const claude_api = @import("claude");
 // Import pattern matching module
 const patterns = @import("patterns.zig");
 
-// Tree-sitter support disabled pending Zig 0.15.x compatibility
-// TODO: Re-enable when z-tree-sitter upstream is fixed
-// const zts = @import("zts");
-const tree_sitter_enabled = false;
+// Import structural extractors (pure Zig AST-like parsing)
+const extractors = @import("extractors.zig");
+
+// Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
+const structural_parsing_enabled = true;
 
 /// Main Clew extraction engine
 pub const Clew = struct {
@@ -56,15 +57,17 @@ pub const Clew = struct {
         source: []const u8,
         language: []const u8,
     ) !ConstraintSet {
-        var constraint_set = ConstraintSet.init(self.allocator, "code_constraints");
+        // Check cache first
+        const cache_key = try self.buildCacheKey(source, self.claude_client != null);
+        defer self.allocator.free(cache_key);
 
-        // TODO: Fix caching - currently disabled due to double-free issues
-        // Cache would need to store pointers or use refcounting
-        // const cache_key = try self.buildCacheKey(source, self.claude_client != null);
-        // defer self.allocator.free(cache_key);
-        // if (self.cache.get(cache_key)) |cached| {
-        //     return cached;
-        // }
+        if (try self.cache.get(cache_key)) |cached| {
+            // Cache hit - return cloned copy (caller owns it)
+            return cached;
+        }
+
+        // Cache miss - extract constraints
+        var constraint_set = ConstraintSet.init(self.allocator, "code_constraints");
 
         // 1. Tree-sitter parsing for syntactic constraints
         const syntax_constraints = try self.extractSyntacticConstraints(source, language);
@@ -104,8 +107,9 @@ pub const Clew = struct {
             }
         }
 
-        // TODO: Cache the result once caching is fixed
-        // try self.cache.put(cache_key, constraint_set);
+        // Cache the result for future lookups
+        // Note: put() clones the constraint_set, so we still own the original
+        try self.cache.put(cache_key, constraint_set);
 
         return constraint_set;
     }
@@ -193,157 +197,39 @@ pub const Clew = struct {
         source: []const u8,
         language: []const u8,
     ) ![]Constraint {
-        // Tree-sitter integration disabled pending Zig 0.15.x compatibility
-        // Using pattern-based extraction with language awareness
-        return try self.extractSyntacticConstraintsFallback(source, language);
+        // Use structural extractors for supported languages (TypeScript, Python)
+        // Falls back to pattern matching for other languages
+        if (structural_parsing_enabled) {
+            const structural_constraints = extractors.extract(
+                self.allocator,
+                self.constraintAllocator(),
+                source,
+                language,
+            ) catch |err| {
+                std.log.warn("Structural extraction failed: {}, falling back to pattern matching", .{err});
+                return try self.extractSyntacticConstraintsFallback(source, language);
+            };
 
-        // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
-        // var constraints = std.ArrayList(Constraint){};
-        //
-        // // Get the appropriate language parser
-        // const lang = try self.getLanguageParser(language);
-        // if (lang == null) {
-        //     // Fall back to pattern matching for unsupported languages
-        //     return try self.extractSyntacticConstraintsFallback(source);
-        // }
-        //
-        // // Create parser and parse the source
-        // var parser = try zts.Parser.init();
-        // defer parser.deinit();
-        //
-        // try parser.setLanguage(lang.?);
-        // const tree = try parser.parseString(null, source);
-        // defer tree.deinit();
-        //
-        // const root_node = tree.rootNode();
-        //
-        // // Extract constraints from the syntax tree
-        // var func_count: u32 = 0;
-        // var typed_func_count: u32 = 0;
-        //
-        // try self.walkTreeForConstraints(
-        //     root_node,
-        //     &constraints,
-        //     &func_count,
-        //     &typed_func_count,
-        //     language,
-        // );
-        //
-        // // Generate high-level constraints based on analysis
-        // if (func_count > 0) {
-        //     const typed_ratio = @as(f32, @floatFromInt(typed_func_count)) / @as(f32, @floatFromInt(func_count));
-        //
-        //     if (typed_ratio > 0.8) {
-        //         try constraints.append(self.allocator, Constraint{
-        //             .kind = .type_safety,
-        //             .severity = .info,
-        //             .name = "explicit_function_types",
-        //             .description = "Most functions have explicit type annotations",
-        //             .source = .{ .static_analysis = {} },
-        //             .confidence = typed_ratio,
-        //         });
-        //     }
-        //
-        //     try constraints.append(self.allocator, Constraint{
-        //         .kind = .syntactic,
-        //         .severity = .info,
-        //         .name = "function_structure",
-        //         .description = std.fmt.allocPrint(
-        //             self.allocator,
-        //             "Code contains {d} function definitions",
-        //             .{func_count},
-        //         ) catch "Code contains function definitions",
-        //         .source = .{ .static_analysis = {} },
-        //     });
-        // }
-        //
-        // return try constraints.toOwnedSlice(self.allocator);
+            // If we got structural constraints, combine with pattern-based ones for completeness
+            if (structural_constraints.len > 0) {
+                const pattern_constraints = try self.extractSyntacticConstraintsFallback(source, language);
+                defer self.allocator.free(pattern_constraints);
+
+                // Merge both sets (structural parsing + pattern matching)
+                var combined = std.ArrayList(Constraint){};
+                defer combined.deinit(self.allocator);
+
+                try combined.appendSlice(self.allocator, structural_constraints);
+                try combined.appendSlice(self.allocator, pattern_constraints);
+
+                return try combined.toOwnedSlice(self.allocator);
+            }
+        }
+
+        // Fallback to pattern-based extraction
+        return try self.extractSyntacticConstraintsFallback(source, language);
     }
 
-    // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
-    // fn getLanguageParser(self: *Clew, language: []const u8) !?*const anyopaque {
-    //     _ = self;
-    //
-    //     // Map language names to Tree-sitter parsers
-    //     if (std.mem.eql(u8, language, "typescript")) {
-    //         return zts.loadLanguage("typescript");
-    //     } else if (std.mem.eql(u8, language, "python")) {
-    //         return zts.loadLanguage("python");
-    //     } else if (std.mem.eql(u8, language, "javascript")) {
-    //         return zts.loadLanguage("javascript");
-    //     } else if (std.mem.eql(u8, language, "rust")) {
-    //         return zts.loadLanguage("rust");
-    //     } else if (std.mem.eql(u8, language, "go")) {
-    //         return zts.loadLanguage("go");
-    //     } else if (std.mem.eql(u8, language, "java")) {
-    //         return zts.loadLanguage("java");
-    //     } else if (std.mem.eql(u8, language, "zig")) {
-    //         return zts.loadLanguage("zig");
-    //     }
-    //
-    //     return null;
-    // }
-    //
-    // fn walkTreeForConstraints(
-    //     self: *Clew,
-    //     node: zts.Node,
-    //     constraints: *std.ArrayList(Constraint),
-    //     func_count: *u32,
-    //     typed_func_count: *u32,
-    //     language: []const u8,
-    // ) !void {
-    //     _ = self;
-    //     _ = constraints;
-    //     _ = language;
-    //
-    //     // Get node type to identify syntactic constructs
-    //     const node_type = node.type();
-    //
-    //     // Identify function definitions (language-specific node types)
-    //     if (std.mem.eql(u8, node_type, "function_declaration") or
-    //         std.mem.eql(u8, node_type, "method_definition") or
-    //         std.mem.eql(u8, node_type, "function_definition") or
-    //         std.mem.eql(u8, node_type, "fn_item"))
-    //     {
-    //         func_count.* += 1;
-    //
-    //         // Check if function has explicit type annotations
-    //         var cursor = node.walk();
-    //         defer cursor.deinit();
-    //
-    //         if (cursor.gotoFirstChild()) {
-    //             while (true) {
-    //                 const child = cursor.node();
-    //                 const child_type = child.type();
-    //
-    //                 if (std.mem.indexOf(u8, child_type, "type") != null) {
-    //                     typed_func_count.* += 1;
-    //                     break;
-    //                 }
-    //
-    //                 if (!cursor.gotoNextSibling()) break;
-    //             }
-    //         }
-    //     }
-    //
-    //     // Recursively walk children
-    //     var cursor = node.walk();
-    //     defer cursor.deinit();
-    //
-    //     if (cursor.gotoFirstChild()) {
-    //         while (true) {
-    //             try self.walkTreeForConstraints(
-    //                 cursor.node(),
-    //                 constraints,
-    //                 func_count,
-    //                 typed_func_count,
-    //                 language,
-    //             );
-    //
-    //             if (!cursor.gotoNextSibling()) break;
-    //         }
-    //     }
-    // }
 
     fn extractSyntacticConstraintsFallback(
         self: *Clew,
@@ -580,7 +466,13 @@ pub const Clew = struct {
     }
 };
 
-/// Cache for extracted constraints
+/// Cache for extracted constraints with clone-on-get semantics.
+///
+/// Ownership model:
+/// - Cache owns all stored ConstraintSets
+/// - get() returns a cloned copy (caller owns it and must call deinit())
+/// - put() clones the input before storing (caller still owns original)
+/// - Cache's deinit() frees all owned ConstraintSets
 const ConstraintCache = struct {
     allocator: std.mem.Allocator,
     cache: std.StringHashMap(ConstraintSet),
@@ -593,19 +485,47 @@ const ConstraintCache = struct {
     }
 
     pub fn deinit(self: *ConstraintCache) void {
+        // Free all owned ConstraintSets and keys
         var iter = self.cache.iterator();
         while (iter.next()) |entry| {
             entry.value_ptr.deinit();
+            self.allocator.free(entry.key_ptr.*);
         }
         self.cache.deinit();
     }
 
-    pub fn get(self: *ConstraintCache, key: []const u8) ?ConstraintSet {
-        return self.cache.get(key);
+    /// Get a cached ConstraintSet by key.
+    /// Returns a CLONED copy if found - caller owns it and must call deinit().
+    /// Returns null if not found.
+    pub fn get(self: *ConstraintCache, key: []const u8) !?ConstraintSet {
+        if (self.cache.get(key)) |cached_set| {
+            // Return a clone so caller owns independent copy
+            return try cached_set.clone(self.allocator);
+        }
+        return null;
     }
 
+    /// Store a ConstraintSet in the cache.
+    /// The input is CLONED before storing - caller still owns the original.
+    /// Key is also duplicated for cache ownership.
     pub fn put(self: *ConstraintCache, key: []const u8, value: ConstraintSet) !void {
-        try self.cache.put(key, value);
+        // Check if key already exists and free old value/key if so
+        if (self.cache.getKey(key)) |existing_key| {
+            if (self.cache.getPtr(key)) |old_value| {
+                old_value.deinit();
+            }
+            self.allocator.free(existing_key);
+        }
+
+        // Clone the value so cache owns independent copy
+        var cloned_value = try value.clone(self.allocator);
+        errdefer cloned_value.deinit();
+
+        // Duplicate the key for cache ownership
+        const owned_key = try self.allocator.dupe(u8, key);
+        errdefer self.allocator.free(owned_key);
+
+        try self.cache.put(owned_key, cloned_value);
     }
 };
 
