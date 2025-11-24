@@ -25,6 +25,17 @@ pub const AnankeError = enum(c_int) {
     CompilationFailed = 5,
 };
 
+/// C-compatible TokenMaskRules structure matching Rust FFI definition
+pub const TokenMaskRulesFFI = extern struct {
+    /// Allowed tokens array
+    allowed_tokens: ?[*]const u32,
+    allowed_tokens_len: usize,
+
+    /// Forbidden tokens array
+    forbidden_tokens: ?[*]const u32,
+    forbidden_tokens_len: usize,
+};
+
 /// C-compatible ConstraintIR structure
 pub const ConstraintIRFFI = extern struct {
     /// JSON schema pointer (nullable)
@@ -37,8 +48,8 @@ pub const ConstraintIRFFI = extern struct {
     regex_patterns: ?[*]const [*:0]const u8,
     regex_patterns_len: usize,
 
-    /// Token masks (reserved for future use)
-    token_masks: ?*anyopaque,
+    /// Token masks pointer to TokenMaskRulesFFI struct (nullable)
+    token_masks: ?*const TokenMaskRulesFFI,
 
     /// Priority for conflict resolution
     priority: u32,
@@ -101,34 +112,60 @@ export fn ananke_extract_constraints(
     };
     defer constraint_set.deinit();
 
-    // For now, create a simple IR with basic information
-    // TODO: Full IR conversion once Braid compilation is complete
-    const ir_ffi = gpa.create(ConstraintIRFFI) catch {
+    // Initialize Braid to compile extracted constraints
+    var braid = Braid.init(gpa) catch {
         return @intFromEnum(AnankeError.AllocationFailure);
     };
+    defer braid.deinit();
 
-    // Allocate and copy constraint name
-    const name_buf = gpa.allocSentinel(u8, 64, 0) catch {
-        gpa.destroy(ir_ffi);
-        return @intFromEnum(AnankeError.AllocationFailure);
+    // Compile the extracted constraints to IR
+    const ir = braid.compile(constraint_set.constraints.items) catch {
+        // If compilation fails, create a minimal IR with extracted metadata
+        const ir_ffi = gpa.create(ConstraintIRFFI) catch {
+            return @intFromEnum(AnankeError.AllocationFailure);
+        };
+
+        // Create name based on language and constraint count
+        const name_buf = gpa.allocSentinel(u8, 64, 0) catch {
+            gpa.destroy(ir_ffi);
+            return @intFromEnum(AnankeError.AllocationFailure);
+        };
+
+        _ = std.fmt.bufPrint(
+            name_buf,
+            "{s}_extracted_{d}",
+            .{ language_slice, constraint_set.constraints.items.len },
+        ) catch {};
+
+        // Create minimal IR with basic info
+        ir_ffi.* = .{
+            .json_schema = null,
+            .grammar = null,
+            .regex_patterns = null,
+            .regex_patterns_len = 0,
+            .token_masks = null,
+            .priority = 50, // Default priority for extracted constraints
+            .name = name_buf.ptr,
+        };
+
+        out_ir.* = ir_ffi;
+        return @intFromEnum(AnankeError.Success);
     };
 
-    const name_fmt = std.fmt.bufPrint(
-        name_buf,
-        "{s}_constraints_{d}",
-        .{ language_slice, constraint_set.constraints.items.len },
-    ) catch "constraints";
-    _ = name_fmt;
-
-    ir_ffi.* = .{
-        .json_schema = null,
-        .grammar = null,
-        .regex_patterns = null,
-        .regex_patterns_len = 0,
-        .token_masks = null,
-        .priority = 100,
-        .name = name_buf.ptr,
+    // Convert the compiled IR to FFI format
+    const ir_ffi = convertIRToFFI(gpa, ir) catch |err| {
+        // Clean up IR before returning error
+        var mutable_ir = ir;
+        mutable_ir.deinit(gpa);
+        return switch (err) {
+            error.OutOfMemory => @intFromEnum(AnankeError.AllocationFailure),
+            else => @intFromEnum(AnankeError.CompilationFailed),
+        };
     };
+
+    // Clean up original IR (data has been copied to FFI struct)
+    var mutable_ir = ir;
+    mutable_ir.deinit(gpa);
 
     out_ir.* = ir_ffi;
     return @intFromEnum(AnankeError.Success);
@@ -322,7 +359,7 @@ fn convertIRToFFI(
         break :blk try allocator.dupeZ(u8, grammar_str);
     } else null;
 
-    // Allocate and copy regex patterns
+    // Allocate and copy regex patterns with flags
     var regex_ptrs: ?[*][*:0]const u8 = null;
     var regex_len: usize = 0;
     if (ir.regex_patterns.len > 0) {
@@ -330,10 +367,53 @@ fn convertIRToFFI(
         errdefer allocator.free(patterns);
 
         for (ir.regex_patterns, 0..) |regex, i| {
-            patterns[i] = (try allocator.dupeZ(u8, regex.pattern)).ptr;
+            // Include flags in pattern if present
+            const pattern_with_flags = if (regex.flags.len > 0) blk: {
+                const formatted = try std.fmt.allocPrint(allocator, "{s}|FLAGS:{s}", .{ regex.pattern, regex.flags });
+                defer allocator.free(formatted);
+                break :blk try allocator.dupeZ(u8, formatted);
+            } else
+                try allocator.dupeZ(u8, regex.pattern);
+            patterns[i] = pattern_with_flags.ptr;
         }
         regex_ptrs = patterns.ptr;
         regex_len = patterns.len;
+    }
+
+    // Allocate and copy token masks if present
+    var token_masks_ptr: ?*TokenMaskRulesFFI = null;
+    if (ir.token_masks) |masks| {
+        const masks_ffi = try allocator.create(TokenMaskRulesFFI);
+        errdefer allocator.destroy(masks_ffi);
+
+        // Copy allowed tokens
+        var allowed_ptr: ?[*]u32 = null;
+        var allowed_len: usize = 0;
+        if (masks.allowed_tokens) |tokens| {
+            const allowed_copy = try allocator.alloc(u32, tokens.len);
+            @memcpy(allowed_copy, tokens);
+            allowed_ptr = allowed_copy.ptr;
+            allowed_len = tokens.len;
+        }
+
+        // Copy forbidden tokens
+        var forbidden_ptr: ?[*]u32 = null;
+        var forbidden_len: usize = 0;
+        if (masks.forbidden_tokens) |tokens| {
+            const forbidden_copy = try allocator.alloc(u32, tokens.len);
+            @memcpy(forbidden_copy, tokens);
+            forbidden_ptr = forbidden_copy.ptr;
+            forbidden_len = tokens.len;
+        }
+
+        masks_ffi.* = .{
+            .allowed_tokens = allowed_ptr,
+            .allowed_tokens_len = allowed_len,
+            .forbidden_tokens = forbidden_ptr,
+            .forbidden_tokens_len = forbidden_len,
+        };
+
+        token_masks_ptr = masks_ffi;
     }
 
     // Generate a name for this IR
@@ -346,7 +426,7 @@ fn convertIRToFFI(
         .grammar = if (grammar_ptr) |ptr| ptr.ptr else null,
         .regex_patterns = regex_ptrs,
         .regex_patterns_len = regex_len,
-        .token_masks = null, // Token masks not yet implemented for FFI
+        .token_masks = token_masks_ptr,
         .priority = ir.priority,
         .name = name_buf.ptr,
     };
@@ -363,9 +443,34 @@ fn serializeJsonSchema(
     defer buf.deinit(allocator);
 
     const writer = buf.writer(allocator);
-    try writer.writeAll("{\"type\":\"");
+    try writer.writeAll("{\"schema_type\":\"");
     try writer.writeAll(schema.type);
-    try writer.writeAll("\"}");
+    try writer.writeAll("\"");
+
+    // Add properties if present
+    if (schema.properties) |_| {
+        try writer.writeAll(",\"properties\":");
+        // For now, serialize as empty object - full JSON map serialization would be complex
+        try writer.writeAll("{}");
+    }
+
+    // Add required array if present
+    if (schema.required.len > 0) {
+        try writer.writeAll(",\"required\":[");
+        for (schema.required, 0..) |req, i| {
+            if (i > 0) try writer.writeAll(",");
+            try writer.writeAll("\"");
+            try writer.writeAll(req);
+            try writer.writeAll("\"");
+        }
+        try writer.writeAll("]");
+    }
+
+    // Add additional_properties flag
+    try writer.writeAll(",\"additional_properties\":");
+    try writer.writeAll(if (schema.additional_properties) "true" else "false");
+
+    try writer.writeAll("}");
 
     return try buf.toOwnedSlice(allocator);
 }
@@ -437,6 +542,24 @@ export fn ananke_free_constraint_ir(ir: ?*ConstraintIRFFI) callconv(.c) void {
         if (ptr.grammar) |grammar| {
             const grammar_slice = std.mem.span(grammar);
             gpa.free(grammar_slice);
+        }
+
+        // Free token masks if present
+        if (ptr.token_masks) |masks| {
+            // Free allowed tokens array
+            if (masks.allowed_tokens) |tokens| {
+                const allowed_slice = tokens[0..masks.allowed_tokens_len];
+                gpa.free(allowed_slice);
+            }
+
+            // Free forbidden tokens array
+            if (masks.forbidden_tokens) |tokens| {
+                const forbidden_slice = tokens[0..masks.forbidden_tokens_len];
+                gpa.free(forbidden_slice);
+            }
+
+            // Free the TokenMaskRulesFFI struct itself
+            gpa.destroy(masks);
         }
 
         gpa.destroy(ptr);
