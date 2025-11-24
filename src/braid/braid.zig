@@ -118,7 +118,7 @@ pub const Braid = struct {
         if (ir.regex_patterns.len > 0) {
             try writer.writeAll("  \"patterns\": [\n");
             for (ir.regex_patterns, 0..) |regex, i| {
-                try writer.print("    \"{}\"", .{std.fmt.fmtSliceEscapeUpper(regex.pattern)});
+                try writer.print("    \"{s}\"", .{regex.pattern});
                 if (i < ir.regex_patterns.len - 1) try writer.writeAll(",");
                 try writer.writeAll("\n");
             }
@@ -359,12 +359,14 @@ pub const Braid = struct {
 
         // Build JSON schema from type constraints
         const type_constraints = try self.extractTypeConstraints(graph);
+        defer self.allocator.free(type_constraints);
         if (type_constraints.len > 0) {
             ir.json_schema = try self.buildJsonSchema(type_constraints);
         }
 
         // Build grammar from syntactic constraints
         const syntax_constraints = try self.extractSyntaxConstraints(graph);
+        defer self.allocator.free(syntax_constraints);
         if (syntax_constraints.len > 0) {
             ir.grammar = try self.buildGrammar(syntax_constraints);
         }
@@ -374,6 +376,7 @@ pub const Braid = struct {
 
         // Build token masks for security constraints
         const security_constraints = try self.extractSecurityConstraints(graph);
+        defer self.allocator.free(security_constraints);
         if (security_constraints.len > 0) {
             ir.token_masks = try self.buildTokenMasks(security_constraints);
         }
