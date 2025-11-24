@@ -57,11 +57,11 @@ pub fn colorize(comptime color: Color, text: []const u8, allocator: std.mem.Allo
 
 /// Format constraints as JSON
 pub fn formatJson(
-    _: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     constraint_set: constraint.ConstraintSet,
 ) ![]u8 {
     var list = std.ArrayList(u8){};
-    errdefer output.deinit();
+    errdefer list.deinit(allocator);
     const writer = list.writer(allocator);
 
     try writer.writeAll("{\n");
@@ -94,11 +94,11 @@ pub fn formatJson(
 
 /// Format constraints as YAML
 pub fn formatYaml(
-    _: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     constraint_set: constraint.ConstraintSet,
 ) ![]u8 {
     var list = std.ArrayList(u8){};
-    errdefer output.deinit();
+    errdefer list.deinit(allocator);
     const writer = list.writer(allocator);
 
     try writer.print("name: {s}\n", .{constraint_set.name});
@@ -121,11 +121,11 @@ pub fn formatYaml(
 
 /// Format constraints in human-readable pretty format
 pub fn formatPretty(
-    _: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     constraint_set: constraint.ConstraintSet,
 ) ![]u8 {
     var list = std.ArrayList(u8){};
-    errdefer output.deinit();
+    errdefer list.deinit(allocator);
     const writer = list.writer(allocator);
 
     try writer.print("Constraint Set: {s}\n", .{constraint_set.name});
@@ -175,11 +175,11 @@ pub fn formatPretty(
 
 /// Format constraints in Ariadne DSL format
 pub fn formatAriadne(
-    _: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     constraint_set: constraint.ConstraintSet,
 ) ![]u8 {
     var list = std.ArrayList(u8){};
-    errdefer output.deinit();
+    errdefer list.deinit(allocator);
     const writer = list.writer(allocator);
 
     try writer.print("constraint_set \"{s}\" {{\n", .{constraint_set.name});
@@ -210,11 +210,11 @@ pub fn formatAriadne(
 
 /// Format ConstraintIR as JSON
 pub fn formatIRJson(
-    _: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     ir: constraint.ConstraintIR,
 ) ![]u8 {
     var list = std.ArrayList(u8){};
-    errdefer output.deinit();
+    errdefer list.deinit(allocator);
     const writer = list.writer(allocator);
 
     try writer.writeAll("{\n");
