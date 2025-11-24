@@ -144,7 +144,7 @@ fn parseInterfaceType(
     // Extract interface name
     var name: []const u8 = "root";
     if (std.mem.indexOf(u8, name_part, "interface ")) |idx| {
-        const after_interface = std.mem.trim(u8, name_part[idx + 10..], " \t\n\r");
+        const after_interface = std.mem.trim(u8, name_part[idx + 10 ..], " \t\n\r");
         if (after_interface.len > 0) {
             name = after_interface;
         }
@@ -166,7 +166,7 @@ fn parseInterfaceType(
         // Parse "name: type" or "name?: type"
         const colon_idx = std.mem.indexOf(u8, trimmed_prop, ":") orelse continue;
         var prop_name = std.mem.trim(u8, trimmed_prop[0..colon_idx], " \t\n\r");
-        const prop_type = std.mem.trim(u8, trimmed_prop[colon_idx + 1..], " \t\n\r");
+        const prop_type = std.mem.trim(u8, trimmed_prop[colon_idx + 1 ..], " \t\n\r");
 
         const optional = std.mem.endsWith(u8, prop_name, "?");
         if (optional) {
@@ -231,7 +231,7 @@ fn parseObjectType(
 
         const colon_idx = std.mem.indexOf(u8, trimmed_prop, ":") orelse continue;
         var prop_name = std.mem.trim(u8, trimmed_prop[0..colon_idx], " \t\n\r");
-        const prop_type = std.mem.trim(u8, trimmed_prop[colon_idx + 1..], " \t\n\r");
+        const prop_type = std.mem.trim(u8, trimmed_prop[colon_idx + 1 ..], " \t\n\r");
 
         const optional = std.mem.endsWith(u8, prop_name, "?");
         if (optional) {

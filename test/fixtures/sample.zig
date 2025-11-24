@@ -22,11 +22,11 @@ pub const UserError = error{
 // Function with error union return type
 pub fn getUser(allocator: std.mem.Allocator, id: u64) UserError!User {
     _ = allocator;
-    
+
     if (id == 0) {
         return UserError.InvalidInput;
     }
-    
+
     // Simulate database lookup
     return User{
         .id = id,
@@ -45,9 +45,9 @@ pub fn createUser(
     if (name.len == 0 or email.len == 0) {
         return UserError.InvalidInput;
     }
-    
+
     _ = allocator;
-    
+
     return User{
         .id = 1,
         .name = name,
@@ -70,7 +70,7 @@ pub fn findById(comptime T: type, items: []const T, id: u64) ?T {
 test "getUser returns valid user" {
     const allocator = testing.allocator;
     const user = try getUser(allocator, 42);
-    
+
     try testing.expectEqual(@as(u64, 42), user.id);
     try testing.expect(user.is_active);
 }

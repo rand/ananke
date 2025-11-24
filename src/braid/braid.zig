@@ -154,7 +154,7 @@ pub const Braid = struct {
 
         // Analyze dependencies between constraints
         for (constraints, 0..) |constraint_a, i| {
-            for (constraints[i + 1..], i + 1..) |constraint_b, j| {
+            for (constraints[i + 1 ..], i + 1..) |constraint_b, j| {
                 if (self.constraintsDependOn(constraint_a, constraint_b)) {
                     try graph.addEdge(i, j);
                 }
@@ -218,7 +218,7 @@ pub const Braid = struct {
 
             // Only check pairs within this kind
             for (indices, 0..) |idx_a, i| {
-                for (indices[i + 1..]) |idx_b| {
+                for (indices[i + 1 ..]) |idx_b| {
                     const node_a = graph.nodes.items[idx_a];
                     const node_b = graph.nodes.items[idx_b];
 
@@ -241,7 +241,7 @@ pub const Braid = struct {
         // Simplified conflict detection
         // Check if constraints have conflicting requirements
         return std.mem.eql(u8, a.name, "forbid_any") and
-               std.mem.eql(u8, b.name, "allow_any");
+            std.mem.eql(u8, b.name, "allow_any");
     }
 
     fn defaultConflictResolution(
@@ -499,7 +499,7 @@ pub const Braid = struct {
             // Detect if statements
             if (std.mem.indexOf(u8, desc, "if") != null and
                 (std.mem.indexOf(u8, desc, "statement") != null or
-                std.mem.indexOf(u8, desc, "else") != null))
+                    std.mem.indexOf(u8, desc, "else") != null))
             {
                 has_if_statement = true;
             }
@@ -507,7 +507,7 @@ pub const Braid = struct {
             // Detect for loops
             if (std.mem.indexOf(u8, desc, "for") != null and
                 (std.mem.indexOf(u8, desc, "loop") != null or
-                std.mem.indexOf(u8, desc, "iteration") != null))
+                    std.mem.indexOf(u8, desc, "iteration") != null))
             {
                 has_for_loop = true;
             }
@@ -1401,8 +1401,8 @@ pub fn deduplicateConstraints(
 
         pub fn eql(self: @This(), other: @This()) bool {
             return self.kind == other.kind and
-                   std.mem.eql(u8, self.description, other.description) and
-                   self.source == other.source;
+                std.mem.eql(u8, self.description, other.description) and
+                self.source == other.source;
         }
     };
 
