@@ -341,6 +341,21 @@ pub fn build(b: *std.Build) void {
 
     const run_clew_tests = b.addRunArtifact(clew_tests);
 
+    // Cache tests
+    const cache_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/cache_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+            },
+        }),
+    });
+
+    const run_cache_tests = b.addRunArtifact(cache_tests);
+
     // Pattern extraction tests
     const pattern_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -510,6 +525,28 @@ pub fn build(b: *std.Build) void {
 
     const run_cli_tests = b.addRunArtifact(cli_tests);
 
+    // CLI integration tests
+    const cli_integration_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/cli/cli_integration_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{},
+        }),
+    });
+
+    // Add only the supporting module imports (not command modules)
+    cli_integration_tests.root_module.addImport("cli_args", b.addModule("cli_args_test", .{
+        .root_source_file = b.path("src/cli/args.zig"),
+        .target = target,
+    }));
+    cli_integration_tests.root_module.addImport("cli_config", b.addModule("cli_config_test", .{
+        .root_source_file = b.path("src/cli/config.zig"),
+        .target = target,
+    }));
+
+    const run_cli_integration_tests = b.addRunArtifact(cli_integration_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -517,6 +554,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
     test_step.dependOn(&run_clew_tests.step);
+    test_step.dependOn(&run_cache_tests.step);
     test_step.dependOn(&run_pattern_tests.step);
     test_step.dependOn(&run_graph_tests.step);
     test_step.dependOn(&run_json_schema_tests.step);
@@ -527,6 +565,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_integration_tests.step);
     test_step.dependOn(&run_e2e_tests.step);
     test_step.dependOn(&run_cli_tests.step);
+    test_step.dependOn(&run_cli_integration_tests.step);
 
     // E2E test step (can be run separately)
     const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
@@ -535,6 +574,11 @@ pub fn build(b: *std.Build) void {
     // CLI test step (can be run separately)
     const cli_test_step = b.step("test-cli", "Run CLI tests");
     cli_test_step.dependOn(&run_cli_tests.step);
+    cli_test_step.dependOn(&run_cli_integration_tests.step);
+
+    // CLI integration test step (can be run separately)
+    const cli_integration_test_step = b.step("test-cli-integration", "Run CLI integration tests");
+    cli_integration_test_step.dependOn(&run_cli_integration_tests.step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

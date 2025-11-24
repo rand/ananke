@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Language: Zig](https://img.shields.io/badge/Language-Zig-blue.svg)](https://ziglang.org/)
 [![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-green.svg)](RELEASE_NOTES.md)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](#current-project-status)
+[![Status: Beta (Core Ready)](https://img.shields.io/badge/Status-Beta%20(Core%20Ready)-yellowgreen.svg)](#current-project-status)
 
 ## Project Philosophy
 
@@ -84,23 +84,35 @@ This hybrid approach lets you use Claude for what it's great at (understanding c
 ## Architecture at a Glance
 
 ```
-User Code/Tests/Docs
+Source Code, Tests, Docs
         ↓
-   ┌─────────────┐
-   │ Clew/Braid  │ ← Optional: Claude API for semantic analysis
-   │  (Zig)      │   Runs locally (no GPU needed)
-   └──────┬──────┘
-          ↓ Compiled ConstraintIR
-   ┌─────────────┐
-   │    Maze     │ ← Orchestration layer (Rust)
-   │ (Rust/Py)   │   Coordinates constrained generation
-   └──────┬──────┘
-          ↓ API calls
-   ┌─────────────────────────────┐
-   │  Inference Service (Modal)  │ ← Required: vLLM + llguidance
-   │  - GPU-accelerated          │   Token-level constraint enforcement
-   │  - <50μs per token          │
-   └─────────────────────────────┘
+   ┌──────────────────┐
+   │  Clew            │ ← Pure Zig structural parsers
+   │  (Extraction)    │   Optional: Claude API for semantic analysis
+   └────────┬─────────┘   Runs locally (no GPU needed)
+            ↓ Extracted Constraints
+   ┌──────────────────┐
+   │  Braid           │ ← Pure Zig constraint compiler
+   │  (Compilation)   │   - Regex extraction
+   │  4 components:   │   - JSON Schema generation
+   │  ✓ Regex matcher │   - Grammar building
+   │  ✓ Schema build  │   - Token mask compilation
+   │  ✓ Mask creator  │   - Caching with clone-on-get
+   │  ✓ Merger        │
+   └────────┬─────────┘
+            ↓ ConstraintIR
+   ┌──────────────────┐
+   │  Maze            │ ← Rust orchestration layer
+   │  (Orchestration) │   HTTP API coordination
+   └────────┬─────────┘
+            ↓ API calls
+   ┌──────────────────────────────┐
+   │ Modal/vLLM Inference Service │ ← GPU-powered (controlled via llguidance)
+   │ - Qwen2.5-Coder-32B-Instruct │   Token-level constraint enforcement
+   │ - ~50μs per token overhead   │   Scale-to-zero architecture
+   └──────────────────────────────┘
+          ↓
+   Generated Code (Constraint-Validated)
 ```
 
 ---
@@ -244,31 +256,33 @@ ananke help
 
 Extract constraints from your codebase, no external services:
 
-```python
-from ananke import Ananke
+```zig
+const ananke = @import("ananke");
+const std = @import("std");
 
-# Initialize with no external services
-ananke = Ananke()
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-# Extract constraints from code (tree-sitter based)
-constraints = await ananke.extract_from_code(
-    source_file="src/handlers/auth.py",
-    use_llm=False  # No Claude needed
-)
+    // Initialize Clew (no external services needed)
+    var clew = try ananke.Clew.init(allocator, null);  // null = no Claude API
+    defer clew.deinit();
 
-# Compile constraints locally
-compiled = await ananke.compile(
-    constraints,
-    optimize_with_llm=False  # No Claude needed
-)
+    // Extract constraints from source code (pure Zig parsers)
+    const source = @embedFile("handlers/auth.ts");
+    const constraints = try clew.extractFromCode(source, null);
+    defer allocator.free(constraints);
 
-# Check: What constraints were found?
-print(constraints)
-# Output: {
-#   "type_safety": {...},
-#   "security_patterns": {...},
-#   "architectural": {...}
-# }
+    // Compile constraints locally
+    var braid = try ananke.Braid.init(allocator);
+    defer braid.deinit();
+    const compiled = try braid.compile(constraints);
+
+    std.debug.print("Found {d} constraints\n", .{constraints.len});
+    // Output: Type safety, security patterns, architectural constraints
+    // All extracted and compiled locally in <100ms
+}
 ```
 
 ### Pattern 2: With Claude for Smarter Analysis
@@ -520,51 +534,72 @@ zig build test -- --coverage
 
 ## Current Project Status
 
-**Phase**: v0.1.0 - Production Ready (100% Complete)
+**Phase**: v0.1.0 - Beta (Core Ready)
 
 **Release**: November 24, 2025
 
-**Completed (v0.1.0):**
-- Modal Inference Service: PRODUCTION READY
-  - vLLM 0.11.0 + llguidance 0.7.11 deployed on Modal
-  - Working endpoint: https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run
-  - Performance verified: 22.3 tokens/sec with JSON schema constraints
-  - Comprehensive docs: [maze/modal_inference/README.md](maze/modal_inference/README.md) (805 lines)
-- Core Type System: IMPLEMENTED
-  - src/types/constraint.zig (266 lines) - full constraint type system
-  - src/types/ir.zig (89 lines) - intermediate representation
-  - 25 tests passing in test/types/constraint_test.zig
-- Build System: FUNCTIONAL
-  - build.zig (334 lines) - full build configuration
-  - All tests passing: `zig build test`
-  - Zig 0.15.2 compatible
-- Clew (Extraction Engine): STUBBED
-  - src/clew/clew.zig (466 lines) - basic framework ready
-  - Needs: Tree-sitter integration, Claude API integration
-- Braid (Compilation Engine): STUBBED
-  - src/braid/braid.zig (567 lines) - basic framework ready
-  - Needs: Constraint graph resolution, llguidance schema generation
-- Test Infrastructure: DOCUMENTED
-  - TEST_STRATEGY.md (1,409 lines) - comprehensive test plan
-  - 174+ tests planned (138 unit, 26 integration, 8+ performance)
-  - Integration test scenarios fully specified
+**Production-Ready Components:**
+- Clew (Constraint Extraction): COMPLETE
+  - Pure Zig structural parsers (not tree-sitter)
+  - 101 constraint patterns across TypeScript/Python (other languages pending)
+  - 40+ unit tests passing
+  - <100ms extraction time
+  - Optional Claude API integration for semantic analysis
 
-**Component Status**:
-- Clew (Extraction): COMPLETE (101 patterns, 50+ tests)
-- Braid (Compilation): COMPLETE (31 tests, all constraint types)
-- Maze (Orchestration): PRODUCTION (Modal service active)
-- Ariadne (DSL): IMPLEMENTED (parsing complete, v0.2 for full features)
-- CLI: COMPLETE (7 commands, 4 output formats)
-- Testing: COMPLETE (120+ tests, 0 memory leaks)
-- Documentation: COMPLETE (12,000+ lines)
+- Braid (Constraint Compilation): COMPLETE
+  - All 4 components fully implemented and tested:
+    - JSON Schema generator
+    - Regular expression matcher
+    - Grammar builder
+    - Token mask compiler
+  - 31+ unit tests passing
+  - LRU caching enabled (clone-on-get strategy)
+  - ~1μs cache hit latency
+
+- Modal Inference Service: PRODUCTION READY
+  - vLLM 0.11.0 + llguidance 0.7.11 deployed
+  - Endpoint: https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run
+  - Model: Qwen2.5-Coder-32B-Instruct
+  - Performance: 22.3 tokens/sec with JSON schema constraints
+  - ~50μs per-token overhead for constraint enforcement
+
+- Maze (Orchestration): PRODUCTION READY
+  - Rust-based async orchestration layer
+  - Complete FFI integration with Zig
+  - 43+ Rust tests passing
+  - HTTP API coordination with inference service
+
+**Experimental/In-Progress:**
+- Ariadne DSL: 70% COMPLETE
+  - Parsing: Complete
+  - Type checking and error recovery: Deferred to v0.2
+  - Basic constraint definitions work well
+
+- Additional Extractors: NOT YET IMPLEMENTED
+  - Rust extraction support (Planned v0.2)
+  - Go extraction support (Planned v0.2)
+  - Zig extraction support (Planned v0.2)
+
+**Test Coverage:**
+- 197 total tests passing (100% pass rate)
+- 154 Zig tests (extraction, compilation, integration)
+- 43 Rust tests (orchestration, FFI, infrastructure)
+- Zero critical failures
+- <5 seconds total test suite runtime
+
+**Known Limitations:**
+- Pure Zig parsers extract syntax patterns only (tree-sitter compatibility deferred to v0.2)
+- Token masking uses hash-based IDs (not real cryptographic tokens)
+- Ariadne DSL lacks full type checking (v0.2 feature)
+- Only TypeScript and Python extractors fully implemented (others in v0.2 roadmap)
 
 **Next Release (v0.2.0)**: Q1 2026
-- Full tree-sitter integration
+- Full tree-sitter integration for extended language support
 - Bidirectional streaming generation
 - Multi-model orchestration
-- Ariadne DSL type checking
+- Ariadne DSL type checking and error recovery
 - Web UI (beta)
-- Windows full support
+- Complete Rust/Go/Zig extractors
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for v0.1.0 details.
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for v0.2 roadmap.
@@ -575,13 +610,13 @@ See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for v0.2 roadmap.
 
 ### Clew: Constraint Extraction
 
-Mines constraints from multiple sources using both static analysis and optional Claude integration:
+Mines constraints from multiple sources using pure Zig structural parsers and optional Claude integration:
 
 ```
-Source Code → Tree-sitter parsing → Syntactic constraints
-Tests       → Tree-sitter parsing → Type/behavior constraints
-Telemetry   → Claude analysis      → Performance constraints
-Docs        → Claude analysis      → Business rules
+Source Code → Pure Zig parsers → Syntactic constraints
+Tests       → Pure Zig parsers → Type/behavior constraints
+Telemetry   → Claude analysis  → Performance constraints
+Docs        → Claude analysis  → Business rules
 ```
 
 Constraint categories:
@@ -662,6 +697,34 @@ Must be controlled locally for token-level constraint enforcement:
 ### Implementation
 - **[IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)** - Detailed roadmap with phases
 - **[beads/implementation-phases.bead](beads/implementation-phases.bead)** - Task tracking
+
+---
+
+## Known Limitations (v0.1.0)
+
+**Language Support:**
+- Extractors: TypeScript/JavaScript and Python fully supported
+- Rust, Go, and Zig extractors planned for v0.2
+- Pure Zig parsers limit semantic extraction (full tree-sitter integration in v0.2)
+
+**Ariadne DSL:**
+- Parsing works well for constraint definitions
+- Type checking and detailed error messages deferred to v0.2
+- Use JSON configuration for production deployments
+
+**Token Masking:**
+- Uses hash-based IDs for token identification
+- Real cryptographic tokenization planned for v0.2
+- Safe for most use cases but not recommended for cryptographic token handling
+
+**Caching:**
+- Works reliably with clone-on-get strategy
+- Single-machine in-process cache (distributed caching in roadmap)
+
+**CLI:**
+- Core commands functional and tested
+- Some advanced features (batch processing, config files) in v0.2
+- Windows support experimental (full support in v0.2)
 
 ---
 

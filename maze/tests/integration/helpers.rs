@@ -3,8 +3,8 @@
 //! Provides common test utilities, fixtures, and assertion helpers
 
 use maze::{
-    MazeOrchestrator, ModalConfig, GenerationRequest, GenerationContext,
-    ffi::{ConstraintIR, RegexPattern, TokenMaskRules, JsonSchema, Grammar, GrammarRule},
+    ffi::{ConstraintIR, Grammar, GrammarRule, JsonSchema, RegexPattern, TokenMaskRules},
+    GenerationContext, GenerationRequest, MazeOrchestrator, ModalConfig,
 };
 use std::collections::HashMap;
 
@@ -168,13 +168,14 @@ pub fn assert_valid_provenance(
 }
 
 /// Assert that validation is successful
-pub fn assert_validation_success(
-    validation: &maze::ValidationResult,
-    expected_constraints: usize,
-) {
+pub fn assert_validation_success(validation: &maze::ValidationResult, expected_constraints: usize) {
     assert!(validation.all_satisfied, "Not all constraints satisfied");
     assert_eq!(validation.satisfied.len(), expected_constraints);
-    assert!(validation.violated.is_empty(), "Some constraints violated: {:?}", validation.violated);
+    assert!(
+        validation.violated.is_empty(),
+        "Some constraints violated: {:?}",
+        validation.violated
+    );
 }
 
 /// Assert that metadata is reasonable
@@ -185,8 +186,7 @@ pub fn assert_valid_metadata(metadata: &maze::GenerationMetadata) {
     if metadata.tokens_generated > 0 && metadata.generation_time_ms > 0 {
         let expected_avg = (metadata.generation_time_ms * 1000) / metadata.tokens_generated as u64;
         assert_eq!(
-            metadata.avg_token_time_us,
-            expected_avg,
+            metadata.avg_token_time_us, expected_avg,
             "Average token time calculation mismatch"
         );
     }

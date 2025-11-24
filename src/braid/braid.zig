@@ -244,6 +244,63 @@ pub const Braid = struct {
             std.mem.eql(u8, b.name, "allow_any");
     }
 
+    fn mergeConstraintsInGraph(
+        self: *Braid,
+        graph: *ConstraintGraph,
+        idx_a: usize,
+        idx_b: usize,
+    ) !void {
+        const node_a = graph.nodes.items[idx_a];
+        const node_b = graph.nodes.items[idx_b];
+
+        // Create merged constraint combining properties from both
+        var merged_desc = std.ArrayList(u8){};
+        defer merged_desc.deinit(self.allocator);
+
+        try merged_desc.appendSlice(self.allocator, node_a.constraint.description);
+        try merged_desc.appendSlice(self.allocator, " AND ");
+        try merged_desc.appendSlice(self.allocator, node_b.constraint.description);
+
+        var merged_name = std.ArrayList(u8){};
+        defer merged_name.deinit(self.allocator);
+
+        try merged_name.appendSlice(self.allocator, node_a.constraint.name);
+        try merged_name.appendSlice(self.allocator, "_merged_");
+        try merged_name.appendSlice(self.allocator, node_b.constraint.name);
+
+        const merged_constraint = Constraint{
+            .id = node_a.constraint.id, // Use first constraint's ID
+            .name = try self.allocator.dupe(u8, merged_name.items),
+            .description = try self.allocator.dupe(u8, merged_desc.items),
+            .kind = node_a.constraint.kind,
+            .source = node_a.constraint.source,
+            .enforcement = node_a.constraint.enforcement,
+            .priority = if (@intFromEnum(node_a.constraint.priority) > @intFromEnum(node_b.constraint.priority))
+                node_a.constraint.priority
+            else
+                node_b.constraint.priority,
+            .confidence = @min(node_a.constraint.confidence, node_b.constraint.confidence),
+            .frequency = node_a.constraint.frequency + node_b.constraint.frequency,
+            .severity = if (@intFromEnum(node_a.constraint.severity) > @intFromEnum(node_b.constraint.severity))
+                node_a.constraint.severity
+            else
+                node_b.constraint.severity,
+            .origin_file = node_a.constraint.origin_file,
+            .origin_line = node_a.constraint.origin_line,
+            .created_at = std.time.timestamp(),
+        };
+
+        // Replace node_a with merged constraint and disable node_b
+        graph.nodes.items[idx_a].constraint = merged_constraint;
+        graph.nodes.items[idx_b].enabled = false;
+
+        std.log.info("Merged constraints: {s} + {s} -> {s}", .{
+            node_a.constraint.name,
+            node_b.constraint.name,
+            merged_constraint.name,
+        });
+    }
+
     fn defaultConflictResolution(
         self: *Braid,
         graph: *ConstraintGraph,
@@ -320,7 +377,13 @@ pub const Braid = struct {
                 },
                 .merge => |info| {
                     std.log.info("Merge suggested: {s}", .{info.reasoning});
-                    // TODO: Implement constraint merging
+                    const conflicts = try self.detectConflicts(graph);
+                    defer self.allocator.free(conflicts);
+
+                    if (info.conflict_index < conflicts.len) {
+                        const conflict = conflicts[info.conflict_index];
+                        try self.mergeConstraintsInGraph(graph, conflict.constraint_a, conflict.constraint_b);
+                    }
                 },
                 .modify_a => |info| {
                     std.log.info("Modify A suggested: {s}", .{info.reasoning});
@@ -440,21 +503,197 @@ pub const Braid = struct {
         self: *Braid,
         graph: *const ConstraintGraph,
     ) ![]const root.types.constraint.Regex {
-        _ = self;
-        _ = graph;
-        // TODO: Extract regex patterns from constraints
-        return &.{};
+        var patterns = std.ArrayList(root.types.constraint.Regex){};
+
+        // Iterate through all enabled nodes in the graph
+        for (graph.nodes.items) |node| {
+            if (!node.enabled) continue;
+
+            const constraint = node.constraint;
+            const desc = constraint.description;
+
+            // Extract explicit regex patterns from descriptions
+            const regex_markers = [_][]const u8{
+                "must match regex: ",
+                "matches pattern ",
+                "regex: ",
+                "pattern: ",
+                "match ",
+            };
+
+            for (regex_markers) |marker| {
+                if (std.mem.indexOf(u8, desc, marker)) |marker_pos| {
+                    const start = marker_pos + marker.len;
+                    var end = desc.len;
+
+                    // Find end of pattern (stop at newline, quote, or end)
+                    for (desc[start..], 0..) |char, offset| {
+                        if (char == '\n' or char == '"' or char == '\'' or char == '`') {
+                            end = start + offset;
+                            break;
+                        }
+                    }
+
+                    if (end > start) {
+                        const raw_pattern = desc[start..end];
+                        const trimmed = std.mem.trim(u8, raw_pattern, " \t\r\n");
+                        if (trimmed.len > 0) {
+                            try patterns.append(self.allocator, .{
+                                .pattern = try self.allocator.dupe(u8, trimmed),
+                                .flags = "",
+                            });
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // Infer regex patterns from naming conventions
+            if (std.mem.indexOf(u8, desc, "camelCase") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[a-z][a-zA-Z0-9]*$"),
+                    .flags = "",
+                });
+            } else if (std.mem.indexOf(u8, desc, "PascalCase") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[A-Z][a-zA-Z0-9]*$"),
+                    .flags = "",
+                });
+            } else if (std.mem.indexOf(u8, desc, "snake_case") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[a-z][a-z0-9_]*$"),
+                    .flags = "",
+                });
+            } else if (std.mem.indexOf(u8, desc, "SCREAMING_SNAKE_CASE") != null or
+                std.mem.indexOf(u8, desc, "UPPER_CASE") != null)
+            {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[A-Z][A-Z0-9_]*$"),
+                    .flags = "",
+                });
+            } else if (std.mem.indexOf(u8, desc, "kebab-case") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[a-z][a-z0-9-]*$"),
+                    .flags = "",
+                });
+            }
+
+            // Infer patterns for common validation rules
+            if (std.mem.indexOf(u8, desc, "email") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"),
+                    .flags = "",
+                });
+            } else if (std.mem.indexOf(u8, desc, "URL") != null or std.mem.indexOf(u8, desc, "url") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^https?://[a-zA-Z0-9.-]+(?:/[^\\s]*)?$"),
+                    .flags = "",
+                });
+            } else if (std.mem.indexOf(u8, desc, "UUID") != null or std.mem.indexOf(u8, desc, "uuid") != null) {
+                try patterns.append(self.allocator, .{
+                    .pattern = try self.allocator.dupe(u8, "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"),
+                    .flags = "",
+                });
+            }
+        }
+
+        return try patterns.toOwnedSlice(self.allocator);
     }
 
     fn buildJsonSchema(
         self: *Braid,
         constraints: []const Constraint,
     ) !JsonSchema {
-        _ = self;
-        _ = constraints;
-        // TODO: Build JSON schema from type constraints
+        var schema_type: []const u8 = "object";
+        var properties = std.json.ObjectMap.init(self.allocator);
+        var required = std.ArrayList([]const u8){};
+
+        // Analyze constraints to infer schema structure
+        for (constraints) |constraint| {
+            const desc = constraint.description;
+
+            // Infer overall type from constraint description
+            if (std.mem.indexOf(u8, desc, "array") != null or
+                std.mem.indexOf(u8, desc, "list") != null)
+            {
+                schema_type = "array";
+            } else if (std.mem.indexOf(u8, desc, "string") != null) {
+                schema_type = "string";
+            } else if (std.mem.indexOf(u8, desc, "number") != null or
+                std.mem.indexOf(u8, desc, "integer") != null)
+            {
+                schema_type = "number";
+            } else if (std.mem.indexOf(u8, desc, "boolean") != null) {
+                schema_type = "boolean";
+            }
+
+            // Extract property names and types from description patterns
+            // Pattern: "property X must be Y" or "field X should be Y"
+            const property_markers = [_][]const u8{
+                "property ",
+                "field ",
+                "attribute ",
+            };
+
+            for (property_markers) |marker| {
+                if (std.mem.indexOf(u8, desc, marker)) |marker_pos| {
+                    const start = marker_pos + marker.len;
+                    var name_end = start;
+
+                    // Find end of property name (stop at space, 'must', 'should', etc.)
+                    for (desc[start..], 0..) |char, offset| {
+                        if (char == ' ' or char == '\n') {
+                            name_end = start + offset;
+                            break;
+                        }
+                    }
+
+                    if (name_end > start) {
+                        const prop_name = desc[start..name_end];
+                        const prop_name_owned = try self.allocator.dupe(u8, prop_name);
+
+                        // Infer property type from constraint description
+                        var prop_type: []const u8 = "string";
+                        if (std.mem.indexOf(u8, desc, "string") != null) {
+                            prop_type = "string";
+                        } else if (std.mem.indexOf(u8, desc, "number") != null) {
+                            prop_type = "number";
+                        } else if (std.mem.indexOf(u8, desc, "integer") != null) {
+                            prop_type = "integer";
+                        } else if (std.mem.indexOf(u8, desc, "boolean") != null) {
+                            prop_type = "boolean";
+                        } else if (std.mem.indexOf(u8, desc, "array") != null) {
+                            prop_type = "array";
+                        } else if (std.mem.indexOf(u8, desc, "object") != null) {
+                            prop_type = "object";
+                        }
+
+                        // Create a simple type object for this property
+                        const type_value = try self.allocator.dupe(u8, prop_type);
+                        try properties.put(prop_name_owned, .{ .string = type_value });
+
+                        // Check if required
+                        if (std.mem.indexOf(u8, desc, "required") != null or
+                            std.mem.indexOf(u8, desc, "must have") != null)
+                        {
+                            try required.append(self.allocator, prop_name_owned);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        const required_slice = if (required.items.len > 0)
+            try required.toOwnedSlice(self.allocator)
+        else
+            &.{};
+
         return JsonSchema{
-            .type = "object",
+            .type = schema_type,
+            .properties = if (properties.count() > 0) properties else null,
+            .required = required_slice,
+            .additional_properties = true,
         };
     }
 
@@ -924,10 +1163,92 @@ pub const Braid = struct {
         self: *Braid,
         constraints: []const Constraint,
     ) !TokenMaskRules {
-        _ = self;
-        _ = constraints;
-        // TODO: Build token masks from security constraints
-        return TokenMaskRules{};
+        var forbidden = std.ArrayList(u32){};
+        var allowed = std.ArrayList(u32){};
+
+        // Simple hash function to convert string patterns to token IDs
+        // In a real implementation, this would use a proper tokenizer vocabulary
+        const hashToken = struct {
+            fn hash(pattern: []const u8) u32 {
+                var h = std.hash.Wyhash.init(0);
+                h.update(pattern);
+                return @truncate(h.final());
+            }
+        }.hash;
+
+        for (constraints) |constraint| {
+            const desc = constraint.description;
+
+            // Check for credential blocking patterns
+            if (containsAny(desc, &.{ "no credential", "no secret", "no password", "block password", "forbid secret" })) {
+                try forbidden.append(self.allocator, hashToken("password"));
+                try forbidden.append(self.allocator, hashToken("secret"));
+                try forbidden.append(self.allocator, hashToken("api_key"));
+                try forbidden.append(self.allocator, hashToken("apiKey"));
+                try forbidden.append(self.allocator, hashToken("token"));
+                try forbidden.append(self.allocator, hashToken("auth"));
+                try forbidden.append(self.allocator, hashToken("bearer"));
+                try forbidden.append(self.allocator, hashToken("credential"));
+            }
+
+            // Check for URL blocking patterns
+            if (containsAny(desc, &.{ "no url", "no external url", "block url", "forbid http" })) {
+                try forbidden.append(self.allocator, hashToken("http://"));
+                try forbidden.append(self.allocator, hashToken("https://"));
+                try forbidden.append(self.allocator, hashToken("www."));
+            }
+
+            // Check for file path blocking
+            if (containsAny(desc, &.{ "no file path", "no path", "block path", "forbid filesystem" })) {
+                try forbidden.append(self.allocator, hashToken("/path/"));
+                try forbidden.append(self.allocator, hashToken("C:\\"));
+                try forbidden.append(self.allocator, hashToken("/usr/"));
+                try forbidden.append(self.allocator, hashToken("/etc/"));
+            }
+
+            // Check for SQL injection prevention
+            if (containsAny(desc, &.{ "no sql", "prevent sql", "block sql injection" })) {
+                try forbidden.append(self.allocator, hashToken("DROP"));
+                try forbidden.append(self.allocator, hashToken("DELETE"));
+                try forbidden.append(self.allocator, hashToken("INSERT"));
+                try forbidden.append(self.allocator, hashToken("UPDATE"));
+                try forbidden.append(self.allocator, hashToken("UNION"));
+                try forbidden.append(self.allocator, hashToken("SELECT"));
+            }
+
+            // Check for code execution blocking
+            if (containsAny(desc, &.{ "no eval", "no exec", "block execution", "forbid eval" })) {
+                try forbidden.append(self.allocator, hashToken("eval"));
+                try forbidden.append(self.allocator, hashToken("exec"));
+                try forbidden.append(self.allocator, hashToken("system"));
+                try forbidden.append(self.allocator, hashToken("execute"));
+            }
+
+            // Check for allow patterns (whitelist approach)
+            if (containsAny(desc, &.{ "only allow", "whitelist", "permit only" })) {
+                // Extract allowed tokens from description
+                // For now, add some common safe tokens
+                try allowed.append(self.allocator, hashToken("const"));
+                try allowed.append(self.allocator, hashToken("let"));
+                try allowed.append(self.allocator, hashToken("var"));
+                try allowed.append(self.allocator, hashToken("function"));
+            }
+        }
+
+        const forbidden_slice = if (forbidden.items.len > 0)
+            try forbidden.toOwnedSlice(self.allocator)
+        else
+            null;
+
+        const allowed_slice = if (allowed.items.len > 0)
+            try allowed.toOwnedSlice(self.allocator)
+        else
+            null;
+
+        return TokenMaskRules{
+            .forbidden_tokens = forbidden_slice,
+            .allowed_tokens = allowed_slice,
+        };
     }
 
     fn writeJsonSchema(

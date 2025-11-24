@@ -5,4 +5,4 @@
 
 pub mod modal_service;
 
-pub use modal_service::{MockModalService, MockScenario, MockResponse};
+pub use modal_service::{MockModalService, MockResponse, MockScenario};
