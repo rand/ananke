@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Ananke CLI service for constraint extraction and compilation
+  ananke:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ananke:latest
+    container_name: ananke-cli
+
+    # Mount local workspace for processing files
+    volumes:
+      - ./:/workspace:ro  # Read-only for safety
+      - ./output:/output  # Writable output directory
+
+    # Environment variables for configuration
+    environment:
+      # Optional: Claude API for semantic analysis
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # Optional: Modal endpoint for constrained generation
+      - MODAL_ENDPOINT=${MODAL_ENDPOINT:-}
+
+      # Log level (debug, info, warn, error)
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+      # Timezone
+      - TZ=${TZ:-UTC}
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+    # Default command (can be overridden)
+    command: help
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Network
+    networks:
+      - ananke-network
+
+    # Labels
+    labels:
+      com.ananke.service: "cli"
+      com.ananke.version: "0.1.0"
+
+  # Optional: Development environment with shell access
+  ananke-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: rust-builder  # Use build stage for development
+    image: ananke:dev
+    container_name: ananke-dev
+
+    volumes:
+      - ./:/workspace
+      - ananke-cargo-cache:/root/.cargo/registry
+      - ananke-zig-cache:/workspace/zig-cache
+
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MODAL_ENDPOINT=${MODAL_ENDPOINT:-}
+      - LOG_LEVEL=debug
+
+    working_dir: /workspace
+
+    # Keep container running for interactive use
+    entrypoint: ["/bin/sh"]
+    stdin_open: true
+    tty: true
+
+    networks:
+      - ananke-network
+
+    labels:
+      com.ananke.service: "dev"
+      com.ananke.version: "0.1.0"
+
+# Networks
+networks:
+  ananke-network:
+    driver: bridge
+    name: ananke-network
+
+# Volumes for caching
+volumes:
+  ananke-cargo-cache:
+    name: ananke-cargo-cache
+  ananke-zig-cache:
+    name: ananke-zig-cache

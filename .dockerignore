@@ -1,0 +1,125 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Build artifacts
+zig-out/
+zig-cache/
+.zig-cache/
+target/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Rust build files
+Cargo.lock
+**/target/
+
+# Documentation
+*.md
+!README.md
+docs/
+beads/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test files
+test/
+tests/
+benches/
+benchmarks/
+*.test
+test_output.log
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Package files
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+.pytest_cache/
+
+# Coverage reports
+coverage/
+*.coverage
+htmlcov/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# Editor backups
+*.swp
+*.swo
+*.backup
+*~
+
+# Examples output (optional - uncomment if you don't want examples)
+# examples/
+
+# Homebrew formula
+homebrew/
+
+# Scripts (optional - uncomment if you don't want scripts in image)
+# scripts/
+
+# Release artifacts
+ananke-*
+*.sha256
+*.tar.gz
+*.zip
