@@ -10,6 +10,7 @@ const ConstraintSet = root.types.constraint.ConstraintSet;
 const ConstraintKind = root.types.constraint.ConstraintKind;
 const JsonSchema = root.types.constraint.JsonSchema;
 const Grammar = root.types.constraint.Grammar;
+const GrammarRule = root.types.constraint.GrammarRule;
 const TokenMaskRules = root.types.constraint.TokenMaskRules;
 
 // Import Claude API client
@@ -332,14 +333,21 @@ pub const Braid = struct {
     }
 
     fn optimizeGraph(self: *Braid, graph: *ConstraintGraph) !void {
-        _ = self;
         // Topological sort for optimal evaluation order
-        try graph.topologicalSort();
+        const sorted_indices = try graph.topologicalSort();
+        defer self.allocator.free(sorted_indices);
 
         // Mark critical path constraints
         for (graph.nodes.items) |*node| {
             if (node.constraint.severity == .err) {
                 node.priority = 1000;
+            }
+        }
+
+        // Update node priorities based on topological order
+        for (sorted_indices, 0..) |node_idx, order| {
+            if (node_idx < graph.nodes.items.len) {
+                graph.nodes.items[node_idx].priority = @as(u32, @intCast(order));
             }
         }
     }
@@ -439,13 +447,462 @@ pub const Braid = struct {
         self: *Braid,
         constraints: []const Constraint,
     ) !Grammar {
-        _ = self;
-        _ = constraints;
-        // TODO: Build grammar from syntax constraints
+        // Create an arena allocator for building the grammar
+        var arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer arena.deinit();
+        const arena_allocator = arena.allocator();
+
+        var rules = try std.ArrayList(GrammarRule).initCapacity(arena_allocator, 50);
+
+        // Track which patterns we've seen to avoid duplicates
+        var has_async_function = false;
+        var has_function = false;
+        var has_if_statement = false;
+        var has_for_loop = false;
+        var has_while_loop = false;
+        var has_try_catch = false;
+        var has_switch_statement = false;
+        var has_arrow_function = false;
+        var has_class_declaration = false;
+        var has_return_statement = false;
+
+        // Analyze constraints to detect patterns
+        for (constraints) |constraint| {
+            if (constraint.kind != .syntactic) continue;
+
+            const desc = constraint.description;
+
+            // Detect async functions
+            if (std.mem.indexOf(u8, desc, "async") != null and
+                std.mem.indexOf(u8, desc, "function") != null)
+            {
+                has_async_function = true;
+            }
+
+            // Detect regular functions
+            if (std.mem.indexOf(u8, desc, "function") != null) {
+                has_function = true;
+            }
+
+            // Detect arrow functions
+            if (std.mem.indexOf(u8, desc, "=>") != null or
+                std.mem.indexOf(u8, desc, "arrow") != null)
+            {
+                has_arrow_function = true;
+            }
+
+            // Detect if statements
+            if (std.mem.indexOf(u8, desc, "if") != null and
+                (std.mem.indexOf(u8, desc, "statement") != null or
+                std.mem.indexOf(u8, desc, "else") != null))
+            {
+                has_if_statement = true;
+            }
+
+            // Detect for loops
+            if (std.mem.indexOf(u8, desc, "for") != null and
+                (std.mem.indexOf(u8, desc, "loop") != null or
+                std.mem.indexOf(u8, desc, "iteration") != null))
+            {
+                has_for_loop = true;
+            }
+
+            // Detect while loops
+            if (std.mem.indexOf(u8, desc, "while") != null and
+                std.mem.indexOf(u8, desc, "loop") != null)
+            {
+                has_while_loop = true;
+            }
+
+            // Detect try/catch
+            if ((std.mem.indexOf(u8, desc, "try") != null and
+                std.mem.indexOf(u8, desc, "catch") != null) or
+                std.mem.indexOf(u8, desc, "exception") != null)
+            {
+                has_try_catch = true;
+            }
+
+            // Detect switch statements
+            if (std.mem.indexOf(u8, desc, "switch") != null or
+                std.mem.indexOf(u8, desc, "case") != null)
+            {
+                has_switch_statement = true;
+            }
+
+            // Detect class declarations
+            if (std.mem.indexOf(u8, desc, "class") != null) {
+                has_class_declaration = true;
+            }
+
+            // Detect return statements
+            if (std.mem.indexOf(u8, desc, "return") != null) {
+                has_return_statement = true;
+            }
+        }
+
+        // Build base grammar rules
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "program"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"statement_list"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "statement_list"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "statement", "statement_list_tail" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "statement_list_tail"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "statement", "statement_list_tail" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "statement_list_tail"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon
+        });
+
+        // Build statement alternatives based on detected patterns
+        var statement_alternatives = try std.ArrayList([]const u8).initCapacity(arena_allocator, 10);
+
+        if (has_function or has_async_function) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "function_declaration"));
+        }
+
+        if (has_arrow_function) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "arrow_function"));
+        }
+
+        if (has_class_declaration) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "class_declaration"));
+        }
+
+        if (has_if_statement) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "if_statement"));
+        }
+
+        if (has_for_loop) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "for_statement"));
+        }
+
+        if (has_while_loop) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "while_statement"));
+        }
+
+        if (has_try_catch) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "try_statement"));
+        }
+
+        if (has_switch_statement) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "switch_statement"));
+        }
+
+        if (has_return_statement) {
+            try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "return_statement"));
+        }
+
+        // Always include basic statements
+        try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "assignment"));
+        try statement_alternatives.append(arena_allocator, try arena_allocator.dupe(u8, "expression_statement"));
+
+        // Add statement rule with all alternatives
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "statement"),
+            .rhs = try statement_alternatives.toOwnedSlice(arena_allocator),
+        });
+
+        // Add detailed rules for each detected pattern
+        if (has_async_function) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "async_function"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "ASYNC", "FUNCTION", "identifier", "LPAREN", "params", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_function) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "function_declaration"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "FUNCTION", "identifier", "LPAREN", "params", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+
+            if (has_async_function) {
+                // Add alternative for async function
+                try rules.append(arena_allocator, GrammarRule{
+                    .lhs = try arena_allocator.dupe(u8, "function_declaration"),
+                    .rhs = try self.createRhsSlice(arena_allocator, &.{"async_function"}),
+                });
+            }
+        }
+
+        if (has_arrow_function) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "arrow_function"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "LPAREN", "params", "RPAREN", "ARROW", "expression" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "arrow_function"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "LPAREN", "params", "RPAREN", "ARROW", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_class_declaration) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "class_declaration"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "CLASS", "identifier", "LBRACE", "class_body", "RBRACE" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "class_body"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{"method_list"}),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "method_list"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "method", "method_list" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "method_list"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "method"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "identifier", "LPAREN", "params", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_if_statement) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "if_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "IF", "LPAREN", "expression", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "if_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "IF", "LPAREN", "expression", "RPAREN", "LBRACE", "statement_list", "RBRACE", "ELSE", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_for_loop) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "for_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "FOR", "LPAREN", "assignment", "SEMICOLON", "expression", "SEMICOLON", "assignment", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_while_loop) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "while_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "WHILE", "LPAREN", "expression", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_try_catch) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "try_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "TRY", "LBRACE", "statement_list", "RBRACE", "CATCH", "LPAREN", "identifier", "RPAREN", "LBRACE", "statement_list", "RBRACE" }),
+            });
+        }
+
+        if (has_switch_statement) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "switch_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "SWITCH", "LPAREN", "expression", "RPAREN", "LBRACE", "case_list", "RBRACE" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "case_list"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "case_clause", "case_list" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "case_list"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "case_clause"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "CASE", "expression", "COLON", "statement_list" }),
+            });
+        }
+
+        if (has_return_statement) {
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "return_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "RETURN", "expression", "SEMICOLON" }),
+            });
+
+            try rules.append(arena_allocator, GrammarRule{
+                .lhs = try arena_allocator.dupe(u8, "return_statement"),
+                .rhs = try self.createRhsSlice(arena_allocator, &.{ "RETURN", "SEMICOLON" }),
+            });
+        }
+
+        // Basic expression and statement rules
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "assignment"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "identifier", "EQUALS", "expression", "SEMICOLON" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "expression_statement"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "expression", "SEMICOLON" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "expression"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"binary_expression"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "expression"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"function_call"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "expression"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"identifier"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "expression"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"literal"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "binary_expression"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "expression", "binary_op", "expression" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "binary_op"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"PLUS"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "binary_op"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"MINUS"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "binary_op"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"STAR"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "binary_op"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"SLASH"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "function_call"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "identifier", "LPAREN", "args", "RPAREN" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "params"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"param_list"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "params"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon - no params
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "param_list"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "identifier", "param_list_tail" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "param_list_tail"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "COMMA", "identifier", "param_list_tail" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "param_list_tail"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "args"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"arg_list"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "args"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon - no args
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "arg_list"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "expression", "arg_list_tail" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "arg_list_tail"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{ "COMMA", "expression", "arg_list_tail" }),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "arg_list_tail"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{}), // epsilon
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "identifier"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"IDENTIFIER"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "literal"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"NUMBER"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "literal"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"STRING"}),
+        });
+
+        try rules.append(arena_allocator, GrammarRule{
+            .lhs = try arena_allocator.dupe(u8, "literal"),
+            .rhs = try self.createRhsSlice(arena_allocator, &.{"BOOLEAN"}),
+        });
+
+        // Allocate the rules slice in the main allocator so it persists
+        const owned_rules = try self.allocator.alloc(GrammarRule, rules.items.len);
+        for (rules.items, 0..) |rule, i| {
+            // Allocate and copy RHS items first
+            const rhs_items = try self.allocator.alloc([]const u8, rule.rhs.len);
+            for (rule.rhs, 0..) |rhs_item, j| {
+                rhs_items[j] = try self.allocator.dupe(u8, rhs_item);
+            }
+
+            owned_rules[i] = GrammarRule{
+                .lhs = try self.allocator.dupe(u8, rule.lhs),
+                .rhs = rhs_items,
+            };
+        }
+
         return Grammar{
-            .rules = &.{},
+            .rules = owned_rules,
             .start_symbol = "program",
         };
+    }
+
+    // Helper function to create RHS slice from string literals
+    fn createRhsSlice(
+        self: *Braid,
+        allocator: std.mem.Allocator,
+        items: []const []const u8,
+    ) ![]const []const u8 {
+        _ = self;
+        const slice = try allocator.alloc([]const u8, items.len);
+        for (items, 0..) |item, i| {
+            slice[i] = try allocator.dupe(u8, item);
+        }
+        return slice;
     }
 
     fn buildTokenMasks(
@@ -488,18 +945,18 @@ pub const Braid = struct {
 };
 
 /// Constraint dependency graph
-const ConstraintGraph = struct {
+pub const ConstraintGraph = struct {
     allocator: std.mem.Allocator,
     nodes: std.ArrayList(Node),
     edges: std.ArrayList(Edge),
 
-    const Node = struct {
+    pub const Node = struct {
         constraint: Constraint,
         enabled: bool = true,
         priority: u32 = 0,
     };
 
-    const Edge = struct {
+    pub const Edge = struct {
         from: usize,
         to: usize,
     };
@@ -527,9 +984,127 @@ const ConstraintGraph = struct {
         try self.edges.append(self.allocator, .{ .from = from, .to = to });
     }
 
-    pub fn topologicalSort(self: *ConstraintGraph) !void {
-        // TODO: Implement topological sort
-        _ = self;
+    pub fn topologicalSort(self: *ConstraintGraph) ![]usize {
+        // Kahn's algorithm for topological sorting with cycle detection
+        var in_degree = std.AutoHashMap(usize, usize).init(self.allocator);
+        defer in_degree.deinit();
+
+        // Initialize in-degree map for all nodes
+        for (0..self.nodes.items.len) |i| {
+            try in_degree.put(i, 0);
+        }
+
+        // Calculate in-degree for each node
+        for (self.edges.items) |edge| {
+            const current = in_degree.get(edge.to) orelse 0;
+            try in_degree.put(edge.to, current + 1);
+        }
+
+        // Find all nodes with in-degree 0
+        var queue = try std.ArrayList(usize).initCapacity(self.allocator, self.nodes.items.len);
+        defer queue.deinit(self.allocator);
+
+        {
+            var it = in_degree.iterator();
+            while (it.next()) |entry| {
+                if (entry.value_ptr.* == 0) {
+                    try queue.append(self.allocator, entry.key_ptr.*);
+                }
+            }
+        }
+
+        // Process queue using Kahn's algorithm
+        var result = try std.ArrayList(usize).initCapacity(self.allocator, self.nodes.items.len);
+        var processed_count: usize = 0;
+
+        while (queue.items.len > 0) {
+            const node_id = queue.orderedRemove(0);
+            try result.append(self.allocator, node_id);
+            processed_count += 1;
+
+            // Find all edges from this node
+            for (self.edges.items) |edge| {
+                if (edge.from == node_id) {
+                    const to_degree = in_degree.get(edge.to) orelse 0;
+                    if (to_degree > 0) {
+                        try in_degree.put(edge.to, to_degree - 1);
+                        if (to_degree - 1 == 0) {
+                            try queue.append(self.allocator, edge.to);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check for cycles
+        if (processed_count < self.nodes.items.len) {
+            std.debug.print(
+                "Warning: Cyclic dependencies detected. Processed {}/{} constraints.\n",
+                .{ processed_count, self.nodes.items.len },
+            );
+
+            // Add remaining nodes to result (partial ordering)
+            for (0..self.nodes.items.len) |i| {
+                var found = false;
+                for (result.items) |item| {
+                    if (item == i) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    try result.append(self.allocator, i);
+                }
+            }
+        }
+
+        return try result.toOwnedSlice(self.allocator);
+    }
+
+    pub fn detectCycle(self: *ConstraintGraph) !bool {
+        // Use DFS-based cycle detection
+        var visited = try std.ArrayList(bool).initCapacity(self.allocator, self.nodes.items.len);
+        defer visited.deinit(self.allocator);
+        try visited.appendNTimes(self.allocator, false, self.nodes.items.len);
+
+        var rec_stack = try std.ArrayList(bool).initCapacity(self.allocator, self.nodes.items.len);
+        defer rec_stack.deinit(self.allocator);
+        try rec_stack.appendNTimes(self.allocator, false, self.nodes.items.len);
+
+        for (0..self.nodes.items.len) |node| {
+            if (!visited.items[node]) {
+                if (try self.hasCycleDFS(node, &visited, &rec_stack)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    fn hasCycleDFS(
+        self: *ConstraintGraph,
+        node: usize,
+        visited: *std.ArrayList(bool),
+        rec_stack: *std.ArrayList(bool),
+    ) !bool {
+        visited.items[node] = true;
+        rec_stack.items[node] = true;
+
+        // Visit all neighbors
+        for (self.edges.items) |edge| {
+            if (edge.from == node) {
+                if (!visited.items[edge.to]) {
+                    if (try self.hasCycleDFS(edge.to, visited, rec_stack)) {
+                        return true;
+                    }
+                } else if (rec_stack.items[edge.to]) {
+                    return true;
+                }
+            }
+        }
+
+        rec_stack.items[node] = false;
+        return false;
     }
 
     pub fn getMaxPriority(self: *const ConstraintGraph) u32 {
@@ -566,3 +1141,15 @@ const Conflict = struct {
     constraint_b: usize,
     description: []const u8,
 };
+// Re-export JSON Schema builder functionality
+pub const buildJSONSchemaString = @import("json_schema_builder.zig").buildJSONSchemaString;
+
+// Public API for testing grammar building
+pub fn buildGrammarFromConstraints(
+    allocator: std.mem.Allocator,
+    constraints: []const Constraint,
+) !Grammar {
+    var braid = try Braid.init(allocator);
+    defer braid.deinit();
+    return try braid.buildGrammar(constraints);
+}
