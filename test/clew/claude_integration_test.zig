@@ -78,7 +78,7 @@ test "Clew extraction from test code" {
     ;
 
     // Should not fail even with no assertions parser yet
-    var constraint_set = try clew.extractFromTests(test_code);
+    var constraint_set = try clew.extractFromTests(test_code, "test.zig");
     defer constraint_set.deinit();
 
     // Currently returns empty set since parseTestAssertions is stubbed

@@ -18,6 +18,9 @@ const patterns = @import("patterns.zig");
 // Import structural extractors (pure Zig AST-like parsing)
 const extractors = @import("extractors.zig");
 
+// Import test assertion parser
+const test_assertions = @import("parsers/test_assertions.zig");
+
 // Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
 const structural_parsing_enabled = true;
 
@@ -115,12 +118,18 @@ pub const Clew = struct {
     }
 
     /// Extract constraints from test files
-    pub fn extractFromTests(self: *Clew, test_source: []const u8) !ConstraintSet {
+    pub fn extractFromTests(self: *Clew, test_source: []const u8, file_path: []const u8) !ConstraintSet {
         var constraint_set = ConstraintSet.init(self.allocator, "test_constraints");
 
         // Parse test assertions to infer constraints (syntactic extraction)
-        const assertions = try self.parseTestAssertions(test_source);
-        defer self.allocator.free(assertions);
+        const assertions = try self.parseTestAssertions(test_source, file_path);
+        defer {
+            for (assertions) |*assertion| {
+                var mut_assertion = assertion;
+                mut_assertion.deinit(self.allocator);
+            }
+            self.allocator.free(assertions);
+        }
 
         for (assertions) |assertion| {
             const constraint = try self.assertionToConstraint(assertion);
@@ -451,18 +460,40 @@ pub const Clew = struct {
         );
     }
 
-    fn parseTestAssertions(self: *Clew, test_source: []const u8) ![]TestAssertion {
-        _ = self;
-        _ = test_source;
-        // TODO: Implement test assertion parsing
-        return &.{};
+    fn parseTestAssertions(self: *Clew, test_source: []const u8, file_path: []const u8) ![]test_assertions.TestAssertion {
+        // Detect language based on file extension
+        const language = test_assertions.detectTestFileType(file_path) orelse return &.{};
+
+        // Create parser and parse assertions
+        var parser = test_assertions.TestAssertionParser.init(self.constraintAllocator());
+        return try parser.parse(test_source, language);
     }
 
-    fn assertionToConstraint(self: *Clew, assertion: TestAssertion) !Constraint {
-        _ = self;
-        _ = assertion;
-        // TODO: Implement proper assertion-to-constraint conversion
-        return Constraint.init(0, "test_derived", "Constraint derived from test assertion");
+    fn assertionToConstraint(self: *Clew, assertion: test_assertions.TestAssertion) !Constraint {
+        return Constraint{
+            .id = 0,
+            .name = try std.fmt.allocPrint(
+                self.constraintAllocator(),
+                "test_{s}_{s}",
+                .{ assertion.function_name, @tagName(assertion.assertion_type) },
+            ),
+            .description = assertion.constraint_text,
+            .kind = switch (assertion.assertion_type) {
+                .type_check => .type_safety,
+                .error_expected => .semantic,
+                else => .semantic,
+            },
+            .source = .Test_Mining,
+            .enforcement = switch (assertion.assertion_type) {
+                .type_check => .Structural,
+                else => .Semantic,
+            },
+            .priority = .High,
+            .confidence = assertion.confidence,
+            .frequency = 1,
+            .severity = .warning,
+            .origin_line = assertion.line,
+        };
     }
 };
 
