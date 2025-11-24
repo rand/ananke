@@ -251,6 +251,8 @@ pub const ConstraintSet = struct {
     }
 
     pub fn deinit(self: *ConstraintSet) void {
+        // Note: Currently does not free individual constraint string fields
+        // TODO: Add ownership tracking or use arena allocator for constraint strings
         self.constraints.deinit(self.allocator);
     }
 
