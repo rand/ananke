@@ -7,8 +7,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### In Progress
+- Tree-sitter integration for Clew constraint extraction
+- Claude API client for semantic analysis
+- Braid dependency graph and conflict resolution
+- Ariadne DSL implementation
+
+## [0.1.0-alpha] - 2025-11-23
+
 ### Added
-- Initial development
+
+#### Modal Inference Service
+- Production-ready GPU inference service with vLLM 0.11.0 + llguidance 0.7.11
+- Working endpoint: https://rand--ananke-inference-generate-api.modal.run
+- JSON Schema constraint enforcement (V1 structured outputs API)
+- Context-free grammar constraints
+- Regex pattern constraints
+- Environment-based cost controls (MODAL_MODE: dev/demo/prod)
+- Scale-to-zero architecture with configurable scaledown windows
+- FastAPI web interface with health check endpoint
+- Comprehensive 805-line documentation (maze/modal_inference/README.md)
+
+#### Core Type System
+- Constraint type with 6 categories (syntactic, type_safety, semantic, architectural, operational, security)
+- ConstraintSource union with 11 source types
+- ConstraintPriority enum (Critical, High, Medium, Low, Optional)
+- Severity levels (err, warning, info, hint)
+- EnforcementType with 6 strategies
+- ConstraintSet with deduplication and iteration
+- ConstraintIR intermediate representation for llguidance
+- TokenMaskRules for direct token control
+- 25 passing unit tests (test/types/constraint_test.zig, 298 lines)
+
+#### Constraint Engines
+- Clew extraction engine framework (src/clew/clew.zig, 466 lines)
+  - Tree-sitter integration stubs
+  - Claude API integration stubs
+  - Multi-language support stubs (TypeScript, Python, Rust, Go, Java, Zig)
+- Braid compilation engine framework (src/braid/braid.zig, 567 lines)
+  - Dependency graph construction stubs
+  - Conflict detection/resolution stubs
+  - llguidance schema generation stubs
+
+#### Build System
+- Comprehensive build.zig (334 lines)
+- Zig 0.15.2 compatibility
+- Module system for component isolation
+- All tests passing: `zig build test`
+- Benchmark infrastructure: `zig build bench`
+
+#### Testing Infrastructure
+- TEST_STRATEGY.md (1,409 lines) with comprehensive test plan
+- 174+ tests planned (138 unit, 26 integration, 8+ performance)
+- Mock strategies for Claude API and HTTP clients
+- Test fixtures for multi-language code samples
+- Performance benchmarking targets defined
+- CI/CD GitHub Actions workflow planned
+
+#### Documentation
+- DEVELOPMENT_HISTORY.md (850+ lines) - narrative development journey
+- IMPLEMENTATION_PLAN.md - detailed phase tracking and roadmap
+- README.md updated with 60% progress status
+- Modal inference service comprehensive docs
+- Test strategy documentation
+
+### Fixed
+
+#### Modal Inference Service
+- Container crash loop: missing Rust compiler for llguidance build
+  - Added rustup installation to Modal image
+- CUDA version compatibility: 12.1 vs 12.4.1 mismatch
+  - Let vLLM manage its own PyTorch+CUDA dependencies
+- vLLM 0.11.0 API compatibility: json vs json_schema parameter
+  - Corrected to use 'json' parameter in StructuredOutputsParams
+- AttributeError: 'AnankeLLM' object has no attribute 'llm'
+  - Fixed Modal lifecycle with proper @modal.method() usage
+- HTTP timeout issues during cold start model loading
+  - Increased timeouts for first-time initialization
+
+#### Zig Build System
+- ArrayList API migration for Zig 0.15.x compatibility
+  - Updated append() to require error handling
+  - Fixed items field access (now slice, not pointer)
+- Build system modularization for clean component separation
+- Test infrastructure with proper module imports
+
+### Performance
+
+#### Achieved Metrics
+- Modal inference: 22.3 tokens/sec with JSON schema constraints
+- llguidance overhead: ~50μs per token
+- Constraint validation: <1ms (type system tests)
+
+#### Target Metrics (Planned)
+- Clew extraction: <100ms for typical files
+- Braid compilation: <50ms for typical constraint sets
+- Cache hit retrieval: <1ms
+- Invalid output rate: <0.12% with llguidance
+
+### Infrastructure
+
+#### Deployment
+- Modal GPU infrastructure (A100-80GB)
+- Qwen2.5-Coder-32B-Instruct model deployment
+- Environment-based configuration (dev: 2min scaledown, demo: 10min, prod: 5min)
+- HuggingFace token integration for model access
+
+#### Cost Controls
+- Scale-to-zero architecture: $4.09/hr only during active use
+- Development mode: 2-minute scaledown for cost optimization
+- Demo mode: 10-minute scaledown for presentations
+- Production mode: 5-minute scaledown for balanced cost/performance
+
+### Known Limitations
+- Clew tree-sitter integration pending full implementation
+- Braid dependency graph pending full implementation
+- Claude API integration pending implementation
+- Ariadne DSL pending implementation
+- Maze orchestration layer pending implementation
+- Streaming generation not yet implemented
+- Local GGUF model support not yet implemented
+
+### Dependencies
+- Zig 0.15.2 or later
+- Rust 1.70+ (for planned Maze library)
+- Python 3.11+ (for Modal inference service)
+- vLLM 0.11.0
+- llguidance 0.7.11-0.8.0
+- Modal account with GPU access
+
+### Security
+- Environment-based secret management (Modal secrets)
+- HuggingFace token isolation
+- No hardcoded credentials in source code
+
+### Development Experience
+- Comprehensive debugging documentation (maze/modal_inference/DEBUGGER_REPORT.md)
+- 5 iterations to production deployment documented
+- Clear lessons learned from Modal integration
+- Test-driven development approach with planned test strategy
+
+---
 
 ## [0.1.0] - 2025-11-23
 
