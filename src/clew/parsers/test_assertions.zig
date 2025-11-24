@@ -61,7 +61,7 @@ pub const TestAssertionParser = struct {
             for (assertions.items) |*assertion| {
                 assertion.deinit(self.allocator);
             }
-            assertions.deinit();
+            assertions.deinit(self.allocator);
         }
 
         var line_num: u32 = 1;
@@ -285,7 +285,7 @@ pub const TestAssertionParser = struct {
             for (assertions.items) |*assertion| {
                 assertion.deinit(self.allocator);
             }
-            assertions.deinit();
+            assertions.deinit(self.allocator);
         }
 
         var line_num: u32 = 1;
