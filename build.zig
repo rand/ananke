@@ -498,4 +498,134 @@ pub fn build(b: *std.Build) void {
     const rust_bench_step = b.step("bench-rust", "Run Rust Maze benchmarks");
     rust_bench_step.dependOn(&cargo_bench.step);
     bench_all_step.dependOn(rust_bench_step);
+    // ============================================================================
+    // Additional Performance Benchmarks
+    // ============================================================================
+
+    // Multi-language extraction benchmarks
+    const multi_lang_bench = b.addExecutable(.{
+        .name = "multi_language_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/multi_language_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+            },
+        }),
+    });
+    b.installArtifact(multi_lang_bench);
+
+    const run_multi_lang_bench = b.addRunArtifact(multi_lang_bench);
+    const multi_lang_bench_step = b.step("bench-multi-lang", "Run multi-language extraction benchmarks");
+    multi_lang_bench_step.dependOn(&run_multi_lang_bench.step);
+
+    // Constraint density benchmarks
+    const density_bench = b.addExecutable(.{
+        .name = "constraint_density_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/constraint_density_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    b.installArtifact(density_bench);
+
+    const run_density_bench = b.addRunArtifact(density_bench);
+    const density_bench_step = b.step("bench-density", "Run constraint density benchmarks");
+    density_bench_step.dependOn(&run_density_bench.step);
+
+    // Memory usage benchmarks
+    const memory_bench = b.addExecutable(.{
+        .name = "memory_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/memory_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    b.installArtifact(memory_bench);
+
+    const run_memory_bench = b.addRunArtifact(memory_bench);
+    const memory_bench_step = b.step("bench-memory", "Run memory usage benchmarks");
+    memory_bench_step.dependOn(&run_memory_bench.step);
+
+    // FFI roundtrip benchmarks
+    const ffi_roundtrip_bench = b.addExecutable(.{
+        .name = "ffi_roundtrip_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/ffi_roundtrip_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "zig_ffi", .module = b.addModule("zig_ffi", .{
+                    .root_source_file = b.path("src/ffi/zig_ffi.zig"),
+                    .target = target,
+                }) },
+            },
+        }),
+    });
+    b.installArtifact(ffi_roundtrip_bench);
+
+    const run_ffi_roundtrip_bench = b.addRunArtifact(ffi_roundtrip_bench);
+    const ffi_roundtrip_bench_step = b.step("bench-ffi-roundtrip", "Run FFI roundtrip benchmarks");
+    ffi_roundtrip_bench_step.dependOn(&run_ffi_roundtrip_bench.step);
+
+    // End-to-end pipeline benchmarks
+    const pipeline_bench = b.addExecutable(.{
+        .name = "pipeline_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/pipeline_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    b.installArtifact(pipeline_bench);
+
+    const run_pipeline_bench = b.addRunArtifact(pipeline_bench);
+    const pipeline_bench_step = b.step("bench-pipeline", "Run end-to-end pipeline benchmarks");
+    pipeline_bench_step.dependOn(&run_pipeline_bench.step);
+
+    // Regression test suite
+    const regression_test = b.addExecutable(.{
+        .name = "regression_test",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/zig/regression_test.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    b.installArtifact(regression_test);
+
+    const run_regression_test = b.addRunArtifact(regression_test);
+    const regression_test_step = b.step("bench-regression", "Run performance regression tests");
+    regression_test_step.dependOn(&run_regression_test.step);
+
+    // Update comprehensive Zig benchmarks step
+    bench_all_zig_step.dependOn(multi_lang_bench_step);
+    bench_all_zig_step.dependOn(density_bench_step);
+    bench_all_zig_step.dependOn(memory_bench_step);
+    bench_all_zig_step.dependOn(ffi_roundtrip_bench_step);
+    bench_all_zig_step.dependOn(pipeline_bench_step);
 }

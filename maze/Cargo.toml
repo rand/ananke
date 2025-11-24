@@ -91,3 +91,7 @@ path = "tests/integration/integration_tests.rs"
 [[example]]
 name = "simple_generation"
 path = "examples/simple_generation.rs"
+
+[[bench]]
+name = "ffi_overhead"
+harness = false

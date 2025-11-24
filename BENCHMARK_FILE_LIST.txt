@@ -1,0 +1,68 @@
+=== Ananke Performance Benchmark Suite - File Locations ===
+
+## Test Fixtures (20 files)
+/Users/rand/src/ananke/test/fixtures/generate_fixtures.py
+/Users/rand/src/ananke/test/fixtures/typescript/small/entity_service_100.ts
+/Users/rand/src/ananke/test/fixtures/typescript/medium/entity_service_500.ts
+/Users/rand/src/ananke/test/fixtures/typescript/large/entity_service_1000.ts
+/Users/rand/src/ananke/test/fixtures/typescript/xlarge/entity_service_5000.ts
+/Users/rand/src/ananke/test/fixtures/python/small/entity_service_100.py
+/Users/rand/src/ananke/test/fixtures/python/medium/entity_service_500.py
+/Users/rand/src/ananke/test/fixtures/python/large/entity_service_1000.py
+/Users/rand/src/ananke/test/fixtures/python/xlarge/entity_service_5000.py
+/Users/rand/src/ananke/test/fixtures/rust/small/entity_service_100.rs
+/Users/rand/src/ananke/test/fixtures/rust/medium/entity_service_500.rs
+/Users/rand/src/ananke/test/fixtures/rust/large/entity_service_1000.rs
+/Users/rand/src/ananke/test/fixtures/rust/xlarge/entity_service_5000.rs
+/Users/rand/src/ananke/test/fixtures/zig/small/entity_service_100.zig
+/Users/rand/src/ananke/test/fixtures/zig/medium/entity_service_500.zig
+/Users/rand/src/ananke/test/fixtures/zig/large/entity_service_1000.zig
+/Users/rand/src/ananke/test/fixtures/zig/xlarge/entity_service_5000.zig
+/Users/rand/src/ananke/test/fixtures/go/small/entity_service_100.go
+/Users/rand/src/ananke/test/fixtures/go/medium/entity_service_500.go
+/Users/rand/src/ananke/test/fixtures/go/large/entity_service_1000.go
+/Users/rand/src/ananke/test/fixtures/go/xlarge/entity_service_5000.go
+
+## Zig Benchmarks (8 files)
+/Users/rand/src/ananke/benches/zig/clew_bench.zig (existing)
+/Users/rand/src/ananke/benches/zig/braid_bench.zig (existing)
+/Users/rand/src/ananke/benches/zig/ffi_bench.zig (existing)
+/Users/rand/src/ananke/benches/zig/multi_language_bench.zig (NEW)
+/Users/rand/src/ananke/benches/zig/constraint_density_bench.zig (NEW)
+/Users/rand/src/ananke/benches/zig/memory_bench.zig (NEW)
+/Users/rand/src/ananke/benches/zig/ffi_roundtrip_bench.zig (NEW)
+/Users/rand/src/ananke/benches/zig/pipeline_bench.zig (NEW)
+/Users/rand/src/ananke/benches/zig/regression_test.zig (NEW)
+
+## Rust Benchmarks (4 files)
+/Users/rand/src/ananke/maze/benches/orchestration.rs (existing)
+/Users/rand/src/ananke/maze/benches/cache_performance.rs (existing)
+/Users/rand/src/ananke/maze/benches/constraint_compilation.rs (existing)
+/Users/rand/src/ananke/maze/benches/ffi_overhead.rs (NEW)
+
+## Documentation (3 files)
+/Users/rand/src/ananke/benchmarks/BENCHMARK_GUIDE.md (NEW - comprehensive guide)
+/Users/rand/src/ananke/benchmarks/README.md (NEW - quick reference)
+/Users/rand/src/ananke/benchmarks/baselines.json (NEW - performance baselines)
+
+## Build Configuration (2 files)
+/Users/rand/src/ananke/build.zig (MODIFIED - added 12 benchmark targets)
+/Users/rand/src/ananke/maze/Cargo.toml (MODIFIED - added ffi_overhead benchmark)
+
+## Reports (2 files)
+/Users/rand/src/ananke/BENCHMARK_IMPLEMENTATION_REPORT.md (NEW - this implementation report)
+/Users/rand/src/ananke/BENCHMARK_FILE_LIST.txt (NEW - this file)
+
+=== Summary ===
+Total files created: 30
+Total files modified: 2
+Total new benchmarks: 5 Zig + 1 Rust = 6
+Total benchmark fixtures: 20 (5 languages × 4 sizes)
+Documentation pages: 3
+
+=== Quick Commands ===
+Run all: zig build bench
+Regression: zig build bench-regression
+Zig only: zig build bench-zig
+Rust only: cd maze && cargo bench
+Help: See benchmarks/BENCHMARK_GUIDE.md
