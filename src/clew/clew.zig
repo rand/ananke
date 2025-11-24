@@ -440,7 +440,7 @@ pub const Clew = struct {
         // Add high-level constraints based on analysis
         if (function_count > 0) {
             const func_desc = try std.fmt.allocPrint(
-                self.allocator,
+                self.constraintAllocator(),
                 "Code contains {d} function-related constructs",
                 .{function_count},
             );
@@ -456,7 +456,7 @@ pub const Clew = struct {
 
         if (type_count > 0) {
             const type_desc = try std.fmt.allocPrint(
-                self.allocator,
+                self.constraintAllocator(),
                 "Strong type safety with {d} type annotations",
                 .{type_count},
             );
@@ -473,7 +473,7 @@ pub const Clew = struct {
 
         if (async_count > 0) {
             const async_desc = try std.fmt.allocPrint(
-                self.allocator,
+                self.constraintAllocator(),
                 "Asynchronous code with {d} async patterns",
                 .{async_count},
             );
@@ -489,7 +489,7 @@ pub const Clew = struct {
 
         if (error_count > 0) {
             const error_desc = try std.fmt.allocPrint(
-                self.allocator,
+                self.constraintAllocator(),
                 "Explicit error handling with {d} error patterns",
                 .{error_count},
             );
