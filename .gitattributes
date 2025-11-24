@@ -1,0 +1,42 @@
+# Enforce LF line endings for all text files to ensure consistent formatting across platforms
+* text=auto eol=lf
+
+# Zig source files
+*.zig text eol=lf
+
+# Documentation
+*.md text eol=lf
+
+# Configuration files
+*.json text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Python files
+*.py text eol=lf
+
+# Rust files
+*.rs text eol=lf
+
+# Cargo files
+Cargo.toml text eol=lf
+Cargo.lock text eol=lf
+
+# Build files
+build.zig text eol=lf
+build.zig.zon text eol=lf
+
+# Binary files (explicitly mark as binary)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
