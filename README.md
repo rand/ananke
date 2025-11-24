@@ -250,6 +250,93 @@ ananke help
 
 ---
 
+## Configuration
+
+### Claude API Setup (Optional)
+
+Ananke can use Claude for enhanced semantic analysis of constraints. This is completely optional - Ananke works great with just its built-in structural parsers.
+
+#### Setting up Claude API
+
+1. **Get an API key** from [Anthropic Console](https://console.anthropic.com/)
+
+2. **Set the environment variable**:
+```bash
+export ANTHROPIC_API_KEY='sk-ant-api...'
+```
+
+3. **Or configure in `.ananke.toml`**:
+```toml
+[claude]
+# API key can be set here or via ANTHROPIC_API_KEY env var
+# api_key = "sk-ant-api..."  # Not recommended for security
+model = "claude-sonnet-4-5-20250929"
+enabled = true
+```
+
+#### Using Claude in Commands
+
+```bash
+# Extract with semantic analysis
+ananke extract src/main.ts --use-claude
+
+# Claude will analyze for:
+# - Business logic constraints
+# - Implicit patterns
+# - Security requirements
+# - Architectural decisions
+```
+
+#### Graceful Fallback
+
+If Claude is not configured or unavailable, Ananke automatically falls back to structural analysis only. Your workflow won't be interrupted.
+
+### Full Configuration File
+
+Create `.ananke.toml` in your project root:
+
+```toml
+[claude]
+# Claude API for semantic analysis (optional)
+# api_key sourced from ANTHROPIC_API_KEY env var
+model = "claude-sonnet-4-5-20250929"
+enabled = true  # Auto-enabled if API key present
+
+[modal]
+# For code generation (optional)
+endpoint = "https://your-app.modal.run"
+# api_key sourced from ANANKE_MODAL_API_KEY env var
+
+[defaults]
+language = "typescript"
+max_tokens = 4096
+temperature = 0.7
+confidence_threshold = 0.5
+output_format = "pretty"
+
+[extract]
+use_claude = false  # Enable globally or per-command
+patterns = ["all"]
+
+[compile]
+priority = "medium"
+formats = ["json-schema"]
+```
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `ANTHROPIC_API_KEY` | Claude API key for semantic analysis | No |
+| `ANANKE_MODAL_API_KEY` | Modal API key for generation | No |
+| `ANANKE_MODAL_ENDPOINT` | Modal endpoint URL | No |
+| `ANANKE_LANGUAGE` | Default source language | No |
+| `ANANKE_CLAUDE_ENDPOINT` | Custom Claude API endpoint | No |
+
+All configuration is optional. Ananke works with zero configuration using its built-in parsers.
+
+---
+
 ## Quick Start
 
 ### Pattern 1: Pure Local (No Claude, No GPU)

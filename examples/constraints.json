@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {
+      "type": "type_safety",
+      "enabled": true,
+      "priority": "high",
+      "description": "Ensure type-safe code generation"
+    },
+    {
+      "type": "error_handling",
+      "enabled": true,
+      "priority": "medium",
+      "description": "Include proper error handling in generated code"
+    },
+    {
+      "type": "documentation",
+      "enabled": true,
+      "priority": "low",
+      "description": "Add documentation comments to generated functions"
+    }
+  ],
+  "language_specific": {
+    "typescript": {
+      "strict": true,
+      "useOptionalChaining": true
+    },
+    "rust": {
+      "use_result": true,
+      "prefer_match": true
+    }
+  }
+}
