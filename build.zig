@@ -466,7 +466,7 @@ pub fn build(b: *std.Build) void {
     // Combined benchmark step (Zig + Rust)
     const bench_all_step = b.step("bench", "Run all benchmarks (Zig + Rust)");
     bench_all_step.dependOn(bench_all_zig_step);
-    
+
     // Add Rust benchmarks via cargo
     const cargo_bench = b.addSystemCommand(&.{
         "cargo",

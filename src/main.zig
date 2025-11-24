@@ -121,7 +121,8 @@ fn handleExtract(allocator: std.mem.Allocator, args: [][:0]u8) !void {
             format = args[i];
             if (!std.mem.eql(u8, format, "json") and
                 !std.mem.eql(u8, format, "yaml") and
-                !std.mem.eql(u8, format, "ariadne")) {
+                !std.mem.eql(u8, format, "ariadne"))
+            {
                 std.debug.print("Error: Invalid format '{s}'. Use: json, yaml, or ariadne\n", .{format});
                 return error.InvalidArgument;
             }
@@ -134,8 +135,6 @@ fn handleExtract(allocator: std.mem.Allocator, args: [][:0]u8) !void {
             language_override = args[i];
         }
     }
-
-    
 
     // Read source file
     const source = std.fs.cwd().readFileAlloc(allocator, file_path, 10 * 1024 * 1024) catch |err| {
@@ -183,7 +182,6 @@ fn handleExtract(allocator: std.mem.Allocator, args: [][:0]u8) !void {
 
 fn handleCompile(allocator: std.mem.Allocator, args: [][:0]u8) !void {
     if (args.len < 1) {
-        
         std.debug.print("Error: compile requires a constraints file\n", .{});
         std.debug.print("Usage: ananke compile <constraints-file> [options]\n", .{});
         std.debug.print("Options:\n", .{});
@@ -200,7 +198,6 @@ fn handleCompile(allocator: std.mem.Allocator, args: [][:0]u8) !void {
         const arg = args[i];
         if (std.mem.eql(u8, arg, "--output") or std.mem.eql(u8, arg, "-o")) {
             if (i + 1 >= args.len) {
-                
                 std.debug.print("Error: --output requires a file path\n", .{});
                 return error.MissingArgument;
             }
@@ -208,9 +205,6 @@ fn handleCompile(allocator: std.mem.Allocator, args: [][:0]u8) !void {
             output_file = args[i];
         }
     }
-
-    
-    
 
     // Read constraints file
     const constraints_json = std.fs.cwd().readFileAlloc(allocator, constraints_file, 10 * 1024 * 1024) catch |err| {
@@ -273,7 +267,6 @@ fn handleCompile(allocator: std.mem.Allocator, args: [][:0]u8) !void {
 
 fn handleGenerate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
     if (args.len < 1) {
-        
         std.debug.print("Error: generate requires an intent or prompt\n", .{});
         std.debug.print("Usage: ananke generate <intent> [options]\n", .{});
         std.debug.print("Options:\n", .{});
@@ -296,7 +289,6 @@ fn handleGenerate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
         const arg = args[i];
         if (std.mem.eql(u8, arg, "--constraints") or std.mem.eql(u8, arg, "-c")) {
             if (i + 1 >= args.len) {
-                
                 std.debug.print("Error: --constraints requires a file path\n", .{});
                 return error.MissingArgument;
             }
@@ -304,7 +296,6 @@ fn handleGenerate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
             constraints_file = args[i];
         } else if (std.mem.eql(u8, arg, "--output") or std.mem.eql(u8, arg, "-o")) {
             if (i + 1 >= args.len) {
-                
                 std.debug.print("Error: --output requires a file path\n", .{});
                 return error.MissingArgument;
             }
@@ -312,38 +303,30 @@ fn handleGenerate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
             output_file = args[i];
         } else if (std.mem.eql(u8, arg, "--max-tokens")) {
             if (i + 1 >= args.len) {
-                
                 std.debug.print("Error: --max-tokens requires a number\n", .{});
                 return error.MissingArgument;
             }
             i += 1;
             max_tokens = std.fmt.parseInt(u32, args[i], 10) catch {
-                
                 std.debug.print("Error: Invalid max-tokens value '{s}'\n", .{args[i]});
                 return error.InvalidArgument;
             };
         } else if (std.mem.eql(u8, arg, "--temperature")) {
             if (i + 1 >= args.len) {
-                
                 std.debug.print("Error: --temperature requires a number\n", .{});
                 return error.MissingArgument;
             }
             i += 1;
             temperature = std.fmt.parseFloat(f32, args[i]) catch {
-                
                 std.debug.print("Error: Invalid temperature value '{s}'\n", .{args[i]});
                 return error.InvalidArgument;
             };
             if (temperature < 0.0 or temperature > 1.0) {
-                
                 std.debug.print("Error: Temperature must be between 0.0 and 1.0\n", .{});
                 return error.InvalidArgument;
             }
         }
     }
-
-    
-    
 
     std.debug.print("Generating code for: \"{s}\"\n", .{intent});
     std.debug.print("Parameters: max_tokens={}, temperature={d:.2}\n", .{ max_tokens, temperature });
@@ -410,7 +393,6 @@ fn handleGenerate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
 
 fn handleValidate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
     if (args.len < 1) {
-        
         std.debug.print("Error: validate requires a file path\n", .{});
         std.debug.print("Usage: ananke validate <code-file> [options]\n", .{});
         std.debug.print("Options:\n", .{});
@@ -427,7 +409,6 @@ fn handleValidate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
         const arg = args[i];
         if (std.mem.eql(u8, arg, "--constraints") or std.mem.eql(u8, arg, "-c")) {
             if (i + 1 >= args.len) {
-                
                 std.debug.print("Error: --constraints requires a file path\n", .{});
                 return error.MissingArgument;
             }
@@ -435,9 +416,6 @@ fn handleValidate(allocator: std.mem.Allocator, args: [][:0]u8) !void {
             constraints_file = args[i];
         }
     }
-
-    
-    
 
     // Read source file
     const source = std.fs.cwd().readFileAlloc(allocator, file_path, 10 * 1024 * 1024) catch |err| {

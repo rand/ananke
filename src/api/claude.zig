@@ -276,7 +276,7 @@ pub const ClaudeClient = struct {
         // Extract JSON from response (may have markdown code blocks)
         const json_start = std.mem.indexOf(u8, response, "[") orelse return error.InvalidResponse;
         const json_end = std.mem.lastIndexOf(u8, response, "]") orelse return error.InvalidResponse;
-        const json_text = response[json_start..json_end + 1];
+        const json_text = response[json_start .. json_end + 1];
 
         const parsed = try http.parseJson(self.allocator, json_text);
         defer parsed.deinit();
@@ -315,7 +315,7 @@ pub const ClaudeClient = struct {
         // Extract JSON from response
         const json_start = std.mem.indexOf(u8, response, "{") orelse return error.InvalidResponse;
         const json_end = std.mem.lastIndexOf(u8, response, "}") orelse return error.InvalidResponse;
-        const json_text = response[json_start..json_end + 1];
+        const json_text = response[json_start .. json_end + 1];
 
         const parsed = try http.parseJson(self.allocator, json_text);
         defer parsed.deinit();
@@ -346,7 +346,7 @@ pub const ClaudeClient = struct {
     fn parseTestIntentResponse(self: *ClaudeClient, response: []const u8) !TestIntentAnalysis {
         const json_start = std.mem.indexOf(u8, response, "{") orelse return error.InvalidResponse;
         const json_end = std.mem.lastIndexOf(u8, response, "}") orelse return error.InvalidResponse;
-        const json_text = response[json_start..json_end + 1];
+        const json_text = response[json_start .. json_end + 1];
 
         const parsed = try http.parseJson(self.allocator, json_text);
         defer parsed.deinit();

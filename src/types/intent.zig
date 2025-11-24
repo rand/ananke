@@ -43,7 +43,8 @@ pub const Intent = struct {
         } else if (std.mem.indexOf(u8, input, "---") != null) {
             return .yaml;
         } else if (std.mem.indexOf(u8, input, "constraint") != null and
-                   std.mem.indexOf(u8, input, "generate") != null) {
+            std.mem.indexOf(u8, input, "generate") != null)
+        {
             return .ariadne;
         }
         return .natural_language;

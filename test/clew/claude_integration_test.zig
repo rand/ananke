@@ -118,7 +118,7 @@ test "Clew extraction from telemetry" {
 
     const telemetry = @import("clew").Telemetry{
         .latency_p99 = 150.0, // Over threshold
-        .error_rate = 0.02,   // Over threshold
+        .error_rate = 0.02, // Over threshold
     };
 
     var constraint_set = try clew.extractFromTelemetry(telemetry);
