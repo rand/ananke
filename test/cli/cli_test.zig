@@ -199,6 +199,48 @@ test "config: parse toml with comments and empty lines" {
     try testing.expectEqual(@as(u32, 4096), config.max_tokens);
 }
 
+test "config: parse Claude section" {
+    const allocator = testing.allocator;
+
+    var config = config_mod.Config.init(allocator);
+    defer config.deinit();
+
+    const toml =
+        \\[claude]
+        \\api_key = "sk-ant-test-key"
+        \\endpoint = "https://custom.anthropic.com/v1/messages"
+        \\model = "claude-opus-4-1-20250805"
+        \\enabled = true
+    ;
+
+    try config.parseToml(toml);
+
+    try testing.expectEqualStrings("sk-ant-test-key", config.claude_api_key.?);
+    try testing.expectEqualStrings("https://custom.anthropic.com/v1/messages", config.claude_endpoint.?);
+    try testing.expectEqualStrings("claude-opus-4-1-20250805", config.claude_model);
+    try testing.expectEqual(true, config.use_claude);
+}
+
+test "config: Claude API key auto-enables use_claude" {
+    const allocator = testing.allocator;
+
+    var config = config_mod.Config.init(allocator);
+    defer config.deinit();
+
+    // Initially should be false
+    try testing.expectEqual(false, config.use_claude);
+
+    const toml =
+        \\[claude]
+        \\api_key = "sk-ant-api-test"
+    ;
+
+    try config.parseToml(toml);
+
+    // Should be auto-enabled when API key is set
+    try testing.expectEqual(true, config.use_claude);
+}
+
 test "output: format enum from string" {
     try testing.expectEqual(output.OutputFormat.json, output.OutputFormat.fromString("json").?);
     try testing.expectEqual(output.OutputFormat.yaml, output.OutputFormat.fromString("yaml").?);

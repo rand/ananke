@@ -90,6 +90,36 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     var ananke_instance = try ananke.Ananke.init(allocator);
     defer ananke_instance.deinit();
 
+    // Initialize Claude client if requested and API key is available
+    var claude_client_opt: ?ananke.api.claude.ClaudeClient = null;
+    defer if (claude_client_opt) |*client| client.deinit();
+
+    if (use_claude) {
+        if (config.claude_api_key) |api_key| {
+            const claude_config = ananke.api.claude.ClaudeConfig{
+                .api_key = api_key,
+                .endpoint = config.claude_endpoint orelse "https://api.anthropic.com/v1/messages",
+                .model = config.claude_model,
+                .max_tokens = config.max_tokens,
+                .temperature = config.temperature,
+                .timeout_ms = 30000,
+            };
+
+            claude_client_opt = try ananke.api.claude.ClaudeClient.init(allocator, claude_config);
+            if (claude_client_opt) |*client| {
+                ananke_instance.clew_engine.setClaudeClient(client);
+            }
+
+            if (verbose) {
+                cli_error.printInfo("Claude client initialized with model: {s}", .{config.claude_model});
+            }
+        } else {
+            if (verbose) {
+                cli_error.printWarning("Claude requested but ANTHROPIC_API_KEY not set - proceeding without semantic analysis", .{});
+            }
+        }
+    }
+
     // Extract constraints
     var spinner = output.Spinner.init("Extracting constraints...");
     var constraint_set = try ananke_instance.extract(source, language);
