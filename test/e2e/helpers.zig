@@ -184,6 +184,14 @@ pub const E2ETestContext = struct {
         self: *E2ETestContext,
         source_file: []const u8,
     ) !i64 {
+        // Warm-up run to initialize tree-sitter parsers and caches
+        // This prevents cold-start overhead from affecting timing measurements
+        {
+            var warmup = try self.runPipeline(source_file);
+            defer warmup.deinit(self.allocator);
+        }
+
+        // Actual timed run
         const start = std.time.milliTimestamp();
 
         var result = try self.runPipeline(source_file);
