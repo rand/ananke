@@ -341,3 +341,99 @@ pub fn extractImports(allocator: Allocator, root: Node) ![]Node {
 
     return try results.toOwnedSlice(allocator);
 }
+
+// ============================================================================
+// Identifier Extraction (for semantic-level constraints)
+// ============================================================================
+
+/// Represents a named declaration with its identifier
+pub const NamedDeclaration = struct {
+    node: Node,
+    name: []const u8,
+    kind: []const u8, // Node type (e.g., "function_declaration", "class_declaration")
+
+    pub fn deinit(self: *NamedDeclaration, allocator: Allocator) void {
+        allocator.free(self.name);
+    }
+};
+
+/// Extract identifier name from a declaration node
+fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !?[]const u8 {
+    const t = Traversal.init(allocator);
+
+    // Common identifier field names across languages
+    const identifier_types = [_][]const u8{
+        "identifier",
+        "name",
+        "type_identifier",
+        "property_identifier",
+    };
+
+    // Try to find identifier child
+    for (identifier_types) |id_type| {
+        const identifiers = try t.findByType(node, id_type);
+        defer allocator.free(identifiers);
+
+        if (identifiers.len > 0) {
+            const id_node = identifiers[0];
+            const id_text = t.getNodeText(id_node, source);
+            if (id_text.len > 0) {
+                return try allocator.dupe(u8, id_text);
+            }
+        }
+    }
+
+    return null;
+}
+
+/// Extract function declarations with their names
+pub fn extractFunctionIdentifiers(allocator: Allocator, root: Node, source: []const u8) ![]NamedDeclaration {
+    const functions = try extractFunctions(allocator, root);
+    defer allocator.free(functions);
+
+    var results = std.ArrayList(NamedDeclaration){};
+    errdefer {
+        for (results.items) |*item| {
+            item.deinit(allocator);
+        }
+        results.deinit(allocator);
+    }
+
+    for (functions) |func_node| {
+        if (try extractIdentifierName(allocator, func_node, source)) |name| {
+            try results.append(allocator, .{
+                .node = func_node,
+                .name = name,
+                .kind = func_node.nodeType(),
+            });
+        }
+    }
+
+    return try results.toOwnedSlice(allocator);
+}
+
+/// Extract type declarations with their names (classes, interfaces, structs, etc.)
+pub fn extractTypeIdentifiers(allocator: Allocator, root: Node, source: []const u8) ![]NamedDeclaration {
+    const types = try extractTypes(allocator, root);
+    defer allocator.free(types);
+
+    var results = std.ArrayList(NamedDeclaration){};
+    errdefer {
+        for (results.items) |*item| {
+            item.deinit(allocator);
+        }
+        results.deinit(allocator);
+    }
+
+    for (types) |type_node| {
+        if (try extractIdentifierName(allocator, type_node, source)) |name| {
+            try results.append(allocator, .{
+                .node = type_node,
+                .name = name,
+                .kind = type_node.nodeType(),
+            });
+        }
+    }
+
+    return try results.toOwnedSlice(allocator);
+}
