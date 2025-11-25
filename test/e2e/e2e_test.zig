@@ -430,7 +430,9 @@ test "E2E: Mock Modal server response" {
     };
 
     const server_thread = try helpers.startMockServer(testing.allocator, mock_config);
-    defer server_thread.join();
+    // Don't join the thread - let it exit naturally after max_requests
+    // The server will shut down automatically after handling max_requests
+    _ = server_thread; // Acknowledge we're intentionally not joining
 
     // Wait a bit for server to start
     std.Thread.sleep(200 * std.time.ns_per_ms);
@@ -440,6 +442,9 @@ test "E2E: Mock Modal server response" {
     try testing.expect(is_running);
 
     std.debug.print("✓ Mock Modal server is running\n", .{});
+
+    // Give server time to shut down after max_requests
+    std.Thread.sleep(100 * std.time.ns_per_ms);
 }
 
 // ============================================================================
