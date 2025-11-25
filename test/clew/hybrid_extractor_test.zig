@@ -106,17 +106,22 @@ test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
     var result = try extractor.extract(typescript_sample, "typescript");
     defer result.deinitFull(allocator);
 
-    // Should find function-related constraints
-    var found_functions = false;
+    // Should find individual function identifiers (not aggregate counts)
+    // The sample has: async function getUser() and method fetchUser()
+    var found_function_identifier = false;
     for (result.constraints) |constraint| {
-        if (std.mem.indexOf(u8, constraint.name, "functions") != null) {
-            found_functions = true;
+        // Look for function identifiers like "getUser" or "fetchUser"
+        if (constraint.kind == .syntactic and
+            (std.mem.eql(u8, constraint.name, "getUser") or
+            std.mem.eql(u8, constraint.name, "fetchUser")))
+        {
+            found_function_identifier = true;
             // Verify it's from AST (use approximate equality for floating point)
             try testing.expectApproxEqAbs(@as(f64, 0.95), constraint.confidence, 0.001);
             break;
         }
     }
-    try testing.expect(found_functions);
+    try testing.expect(found_function_identifier);
 }
 
 test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
@@ -127,16 +132,21 @@ test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
     var result = try extractor.extract(typescript_sample, "typescript");
     defer result.deinitFull(allocator);
 
-    // Should find type-related constraints (interface, class)
-    var found_types = false;
+    // Should find individual type identifiers (not aggregate counts)
+    // The sample has: interface User and class UserService
+    var found_type_identifier = false;
     for (result.constraints) |constraint| {
-        if (std.mem.indexOf(u8, constraint.name, "types") != null) {
-            found_types = true;
+        // Look for type identifiers like "User" or "UserService"
+        if (constraint.kind == .type_safety and
+            (std.mem.eql(u8, constraint.name, "User") or
+            std.mem.eql(u8, constraint.name, "UserService")))
+        {
+            found_type_identifier = true;
             try testing.expectApproxEqAbs(@as(f64, 0.95), constraint.confidence, 0.001);
             break;
         }
     }
-    try testing.expect(found_types);
+    try testing.expect(found_type_identifier);
 }
 
 test "HybridExtractor: tree_sitter_only extracts imports from TypeScript" {
