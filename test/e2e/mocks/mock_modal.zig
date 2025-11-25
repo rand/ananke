@@ -14,6 +14,7 @@ pub const MockServerConfig = struct {
     response_delay_ms: u32 = 0,
     should_fail: bool = false,
     error_code: u16 = 500,
+    max_requests: ?u32 = null, // null = unlimited (for manual testing), or set a limit for tests
 };
 
 /// Run the mock Modal server
@@ -26,7 +27,16 @@ pub fn runMockServer(allocator: Allocator, config: MockServerConfig) !void {
 
     std.debug.print("Mock Modal server listening on port {d}\n", .{config.port});
 
+    var requests_handled: u32 = 0;
     while (true) {
+        // Check if we've reached the request limit
+        if (config.max_requests) |max| {
+            if (requests_handled >= max) {
+                std.debug.print("Mock server reached max_requests limit ({d}), shutting down\n", .{max});
+                break;
+            }
+        }
+
         const connection = server.accept() catch |err| {
             std.debug.print("Accept error: {}\n", .{err});
             continue;
@@ -37,6 +47,8 @@ pub fn runMockServer(allocator: Allocator, config: MockServerConfig) !void {
         handleRequest(allocator, connection, config) catch |err| {
             std.debug.print("Request handling error: {}\n", .{err});
         };
+
+        requests_handled += 1;
     }
 }
 
