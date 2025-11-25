@@ -81,9 +81,13 @@ pub const E2ETestContext = struct {
             return error.UnknownLanguage;
 
         // Determine the full path to the source file
-        // If it's a relative path, prepend temp_path; if absolute, use as-is
+        // If it's an absolute path, use as-is
+        // If it's a relative path starting with "test/", it's a fixture in the source tree
+        // Otherwise, prepend temp_path for dynamically created test files
         const full_path = if (std.fs.path.isAbsolute(source_file))
             source_file
+        else if (std.mem.startsWith(u8, source_file, "test/"))
+            source_file // Fixture files are relative to project root, not temp dir
         else blk: {
             const path = try std.fs.path.join(
                 self.allocator,
@@ -92,7 +96,7 @@ pub const E2ETestContext = struct {
             break :blk path;
         };
         defer {
-            if (!std.fs.path.isAbsolute(source_file)) {
+            if (!std.fs.path.isAbsolute(source_file) and !std.mem.startsWith(u8, source_file, "test/")) {
                 self.allocator.free(full_path);
             }
         }
