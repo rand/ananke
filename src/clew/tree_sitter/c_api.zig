@@ -144,6 +144,32 @@ pub const Error = error{
     UnsupportedLanguage,
 };
 
+// Helper to check if a language parser is available
+pub fn isLanguageAvailable(language: []const u8) bool {
+    if (std.mem.eql(u8, language, "typescript")) {
+        return tree_sitter_typescript() != null;
+    } else if (std.mem.eql(u8, language, "tsx")) {
+        return tree_sitter_tsx() != null;
+    } else if (std.mem.eql(u8, language, "javascript")) {
+        return tree_sitter_javascript() != null;
+    } else if (std.mem.eql(u8, language, "python")) {
+        return tree_sitter_python() != null;
+    } else if (std.mem.eql(u8, language, "rust")) {
+        return tree_sitter_rust() != null;
+    } else if (std.mem.eql(u8, language, "go")) {
+        return tree_sitter_go() != null;
+    } else if (std.mem.eql(u8, language, "zig")) {
+        return tree_sitter_zig() != null;
+    } else if (std.mem.eql(u8, language, "c")) {
+        return tree_sitter_c() != null;
+    } else if (std.mem.eql(u8, language, "cpp")) {
+        return tree_sitter_cpp() != null;
+    } else if (std.mem.eql(u8, language, "java")) {
+        return tree_sitter_java() != null;
+    }
+    return false;
+}
+
 // Helper to convert C string to Zig string (caller must free with c allocator)
 pub fn cStringToZig(allocator: std.mem.Allocator, c_str: [*c]const u8) ![]const u8 {
     if (c_str == null) return error.NullCString;
