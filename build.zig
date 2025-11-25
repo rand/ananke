@@ -32,7 +32,7 @@ pub fn build(b: *std.Build) void {
 
     // Tree-sitter module for direct C FFI bindings
     const tree_sitter_mod = b.addModule("tree_sitter", .{
-        .root_source_file = b.path("src/clew/tree_sitter/parser.zig"),
+        .root_source_file = b.path("src/clew/tree_sitter.zig"),
         .target = target,
         .link_libc = true,
     });
