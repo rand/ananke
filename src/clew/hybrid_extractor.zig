@@ -268,49 +268,61 @@ pub const HybridExtractor = struct {
             constraints.deinit(self.allocator);
         }
 
-        // Extract function-related constraints
-        const functions = try tree_sitter.traversal.extractFunctions(self.allocator, root);
-        defer self.allocator.free(functions);
+        // Extract individual function identifiers
+        const func_ids = try tree_sitter.traversal.extractFunctionIdentifiers(self.allocator, root, source);
+        defer {
+            for (func_ids) |*func_id| {
+                var mut_func_id = func_id.*;
+                mut_func_id.deinit(self.allocator);
+            }
+            self.allocator.free(func_ids);
+        }
 
-        if (functions.len > 0) {
+        for (func_ids) |func_id| {
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
-                .name = try self.allocator.dupe(u8, "ast_functions"),
+                .name = try self.allocator.dupe(u8, func_id.name),
                 .description = try std.fmt.allocPrint(
                     self.allocator,
-                    "Code contains {} function declarations (AST)",
-                    .{functions.len},
+                    "Function declaration: {s}",
+                    .{func_id.name},
                 ),
                 .source = .AST_Pattern,
                 .confidence = 0.95, // Tree-sitter AST has higher confidence
-                .frequency = @intCast(functions.len),
+                .frequency = 1,
             };
             try constraints.append(self.allocator, constraint);
         }
 
-        // Extract type-related constraints
-        const types = try tree_sitter.traversal.extractTypes(self.allocator, root);
-        defer self.allocator.free(types);
+        // Extract individual type identifiers (classes, interfaces, etc.)
+        const type_ids = try tree_sitter.traversal.extractTypeIdentifiers(self.allocator, root, source);
+        defer {
+            for (type_ids) |*type_id| {
+                var mut_type_id = type_id.*;
+                mut_type_id.deinit(self.allocator);
+            }
+            self.allocator.free(type_ids);
+        }
 
-        if (types.len > 0) {
+        for (type_ids) |type_id| {
             const constraint = Constraint{
                 .kind = .type_safety,
                 .severity = .info,
-                .name = try self.allocator.dupe(u8, "ast_types"),
+                .name = try self.allocator.dupe(u8, type_id.name),
                 .description = try std.fmt.allocPrint(
                     self.allocator,
-                    "Code defines {} type declarations (AST)",
-                    .{types.len},
+                    "Type declaration: {s}",
+                    .{type_id.name},
                 ),
                 .source = .Type_System,
                 .confidence = 0.95,
-                .frequency = @intCast(types.len),
+                .frequency = 1,
             };
             try constraints.append(self.allocator, constraint);
         }
 
-        // Extract import-related constraints
+        // Extract import-related constraints (keep aggregate count for backward compatibility)
         const imports = try tree_sitter.traversal.extractImports(self.allocator, root);
         defer self.allocator.free(imports);
 
