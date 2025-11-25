@@ -21,6 +21,7 @@ pub const TSQuery = c.TSQuery;
 pub const TSQueryCursor = c.TSQueryCursor;
 pub const TSQueryMatch = c.TSQueryMatch;
 pub const TSQueryCapture = c.TSQueryCapture;
+pub const TSQueryError = c.TSQueryError;
 
 // Parser functions
 pub const ts_parser_new = c.ts_parser_new;
@@ -62,6 +63,19 @@ pub const ts_node_prev_sibling = c.ts_node_prev_sibling;
 pub const ts_node_next_named_sibling = c.ts_node_next_named_sibling;
 pub const ts_node_prev_named_sibling = c.ts_node_prev_named_sibling;
 pub const ts_node_eq = c.ts_node_eq;
+
+// Query functions
+pub const ts_query_new = c.ts_query_new;
+pub const ts_query_delete = c.ts_query_delete;
+pub const ts_query_pattern_count = c.ts_query_pattern_count;
+pub const ts_query_capture_count = c.ts_query_capture_count;
+pub const ts_query_capture_name_for_id = c.ts_query_capture_name_for_id;
+pub const ts_query_cursor_new = c.ts_query_cursor_new;
+pub const ts_query_cursor_delete = c.ts_query_cursor_delete;
+pub const ts_query_cursor_exec = c.ts_query_cursor_exec;
+pub const ts_query_cursor_next_match = c.ts_query_cursor_next_match;
+pub const ts_query_cursor_set_byte_range = c.ts_query_cursor_set_byte_range;
+pub const ts_query_cursor_set_point_range = c.ts_query_cursor_set_point_range;
 
 // Language functions (external declarations for language parsers)
 // These are provided by the tree-sitter-{lang} libraries
@@ -124,6 +138,10 @@ pub const Error = error{
     InvalidLanguage,
     NullTree,
     NullNode,
+    QueryCreationFailed,
+    CursorCreationFailed,
+    InvalidCaptureIndex,
+    UnsupportedLanguage,
 };
 
 // Helper to convert C string to Zig string (caller must free with c allocator)
