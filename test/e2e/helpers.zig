@@ -33,15 +33,18 @@ pub const E2ETestContext = struct {
         braid.* = try Braid.init(allocator);
 
         // Get the temp directory path for file operations
-        const temp_path = try allocator.alloc(u8, 256);
-        const path_len = (try temp_dir.dir.realpath(".", temp_path)).len;
+        const temp_buffer = try allocator.alloc(u8, 256);
+        defer allocator.free(temp_buffer);
+
+        const path_len = (try temp_dir.dir.realpath(".", temp_buffer)).len;
+        const temp_path = try allocator.dupe(u8, temp_buffer[0..path_len]);
 
         return E2ETestContext{
             .allocator = allocator,
             .temp_dir = temp_dir,
             .clew = clew,
             .braid = braid,
-            .temp_path = temp_path[0..path_len],
+            .temp_path = temp_path,
         };
     }
 
