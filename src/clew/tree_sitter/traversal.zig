@@ -31,32 +31,36 @@ pub const Traversal = struct {
         context: ?*anyopaque,
     ) !void {
         switch (order) {
-            .pre_order => try self.traversePreOrder(root, 0, visitor, context),
+            .pre_order => _ = try self.traversePreOrder(root, 0, visitor, context),
             .post_order => try self.traversePostOrder(root, 0, visitor, context),
             .level_order => try self.traverseLevelOrder(root, visitor, context),
         }
     }
 
     /// Pre-order traversal (node, then children)
+    /// Returns true if traversal should continue, false if stopped early
     fn traversePreOrder(
         self: Traversal,
         node: Node,
         depth: u32,
         visitor: VisitorFn,
         context: ?*anyopaque,
-    ) !void {
+    ) !bool {
         // Visit node first
         const should_continue = try visitor(node, depth, context);
-        if (!should_continue) return;
+        if (!should_continue) return false;
 
         // Then visit children
         const child_count = node.namedChildCount();
         var i: u32 = 0;
         while (i < child_count) : (i += 1) {
             if (node.namedChild(i)) |child| {
-                try self.traversePreOrder(child, depth + 1, visitor, context);
+                const continue_traversal = try self.traversePreOrder(child, depth + 1, visitor, context);
+                if (!continue_traversal) return false;
             }
         }
+
+        return true;
     }
 
     /// Post-order traversal (children, then node)
@@ -324,7 +328,8 @@ pub fn extractImports(allocator: Allocator, root: Node) ![]Node {
     const t = Traversal.init(allocator);
 
     const import_types = [_][]const u8{
-        "import_statement", // Python
+        "import_statement", // Python (import x)
+        "import_from_statement", // Python (from x import y)
         "import_declaration", // JavaScript/TypeScript
         "use_declaration", // Rust
         "import_spec", // Go
