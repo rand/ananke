@@ -360,16 +360,32 @@ pub const NamedDeclaration = struct {
 /// Extract identifier name from a declaration node
 fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !?[]const u8 {
     const t = Traversal.init(allocator);
+    const node_type = node.nodeType();
 
-    // Common identifier field names across languages
-    const identifier_types = [_][]const u8{
-        "identifier",
-        "name",
-        "type_identifier",
-        "property_identifier",
-    };
+    // Determine which identifier types to search based on node type
+    // This is important because different declaration types use different identifier child types
+    var identifier_types: []const []const u8 = undefined;
 
-    // Try to find identifier child
+    if (std.mem.indexOf(u8, node_type, "class") != null or
+        std.mem.indexOf(u8, node_type, "interface") != null or
+        std.mem.indexOf(u8, node_type, "type_alias") != null or
+        std.mem.eql(u8, node_type, "enum_declaration")) {
+        // Type declarations use type_identifier for their name
+        identifier_types = &[_][]const u8{
+            "type_identifier",      // The actual name of the type
+            "identifier",           // Fallback for some languages
+            "name",                 // Generic fallback
+        };
+    } else {
+        // Functions and other declarations use identifier for their name
+        identifier_types = &[_][]const u8{
+            "identifier",           // The actual name of the function/variable
+            "type_identifier",      // Fallback for rare cases
+            "name",                 // Generic fallback
+        };
+    }
+
+    // Try to find identifier child in order
     for (identifier_types) |id_type| {
         const identifiers = try t.findByType(node, id_type);
         defer allocator.free(identifiers);
