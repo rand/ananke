@@ -421,6 +421,7 @@ test "E2E: Mock Modal server response" {
         .port = 8899,
         .response_delay_ms = 10,
         .should_fail = false,
+        .max_requests = 2, // Limit to 2 requests to prevent deadlock
     };
 
     const server_thread = try helpers.startMockServer(testing.allocator, mock_config);
