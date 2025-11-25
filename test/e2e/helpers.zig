@@ -80,10 +80,27 @@ pub const E2ETestContext = struct {
         const language = detectLanguage(source_file) orelse
             return error.UnknownLanguage;
 
+        // Determine the full path to the source file
+        // If it's a relative path, prepend temp_path; if absolute, use as-is
+        const full_path = if (std.fs.path.isAbsolute(source_file))
+            source_file
+        else blk: {
+            const path = try std.fs.path.join(
+                self.allocator,
+                &[_][]const u8{ self.temp_path, source_file },
+            );
+            break :blk path;
+        };
+        defer {
+            if (!std.fs.path.isAbsolute(source_file)) {
+                self.allocator.free(full_path);
+            }
+        }
+
         // Read the source file
         const source = try std.fs.cwd().readFileAlloc(
             self.allocator,
-            source_file,
+            full_path,
             1024 * 1024, // 1MB max
         );
         defer self.allocator.free(source);
