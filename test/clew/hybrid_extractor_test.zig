@@ -57,8 +57,6 @@ const unsupported_language_sample = "let x = 42;"; // Generic code
 // ============================================================================
 
 test "HybridExtractor: tree_sitter_only strategy succeeds for supported language" {
-    }
-
     const allocator = testing.allocator;
 
     var extractor = HybridExtractor.init(allocator, .tree_sitter_only);
@@ -101,7 +99,6 @@ test "HybridExtractor: tree_sitter_only strategy fails gracefully for unsupporte
 }
 
 test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
-    }
 
     const allocator = testing.allocator;
 
@@ -114,8 +111,8 @@ test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
     for (result.constraints) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "functions") != null) {
             found_functions = true;
-            // Verify it's from AST
-            try testing.expectEqual(@as(f64, 0.95), constraint.confidence);
+            // Verify it's from AST (use approximate equality for floating point)
+            try testing.expectApproxEqAbs(@as(f64, 0.95), constraint.confidence, 0.001);
             break;
         }
     }
@@ -123,7 +120,6 @@ test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
 }
 
 test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
-    }
 
     const allocator = testing.allocator;
 
@@ -136,7 +132,7 @@ test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
     for (result.constraints) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "types") != null) {
             found_types = true;
-            try testing.expectEqual(@as(f64, 0.95), constraint.confidence);
+            try testing.expectApproxEqAbs(@as(f64, 0.95), constraint.confidence, 0.001);
             break;
         }
     }
@@ -144,7 +140,6 @@ test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
 }
 
 test "HybridExtractor: tree_sitter_only extracts imports from TypeScript" {
-    }
 
     const allocator = testing.allocator;
 
@@ -164,7 +159,7 @@ test "HybridExtractor: tree_sitter_only extracts imports from TypeScript" {
     for (result.constraints) |constraint| {
         if (std.mem.indexOf(u8, constraint.name, "imports") != null) {
             found_imports = true;
-            try testing.expectEqual(@as(f64, 0.95), constraint.confidence);
+            try testing.expectApproxEqAbs(@as(f64, 0.95), constraint.confidence, 0.001);
             break;
         }
     }
@@ -231,7 +226,6 @@ test "HybridExtractor: pattern_only extracts from Python" {
 // ============================================================================
 
 test "HybridExtractor: tree_sitter_with_fallback prefers tree-sitter for supported language" {
-    }
 
     const allocator = testing.allocator;
 
@@ -269,7 +263,6 @@ test "HybridExtractor: tree_sitter_with_fallback falls back to patterns for unsu
 }
 
 test "HybridExtractor: tree_sitter_with_fallback handles Python" {
-    }
 
     const allocator = testing.allocator;
 
@@ -297,7 +290,6 @@ test "HybridExtractor: tree_sitter_with_fallback handles Python" {
 // ============================================================================
 
 test "HybridExtractor: combined strategy merges AST and pattern results" {
-    }
 
     const allocator = testing.allocator;
 
@@ -327,7 +319,6 @@ test "HybridExtractor: combined strategy merges AST and pattern results" {
 }
 
 test "HybridExtractor: combined strategy deduplicates constraints" {
-    }
 
     const allocator = testing.allocator;
 
@@ -359,7 +350,6 @@ test "HybridExtractor: combined strategy deduplicates constraints" {
 }
 
 test "HybridExtractor: combined strategy provides maximum coverage" {
-    }
 
     const allocator = testing.allocator;
 
