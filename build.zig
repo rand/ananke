@@ -397,6 +397,62 @@ pub fn build(b: *std.Build) void {
 
     const run_tree_sitter_tests = b.addRunArtifact(tree_sitter_tests);
 
+    // Hybrid extractor integration tests
+    const hybrid_extractor_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/hybrid_extractor_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    hybrid_extractor_tests.linkSystemLibrary("tree-sitter");
+    hybrid_extractor_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    hybrid_extractor_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_hybrid_extractor_tests = b.addRunArtifact(hybrid_extractor_tests);
+
+    // Tree-sitter traversal integration tests
+    const traversal_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/tree_sitter_traversal_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    traversal_tests.linkSystemLibrary("tree-sitter");
+    traversal_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    traversal_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_traversal_tests = b.addRunArtifact(traversal_tests);
+
+    // Phase 3: Rust/Go/Zig extraction tests
+    const rust_go_zig_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/rust_go_zig_extraction_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+            },
+        }),
+    });
+    rust_go_zig_tests.linkSystemLibrary("tree-sitter");
+    rust_go_zig_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    rust_go_zig_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_rust_go_zig_tests = b.addRunArtifact(rust_go_zig_tests);
+
     // Graph algorithm tests for Braid constraint compilation
     const graph_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -535,6 +591,86 @@ pub fn build(b: *std.Build) void {
 
     const run_new_e2e_tests = b.addRunArtifact(new_e2e_tests);
 
+    // Phase 2 E2E tests: Full pipeline integration
+    const phase2_full_pipeline_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/phase2/full_pipeline_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    phase2_full_pipeline_tests.linkSystemLibrary("tree-sitter");
+    phase2_full_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    phase2_full_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_phase2_full_pipeline_tests = b.addRunArtifact(phase2_full_pipeline_tests);
+
+    // Phase 2 E2E tests: Multi-language integration
+    const phase2_multi_language_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/phase2/multi_language_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    phase2_multi_language_tests.linkSystemLibrary("tree-sitter");
+    phase2_multi_language_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    phase2_multi_language_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_phase2_multi_language_tests = b.addRunArtifact(phase2_multi_language_tests);
+
+    // Phase 2 E2E tests: Strategy comparison
+    const phase2_strategy_comparison_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/phase2/strategy_comparison_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    phase2_strategy_comparison_tests.linkSystemLibrary("tree-sitter");
+    phase2_strategy_comparison_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    phase2_strategy_comparison_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_phase2_strategy_comparison_tests = b.addRunArtifact(phase2_strategy_comparison_tests);
+
+    // Phase 2 E2E tests: Constraint quality validation
+    const phase2_constraint_quality_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/phase2/constraint_quality_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    phase2_constraint_quality_tests.linkSystemLibrary("tree-sitter");
+    phase2_constraint_quality_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    phase2_constraint_quality_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_phase2_constraint_quality_tests = b.addRunArtifact(phase2_constraint_quality_tests);
+
     // CLI tests
     const cli_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -599,6 +735,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_cache_tests.step);
     test_step.dependOn(&run_pattern_tests.step);
     test_step.dependOn(&run_tree_sitter_tests.step);
+    test_step.dependOn(&run_hybrid_extractor_tests.step);
+    test_step.dependOn(&run_traversal_tests.step);
+    test_step.dependOn(&run_rust_go_zig_tests.step);
     test_step.dependOn(&run_graph_tests.step);
     test_step.dependOn(&run_json_schema_tests.step);
     test_step.dependOn(&run_grammar_tests.step);
@@ -608,6 +747,10 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_integration_tests.step);
     test_step.dependOn(&run_e2e_tests.step);
     test_step.dependOn(&run_new_e2e_tests.step);
+    test_step.dependOn(&run_phase2_full_pipeline_tests.step);
+    test_step.dependOn(&run_phase2_multi_language_tests.step);
+    test_step.dependOn(&run_phase2_strategy_comparison_tests.step);
+    test_step.dependOn(&run_phase2_constraint_quality_tests.step);
     test_step.dependOn(&run_cli_tests.step);
     test_step.dependOn(&run_cli_integration_tests.step);
 
@@ -615,6 +758,17 @@ pub fn build(b: *std.Build) void {
     const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
     e2e_test_step.dependOn(&run_e2e_tests.step);
     e2e_test_step.dependOn(&run_new_e2e_tests.step);
+    e2e_test_step.dependOn(&run_phase2_full_pipeline_tests.step);
+    e2e_test_step.dependOn(&run_phase2_multi_language_tests.step);
+    e2e_test_step.dependOn(&run_phase2_strategy_comparison_tests.step);
+    e2e_test_step.dependOn(&run_phase2_constraint_quality_tests.step);
+
+    // Phase 2 E2E test step (can be run separately)
+    const phase2_test_step = b.step("test-phase2", "Run Phase 2 E2E integration tests");
+    phase2_test_step.dependOn(&run_phase2_full_pipeline_tests.step);
+    phase2_test_step.dependOn(&run_phase2_multi_language_tests.step);
+    phase2_test_step.dependOn(&run_phase2_strategy_comparison_tests.step);
+    phase2_test_step.dependOn(&run_phase2_constraint_quality_tests.step);
 
     // CLI test step (can be run separately)
     const cli_test_step = b.step("test-cli", "Run CLI tests");
@@ -655,6 +809,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(clew_bench);
+    clew_bench.linkSystemLibrary("tree-sitter");
+    clew_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    clew_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_clew_bench = b.addRunArtifact(clew_bench);
     const clew_bench_step = b.step("bench-clew", "Run Clew extraction benchmarks");
@@ -739,6 +896,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(multi_lang_bench);
+    multi_lang_bench.linkSystemLibrary("tree-sitter");
+    multi_lang_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    multi_lang_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_multi_lang_bench = b.addRunArtifact(multi_lang_bench);
     const multi_lang_bench_step = b.step("bench-multi-lang", "Run multi-language extraction benchmarks");
@@ -778,6 +938,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(memory_bench);
+    memory_bench.linkSystemLibrary("tree-sitter");
+    memory_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    memory_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_memory_bench = b.addRunArtifact(memory_bench);
     const memory_bench_step = b.step("bench-memory", "Run memory usage benchmarks");
@@ -820,6 +983,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(pipeline_bench);
+    pipeline_bench.linkSystemLibrary("tree-sitter");
+    pipeline_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    pipeline_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_pipeline_bench = b.addRunArtifact(pipeline_bench);
     const pipeline_bench_step = b.step("bench-pipeline", "Run end-to-end pipeline benchmarks");
@@ -840,6 +1006,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     b.installArtifact(regression_test);
+    regression_test.linkSystemLibrary("tree-sitter");
+    regression_test.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    regression_test.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_regression_test = b.addRunArtifact(regression_test);
     const regression_test_step = b.step("bench-regression", "Run performance regression tests");
