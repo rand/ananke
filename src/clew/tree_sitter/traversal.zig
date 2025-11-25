@@ -87,10 +87,10 @@ pub const Traversal = struct {
         visitor: VisitorFn,
         context: ?*anyopaque,
     ) !void {
-        var queue = std.ArrayList(struct { node: Node, depth: u32 }).init(self.allocator);
-        defer queue.deinit();
+        var queue = std.ArrayList(struct { node: Node, depth: u32 }){};
+        defer queue.deinit(self.allocator);
 
-        try queue.append(.{ .node = root, .depth = 0 });
+        try queue.append(self.allocator, .{ .node = root, .depth = 0 });
 
         while (queue.items.len > 0) {
             const item = queue.orderedRemove(0);
@@ -102,7 +102,7 @@ pub const Traversal = struct {
             var i: u32 = 0;
             while (i < child_count) : (i += 1) {
                 if (item.node.namedChild(i)) |child| {
-                    try queue.append(.{ .node = child, .depth = item.depth + 1 });
+                    try queue.append(self.allocator, .{ .node = child, .depth = item.depth + 1 });
                 }
             }
         }
@@ -114,15 +114,17 @@ pub const Traversal = struct {
         root: Node,
         predicate: *const fn (Node) bool,
     ) ![]Node {
-        var results = std.ArrayList(Node).init(self.allocator);
-        errdefer results.deinit();
+        var results = std.ArrayList(Node){};
+        errdefer results.deinit(self.allocator);
 
         const Context = struct {
+            allocator: Allocator,
             predicate: *const fn (Node) bool,
             results: *std.ArrayList(Node),
         };
 
         var ctx = Context{
+            .allocator = self.allocator,
             .predicate = predicate,
             .results = &results,
         };
@@ -132,14 +134,14 @@ pub const Traversal = struct {
                 _ = depth;
                 const c: *Context = @ptrCast(@alignCast(context.?));
                 if (c.predicate(node)) {
-                    try c.results.append(node);
+                    try c.results.append(c.allocator, node);
                 }
                 return true;
             }
         }.visit;
 
         try self.traverse(root, .pre_order, visitor, &ctx);
-        return try results.toOwnedSlice();
+        return try results.toOwnedSlice(self.allocator);
     }
 
     /// Find first node matching a predicate
@@ -182,29 +184,31 @@ pub const Traversal = struct {
     ) ![]Node {
         // Create a closure-like context
         const Context = struct {
+            allocator: Allocator,
             node_type: []const u8,
             results: std.ArrayList(Node),
         };
 
         var ctx = Context{
+            .allocator = self.allocator,
             .node_type = node_type,
-            .results = std.ArrayList(Node).init(self.allocator),
+            .results = std.ArrayList(Node){},
         };
-        errdefer ctx.results.deinit();
+        errdefer ctx.results.deinit(self.allocator);
 
         const visitor = struct {
             fn visit(node: Node, depth: u32, context: ?*anyopaque) !bool {
                 _ = depth;
                 const c: *Context = @ptrCast(@alignCast(context.?));
                 if (std.mem.eql(u8, node.nodeType(), c.node_type)) {
-                    try c.results.append(node);
+                    try c.results.append(c.allocator, node);
                 }
                 return true;
             }
         }.visit;
 
         try self.traverse(root, .pre_order, visitor, &ctx);
-        return try ctx.results.toOwnedSlice();
+        return try ctx.results.toOwnedSlice(self.allocator);
     }
 
     /// Get text for a node from source
@@ -276,16 +280,16 @@ pub fn extractFunctions(allocator: Allocator, root: Node) ![]Node {
         "method_definition", // JavaScript/TypeScript classes
     };
 
-    var results = std.ArrayList(Node).init(allocator);
-    defer results.deinit();
+    var results = std.ArrayList(Node){};
+    defer results.deinit(allocator);
 
     for (function_types) |func_type| {
         const nodes = try t.findByType(root, func_type);
         defer allocator.free(nodes);
-        try results.appendSlice(nodes);
+        try results.appendSlice(allocator, nodes);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }
 
 /// Extract type/interface declarations
@@ -302,16 +306,16 @@ pub fn extractTypes(allocator: Allocator, root: Node) ![]Node {
         "trait_item", // Rust
     };
 
-    var results = std.ArrayList(Node).init(allocator);
-    defer results.deinit();
+    var results = std.ArrayList(Node){};
+    defer results.deinit(allocator);
 
     for (type_node_types) |type_name| {
         const nodes = try t.findByType(root, type_name);
         defer allocator.free(nodes);
-        try results.appendSlice(nodes);
+        try results.appendSlice(allocator, nodes);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }
 
 /// Extract import/use statements
@@ -326,14 +330,14 @@ pub fn extractImports(allocator: Allocator, root: Node) ![]Node {
         "include", // C/C++
     };
 
-    var results = std.ArrayList(Node).init(allocator);
-    defer results.deinit();
+    var results = std.ArrayList(Node){};
+    defer results.deinit(allocator);
 
     for (import_types) |import_type| {
         const nodes = try t.findByType(root, import_type);
         defer allocator.free(nodes);
-        try results.appendSlice(nodes);
+        try results.appendSlice(allocator, nodes);
     }
 
-    return try results.toOwnedSlice();
+    return try results.toOwnedSlice(allocator);
 }

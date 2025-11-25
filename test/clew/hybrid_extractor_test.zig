@@ -57,10 +57,6 @@ const unsupported_language_sample = "let x = 42;"; // Generic code
 // ============================================================================
 
 test "HybridExtractor: tree_sitter_only strategy succeeds for supported language" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -105,10 +101,6 @@ test "HybridExtractor: tree_sitter_only strategy fails gracefully for unsupporte
 }
 
 test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -131,10 +123,6 @@ test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
 }
 
 test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -156,10 +144,6 @@ test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
 }
 
 test "HybridExtractor: tree_sitter_only extracts imports from TypeScript" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -247,10 +231,6 @@ test "HybridExtractor: pattern_only extracts from Python" {
 // ============================================================================
 
 test "HybridExtractor: tree_sitter_with_fallback prefers tree-sitter for supported language" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -289,10 +269,6 @@ test "HybridExtractor: tree_sitter_with_fallback falls back to patterns for unsu
 }
 
 test "HybridExtractor: tree_sitter_with_fallback handles Python" {
-    // Skip if Python parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("python")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -321,10 +297,6 @@ test "HybridExtractor: tree_sitter_with_fallback handles Python" {
 // ============================================================================
 
 test "HybridExtractor: combined strategy merges AST and pattern results" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -355,10 +327,6 @@ test "HybridExtractor: combined strategy merges AST and pattern results" {
 }
 
 test "HybridExtractor: combined strategy deduplicates constraints" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;
@@ -391,10 +359,6 @@ test "HybridExtractor: combined strategy deduplicates constraints" {
 }
 
 test "HybridExtractor: combined strategy provides maximum coverage" {
-    // Skip if TypeScript parser not available
-    const c_api = @import("clew").tree_sitter.c_api;
-    if (!c_api.isLanguageAvailable("typescript")) {
-        return error.SkipZigTest;
     }
 
     const allocator = testing.allocator;

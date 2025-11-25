@@ -78,52 +78,17 @@ pub const ts_query_cursor_set_byte_range = c.ts_query_cursor_set_byte_range;
 pub const ts_query_cursor_set_point_range = c.ts_query_cursor_set_point_range;
 
 // Language functions (external declarations for language parsers)
-// These are provided by the tree-sitter-{lang} libraries
-// We'll check if they exist at runtime rather than link time
-// to avoid undefined symbol errors when language parsers aren't installed
-
-// For now, we'll provide stub implementations that return null
-// Real implementations will override these when libraries are linked
-pub fn tree_sitter_typescript() callconv(.c) ?*const TSLanguage {
-    // Stub: language parser not available
-    return null;
-}
-
-pub fn tree_sitter_tsx() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_javascript() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_python() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_rust() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_go() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_zig() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_c() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_cpp() callconv(.c) ?*const TSLanguage {
-    return null;
-}
-
-pub fn tree_sitter_java() callconv(.c) ?*const TSLanguage {
-    return null;
-}
+// These are provided by the tree-sitter-{lang} libraries compiled in build.zig
+pub extern "c" fn tree_sitter_typescript() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_tsx() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_javascript() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_python() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_rust() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_go() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_zig() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_c() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_cpp() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_java() ?*const TSLanguage;
 
 // Helper to check if a pointer is null
 pub fn isNull(ptr: anytype) bool {
