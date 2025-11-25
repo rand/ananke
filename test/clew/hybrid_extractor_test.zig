@@ -355,15 +355,15 @@ test "HybridExtractor: combined strategy provides maximum coverage" {
 
     var extractor_combined = HybridExtractor.init(allocator, .combined);
     var result_combined = try extractor_combined.extract(typescript_sample, "typescript");
-    defer result_combined.deinit(allocator);
+    defer result_combined.deinitFull(allocator);
 
     var extractor_ts_only = HybridExtractor.init(allocator, .tree_sitter_only);
     var result_ts_only = try extractor_ts_only.extract(typescript_sample, "typescript");
-    defer result_ts_only.deinit(allocator);
+    defer result_ts_only.deinitFull(allocator);
 
     var extractor_pattern_only = HybridExtractor.init(allocator, .pattern_only);
     var result_pattern_only = try extractor_pattern_only.extract(typescript_sample, "typescript");
-    defer result_pattern_only.deinit(allocator);
+    defer result_pattern_only.deinitFull(allocator);
 
     // Combined should have >= constraints than either individual strategy
     try testing.expect(result_combined.constraints.len >= result_ts_only.constraints.len);
