@@ -1,0 +1,64 @@
+{
+  "constraints": [
+    {
+      "identifier": "User",
+      "constraint_type": "TypeDefinition",
+      "severity": "Required",
+      "description": "User interface with authentication properties"
+    },
+    {
+      "identifier": "AuthCredentials",
+      "constraint_type": "TypeDefinition",
+      "severity": "Required",
+      "description": "Authentication credentials structure"
+    },
+    {
+      "identifier": "isValidEmail",
+      "constraint_type": "ValidationRule",
+      "severity": "Error",
+      "description": "Email format validation with max length 255"
+    },
+    {
+      "identifier": "authenticate",
+      "constraint_type": "Function",
+      "severity": "Required",
+      "description": "Authentication function with validation"
+    },
+    {
+      "identifier": "email_required",
+      "constraint_type": "NotNull",
+      "severity": "Error",
+      "description": "Email field is required for authentication"
+    },
+    {
+      "identifier": "password_required",
+      "constraint_type": "NotNull",
+      "severity": "Error",
+      "description": "Password field is required for authentication"
+    },
+    {
+      "identifier": "password_min_length",
+      "constraint_type": "MinLength",
+      "severity": "Error",
+      "description": "Password must be at least 8 characters"
+    },
+    {
+      "identifier": "SessionManager",
+      "constraint_type": "ClassDefinition",
+      "severity": "Required",
+      "description": "Session management with timeout constraints"
+    },
+    {
+      "identifier": "maxSessionDuration",
+      "constraint_type": "MaxValue",
+      "severity": "Warning",
+      "description": "Session timeout after 1 hour"
+    },
+    {
+      "identifier": "hasPermission",
+      "constraint_type": "AccessControl",
+      "severity": "Required",
+      "description": "Role-based permission checking"
+    }
+  ]
+}

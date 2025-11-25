@@ -1,0 +1,70 @@
+{
+  "constraints": [
+    {
+      "identifier": "EmailValidator",
+      "constraint_type": "ClassDefinition",
+      "severity": "Required",
+      "description": "Email validation with multiple constraints"
+    },
+    {
+      "identifier": "email_max_length",
+      "constraint_type": "MaxLength",
+      "severity": "Error",
+      "description": "Email must not exceed 255 characters"
+    },
+    {
+      "identifier": "email_min_length",
+      "constraint_type": "MinLength",
+      "severity": "Error",
+      "description": "Email must be at least 3 characters"
+    },
+    {
+      "identifier": "email_pattern",
+      "constraint_type": "Pattern",
+      "severity": "Error",
+      "description": "Email must match valid format pattern"
+    },
+    {
+      "identifier": "domain_blacklist",
+      "constraint_type": "Blacklist",
+      "severity": "Warning",
+      "description": "Certain email domains are not allowed"
+    },
+    {
+      "identifier": "validatePhoneNumber",
+      "constraint_type": "Function",
+      "severity": "Required",
+      "description": "Phone number validation with format constraints"
+    },
+    {
+      "identifier": "phone_length",
+      "constraint_type": "ExactLength",
+      "severity": "Error",
+      "description": "Phone must be 10 or 11 digits"
+    },
+    {
+      "identifier": "checkPasswordStrength",
+      "constraint_type": "Function",
+      "severity": "Required",
+      "description": "Password strength validation"
+    },
+    {
+      "identifier": "password_complexity",
+      "constraint_type": "ComplexityRule",
+      "severity": "Warning",
+      "description": "Password must include various character types"
+    },
+    {
+      "identifier": "FormValidator",
+      "constraint_type": "ClassDefinition",
+      "severity": "Required",
+      "description": "Form validation with nested constraints"
+    },
+    {
+      "identifier": "password_confirmation",
+      "constraint_type": "MatchField",
+      "severity": "Error",
+      "description": "Password and confirmation must match"
+    }
+  ]
+}
