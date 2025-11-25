@@ -299,7 +299,8 @@ pub fn extractTypes(allocator: Allocator, root: Node) ![]Node {
     const type_node_types = [_][]const u8{
         "interface_declaration", // TypeScript/Java
         "type_alias_declaration", // TypeScript
-        "class_declaration", // Most languages
+        "class_declaration", // TypeScript, Java, C++
+        "class_definition", // Python
         "struct_item", // Rust
         "struct_declaration", // C, Go
         "enum_declaration", // Many languages
