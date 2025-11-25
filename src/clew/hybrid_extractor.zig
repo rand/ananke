@@ -187,7 +187,12 @@ pub const HybridExtractor = struct {
 
         // Always run pattern-based extraction for additional coverage
         const pattern_constraints = try self.extractWithPatterns(source, language_name);
-        defer self.allocator.free(pattern_constraints);
+        defer {
+            // Free the pattern constraints slice
+            self.allocator.free(pattern_constraints);
+            // NOTE: Individual constraint strings are freed separately to avoid double-free
+            // See cleanup loop below for used constraints and duplicate cleanup
+        }
 
         // Track which pattern constraints are used to avoid memory leaks
         var pattern_constraints_used = try std.ArrayList(bool).initCapacity(
@@ -219,6 +224,8 @@ pub const HybridExtractor = struct {
         }
 
         // Free strings for unused (duplicate) pattern constraints to prevent memory leaks
+        // Used constraints stay alive because their copies are in all_constraints,
+        // and they will be freed via deinitFull() when the result is cleaned up
         for (pattern_constraints, 0..) |constraint, idx| {
             if (!pattern_constraints_used.items[idx]) {
                 self.allocator.free(constraint.name);
@@ -269,7 +276,7 @@ pub const HybridExtractor = struct {
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
-                .name = "ast_functions",
+                .name = try self.allocator.dupe(u8, "ast_functions"),
                 .description = try std.fmt.allocPrint(
                     self.allocator,
                     "Code contains {} function declarations (AST)",
@@ -290,7 +297,7 @@ pub const HybridExtractor = struct {
             const constraint = Constraint{
                 .kind = .type_safety,
                 .severity = .info,
-                .name = "ast_types",
+                .name = try self.allocator.dupe(u8, "ast_types"),
                 .description = try std.fmt.allocPrint(
                     self.allocator,
                     "Code defines {} type declarations (AST)",
@@ -311,7 +318,7 @@ pub const HybridExtractor = struct {
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
-                .name = "ast_imports",
+                .name = try self.allocator.dupe(u8, "ast_imports"),
                 .description = try std.fmt.allocPrint(
                     self.allocator,
                     "Code has {} import statements (AST)",
@@ -334,7 +341,14 @@ pub const HybridExtractor = struct {
         language_name: []const u8,
     ) ![]Constraint {
         var constraints = std.ArrayList(Constraint){};
-        errdefer constraints.deinit(self.allocator);
+        errdefer {
+            // Clean up any partially allocated constraints in case of error
+            for (constraints.items) |constraint| {
+                self.allocator.free(constraint.name);
+                self.allocator.free(constraint.description);
+            }
+            constraints.deinit(self.allocator);
+        }
 
         // Get patterns for the specified language
         const lang_patterns = patterns.getPatternsForLanguage(language_name) orelse {
@@ -352,7 +366,14 @@ pub const HybridExtractor = struct {
 
         // Track unique constraint types to avoid duplicates
         var seen_patterns = std.StringHashMap(void).init(self.allocator);
-        defer seen_patterns.deinit();
+        defer {
+            // Clean up seen_patterns keys
+            var iter = seen_patterns.keyIterator();
+            while (iter.next()) |key| {
+                self.allocator.free(key.*);
+            }
+            seen_patterns.deinit();
+        }
 
         // Convert matches to constraints
         for (matches) |match| {
@@ -385,12 +406,6 @@ pub const HybridExtractor = struct {
             };
 
             try constraints.append(self.allocator, constraint);
-        }
-
-        // Clean up seen_patterns keys
-        var iter = seen_patterns.keyIterator();
-        while (iter.next()) |key| {
-            self.allocator.free(key.*);
         }
 
         return try constraints.toOwnedSlice(self.allocator);
