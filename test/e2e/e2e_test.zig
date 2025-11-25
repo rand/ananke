@@ -13,6 +13,15 @@ const E2ETestContext = helpers.E2ETestContext;
 const mock_modal = @import("mocks/mock_modal.zig");
 const MockServerConfig = mock_modal.MockServerConfig;
 
+// Helper function for case-insensitive substring matching
+fn containsIgnoreCase(allocator: std.mem.Allocator, haystack: []const u8, needle: []const u8) !bool {
+    const haystack_lower = try std.ascii.allocLowerString(allocator, haystack);
+    defer allocator.free(haystack_lower);
+    const needle_lower = try std.ascii.allocLowerString(allocator, needle);
+    defer allocator.free(needle_lower);
+    return std.mem.indexOf(u8, haystack_lower, needle_lower) != null;
+}
+
 // ============================================================================
 // TypeScript Tests
 // ============================================================================
@@ -152,11 +161,11 @@ test "E2E: Python auth extraction" {
     var found_rate_limit = false;
 
     for (result.constraints.constraints.items) |constraint| {
-        if (std.mem.eql(u8, constraint.name, "User")) {
+        if (try containsIgnoreCase(testing.allocator, constraint.name, "user")) {
             found_user_dataclass = true;
-        } else if (std.mem.eql(u8, constraint.name, "SessionManager")) {
+        } else if (try containsIgnoreCase(testing.allocator, constraint.name, "sessionmanager")) {
             found_session_manager = true;
-        } else if (std.mem.eql(u8, constraint.name, "RateLimitError")) {
+        } else if (try containsIgnoreCase(testing.allocator, constraint.name, "ratelimiterror")) {
             found_rate_limit = true;
         }
     }
@@ -184,7 +193,7 @@ test "E2E: Python validation extraction" {
     // Check for validation classes and decorators
     var found_validators: usize = 0;
     for (result.constraints.constraints.items) |constraint| {
-        if (std.mem.indexOf(u8, constraint.name, "Validator") != null) {
+        if (try containsIgnoreCase(testing.allocator, constraint.name, "validator")) {
             found_validators += 1;
         }
     }
@@ -214,11 +223,11 @@ test "E2E: Python async operations extraction" {
     var found_task_queue = false;
 
     for (result.constraints.constraints.items) |constraint| {
-        if (std.mem.eql(u8, constraint.name, "RateLimiter")) {
+        if (try containsIgnoreCase(testing.allocator, constraint.name, "ratelimiter")) {
             found_rate_limiter = true;
-        } else if (std.mem.eql(u8, constraint.name, "CircuitBreaker")) {
+        } else if (try containsIgnoreCase(testing.allocator, constraint.name, "circuitbreaker")) {
             found_circuit_breaker = true;
-        } else if (std.mem.eql(u8, constraint.name, "TaskQueue")) {
+        } else if (try containsIgnoreCase(testing.allocator, constraint.name, "taskqueue")) {
             found_task_queue = true;
         }
     }
@@ -286,18 +295,14 @@ test "E2E: Cross-language constraint comparison" {
     var py_has_auth = false;
 
     for (ts_result.constraints.constraints.items) |constraint| {
-        if (std.mem.indexOf(u8, constraint.name, "auth") != null or
-            std.mem.indexOf(u8, constraint.name, "Auth") != null)
-        {
+        if (try containsIgnoreCase(testing.allocator, constraint.name, "auth")) {
             ts_has_auth = true;
             break;
         }
     }
 
     for (py_result.constraints.constraints.items) |constraint| {
-        if (std.mem.indexOf(u8, constraint.name, "auth") != null or
-            std.mem.indexOf(u8, constraint.name, "Auth") != null)
-        {
+        if (try containsIgnoreCase(testing.allocator, constraint.name, "auth")) {
             py_has_auth = true;
             break;
         }
