@@ -69,7 +69,7 @@ run_zig_tests() {
     fi
 
     print_info "Running Zig tests..."
-    if zig build test --summary all 2>&1 | tail -20; then
+    if ./scripts/test-runner.sh; then
         print_success "All Zig tests passed"
     else
         print_error "Zig tests failed"
