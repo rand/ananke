@@ -556,6 +556,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    integration_tests.linkSystemLibrary("tree-sitter");
+    integration_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    integration_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_integration_tests = b.addRunArtifact(integration_tests);
 
@@ -572,6 +575,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    e2e_tests.linkSystemLibrary("tree-sitter");
+    e2e_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    e2e_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_e2e_tests = b.addRunArtifact(e2e_tests);
 
@@ -588,6 +594,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    new_e2e_tests.linkSystemLibrary("tree-sitter");
+    new_e2e_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    new_e2e_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     const run_new_e2e_tests = b.addRunArtifact(new_e2e_tests);
 
