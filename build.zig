@@ -37,6 +37,161 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
     });
 
+    // Tree-sitter language parsers as static libraries
+    // TypeScript parser
+    const ts_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-typescript",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    ts_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    ts_parser_lib.addIncludePath(.{ .cwd_relative = "vendor/tree-sitter-typescript/typescript/src" });
+    ts_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-typescript/typescript/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // Python parser
+    const py_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-python",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    py_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    py_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-python/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // JavaScript parser
+    const js_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-javascript",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    js_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    js_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-javascript/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // Rust parser
+    const rust_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-rust",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    rust_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    rust_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-rust/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // Go parser
+    const go_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-go",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    go_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    go_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-go/src"),
+        .files = &.{"parser.c"},
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // Zig parser
+    const zig_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-zig",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    zig_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    zig_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-zig/src"),
+        .files = &.{"parser.c"},
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // C parser
+    const c_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-c",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    c_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    c_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-c/src"),
+        .files = &.{"parser.c"},
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // C++ parser
+    const cpp_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-cpp",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    cpp_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    cpp_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-cpp/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
+    // Java parser
+    const java_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-java",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    java_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    java_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-java/src"),
+        .files = &.{"parser.c"},
+        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+    });
+
     // Core Ananke modules
     // Note: We need to create modules first, then add imports after
 
@@ -196,6 +351,22 @@ pub fn build(b: *std.Build) void {
     lib.linkSystemLibrary("tree-sitter");
     lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     lib.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    lib.linkLibrary(ts_parser_lib);
+    lib.linkLibrary(py_parser_lib);
+    lib.linkLibrary(js_parser_lib);
+    lib.linkLibrary(rust_parser_lib);
+    lib.linkLibrary(go_parser_lib);
+    lib.linkLibrary(zig_parser_lib);
+    lib.linkLibrary(c_parser_lib);
+    lib.linkLibrary(cpp_parser_lib);
+    lib.linkLibrary(java_parser_lib);
+    lib.linkLibrary(js_parser_lib);
+    lib.linkLibrary(rust_parser_lib);
+    lib.linkLibrary(go_parser_lib);
+    lib.linkLibrary(zig_parser_lib);
+    lib.linkLibrary(c_parser_lib);
+    lib.linkLibrary(cpp_parser_lib);
+    lib.linkLibrary(java_parser_lib);
     b.installArtifact(lib);
 
     // Here we define an executable. An executable needs to have a root module
@@ -254,6 +425,15 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("tree-sitter");
     exe.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     exe.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    exe.linkLibrary(ts_parser_lib);
+    exe.linkLibrary(py_parser_lib);
+    exe.linkLibrary(js_parser_lib);
+    exe.linkLibrary(rust_parser_lib);
+    exe.linkLibrary(go_parser_lib);
+    exe.linkLibrary(zig_parser_lib);
+    exe.linkLibrary(c_parser_lib);
+    exe.linkLibrary(cpp_parser_lib);
+    exe.linkLibrary(java_parser_lib);
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -349,6 +529,15 @@ pub fn build(b: *std.Build) void {
     clew_tests.linkSystemLibrary("tree-sitter");
     clew_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     clew_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    clew_tests.linkLibrary(ts_parser_lib);
+    clew_tests.linkLibrary(py_parser_lib);
+    clew_tests.linkLibrary(js_parser_lib);
+    clew_tests.linkLibrary(rust_parser_lib);
+    clew_tests.linkLibrary(go_parser_lib);
+    clew_tests.linkLibrary(zig_parser_lib);
+    clew_tests.linkLibrary(c_parser_lib);
+    clew_tests.linkLibrary(cpp_parser_lib);
+    clew_tests.linkLibrary(java_parser_lib);
 
     const run_clew_tests = b.addRunArtifact(clew_tests);
 
@@ -367,6 +556,15 @@ pub fn build(b: *std.Build) void {
     cache_tests.linkSystemLibrary("tree-sitter");
     cache_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     cache_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    cache_tests.linkLibrary(ts_parser_lib);
+    cache_tests.linkLibrary(py_parser_lib);
+    cache_tests.linkLibrary(js_parser_lib);
+    cache_tests.linkLibrary(rust_parser_lib);
+    cache_tests.linkLibrary(go_parser_lib);
+    cache_tests.linkLibrary(zig_parser_lib);
+    cache_tests.linkLibrary(c_parser_lib);
+    cache_tests.linkLibrary(cpp_parser_lib);
+    cache_tests.linkLibrary(java_parser_lib);
 
     const run_cache_tests = b.addRunArtifact(cache_tests);
 
@@ -385,6 +583,15 @@ pub fn build(b: *std.Build) void {
     pattern_tests.linkSystemLibrary("tree-sitter");
     pattern_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     pattern_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    pattern_tests.linkLibrary(ts_parser_lib);
+    pattern_tests.linkLibrary(py_parser_lib);
+    pattern_tests.linkLibrary(js_parser_lib);
+    pattern_tests.linkLibrary(rust_parser_lib);
+    pattern_tests.linkLibrary(go_parser_lib);
+    pattern_tests.linkLibrary(zig_parser_lib);
+    pattern_tests.linkLibrary(c_parser_lib);
+    pattern_tests.linkLibrary(cpp_parser_lib);
+    pattern_tests.linkLibrary(java_parser_lib);
 
     const run_pattern_tests = b.addRunArtifact(pattern_tests);
 
@@ -403,6 +610,15 @@ pub fn build(b: *std.Build) void {
     tree_sitter_tests.linkSystemLibrary("tree-sitter");
     tree_sitter_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     tree_sitter_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    tree_sitter_tests.linkLibrary(ts_parser_lib);
+    tree_sitter_tests.linkLibrary(py_parser_lib);
+    tree_sitter_tests.linkLibrary(js_parser_lib);
+    tree_sitter_tests.linkLibrary(rust_parser_lib);
+    tree_sitter_tests.linkLibrary(go_parser_lib);
+    tree_sitter_tests.linkLibrary(zig_parser_lib);
+    tree_sitter_tests.linkLibrary(c_parser_lib);
+    tree_sitter_tests.linkLibrary(cpp_parser_lib);
+    tree_sitter_tests.linkLibrary(java_parser_lib);
 
     const run_tree_sitter_tests = b.addRunArtifact(tree_sitter_tests);
 
@@ -423,6 +639,15 @@ pub fn build(b: *std.Build) void {
     hybrid_extractor_tests.linkSystemLibrary("tree-sitter");
     hybrid_extractor_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     hybrid_extractor_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    hybrid_extractor_tests.linkLibrary(ts_parser_lib);
+    hybrid_extractor_tests.linkLibrary(py_parser_lib);
+    hybrid_extractor_tests.linkLibrary(js_parser_lib);
+    hybrid_extractor_tests.linkLibrary(rust_parser_lib);
+    hybrid_extractor_tests.linkLibrary(go_parser_lib);
+    hybrid_extractor_tests.linkLibrary(zig_parser_lib);
+    hybrid_extractor_tests.linkLibrary(c_parser_lib);
+    hybrid_extractor_tests.linkLibrary(cpp_parser_lib);
+    hybrid_extractor_tests.linkLibrary(java_parser_lib);
 
     const run_hybrid_extractor_tests = b.addRunArtifact(hybrid_extractor_tests);
 
@@ -441,6 +666,15 @@ pub fn build(b: *std.Build) void {
     traversal_tests.linkSystemLibrary("tree-sitter");
     traversal_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     traversal_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    traversal_tests.linkLibrary(ts_parser_lib);
+    traversal_tests.linkLibrary(py_parser_lib);
+    traversal_tests.linkLibrary(js_parser_lib);
+    traversal_tests.linkLibrary(rust_parser_lib);
+    traversal_tests.linkLibrary(go_parser_lib);
+    traversal_tests.linkLibrary(zig_parser_lib);
+    traversal_tests.linkLibrary(c_parser_lib);
+    traversal_tests.linkLibrary(cpp_parser_lib);
+    traversal_tests.linkLibrary(java_parser_lib);
 
     const run_traversal_tests = b.addRunArtifact(traversal_tests);
 
@@ -459,6 +693,15 @@ pub fn build(b: *std.Build) void {
     rust_go_zig_tests.linkSystemLibrary("tree-sitter");
     rust_go_zig_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     rust_go_zig_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    rust_go_zig_tests.linkLibrary(ts_parser_lib);
+    rust_go_zig_tests.linkLibrary(py_parser_lib);
+    rust_go_zig_tests.linkLibrary(js_parser_lib);
+    rust_go_zig_tests.linkLibrary(rust_parser_lib);
+    rust_go_zig_tests.linkLibrary(go_parser_lib);
+    rust_go_zig_tests.linkLibrary(zig_parser_lib);
+    rust_go_zig_tests.linkLibrary(c_parser_lib);
+    rust_go_zig_tests.linkLibrary(cpp_parser_lib);
+    rust_go_zig_tests.linkLibrary(java_parser_lib);
 
     const run_rust_go_zig_tests = b.addRunArtifact(rust_go_zig_tests);
 
@@ -568,6 +811,15 @@ pub fn build(b: *std.Build) void {
     integration_tests.linkSystemLibrary("tree-sitter");
     integration_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     integration_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    integration_tests.linkLibrary(ts_parser_lib);
+    integration_tests.linkLibrary(py_parser_lib);
+    integration_tests.linkLibrary(js_parser_lib);
+    integration_tests.linkLibrary(rust_parser_lib);
+    integration_tests.linkLibrary(go_parser_lib);
+    integration_tests.linkLibrary(zig_parser_lib);
+    integration_tests.linkLibrary(c_parser_lib);
+    integration_tests.linkLibrary(cpp_parser_lib);
+    integration_tests.linkLibrary(java_parser_lib);
 
     const run_integration_tests = b.addRunArtifact(integration_tests);
 
@@ -587,6 +839,15 @@ pub fn build(b: *std.Build) void {
     e2e_tests.linkSystemLibrary("tree-sitter");
     e2e_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     e2e_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    e2e_tests.linkLibrary(ts_parser_lib);
+    e2e_tests.linkLibrary(py_parser_lib);
+    e2e_tests.linkLibrary(js_parser_lib);
+    e2e_tests.linkLibrary(rust_parser_lib);
+    e2e_tests.linkLibrary(go_parser_lib);
+    e2e_tests.linkLibrary(zig_parser_lib);
+    e2e_tests.linkLibrary(c_parser_lib);
+    e2e_tests.linkLibrary(cpp_parser_lib);
+    e2e_tests.linkLibrary(java_parser_lib);
 
     const run_e2e_tests = b.addRunArtifact(e2e_tests);
 
@@ -606,6 +867,15 @@ pub fn build(b: *std.Build) void {
     new_e2e_tests.linkSystemLibrary("tree-sitter");
     new_e2e_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     new_e2e_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    new_e2e_tests.linkLibrary(ts_parser_lib);
+    new_e2e_tests.linkLibrary(py_parser_lib);
+    new_e2e_tests.linkLibrary(js_parser_lib);
+    new_e2e_tests.linkLibrary(rust_parser_lib);
+    new_e2e_tests.linkLibrary(go_parser_lib);
+    new_e2e_tests.linkLibrary(zig_parser_lib);
+    new_e2e_tests.linkLibrary(c_parser_lib);
+    new_e2e_tests.linkLibrary(cpp_parser_lib);
+    new_e2e_tests.linkLibrary(java_parser_lib);
 
     const run_new_e2e_tests = b.addRunArtifact(new_e2e_tests);
 
@@ -626,6 +896,15 @@ pub fn build(b: *std.Build) void {
     phase2_full_pipeline_tests.linkSystemLibrary("tree-sitter");
     phase2_full_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     phase2_full_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    phase2_full_pipeline_tests.linkLibrary(ts_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(py_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(js_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(rust_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(go_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(zig_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(c_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(cpp_parser_lib);
+    phase2_full_pipeline_tests.linkLibrary(java_parser_lib);
 
     const run_phase2_full_pipeline_tests = b.addRunArtifact(phase2_full_pipeline_tests);
 
@@ -646,6 +925,15 @@ pub fn build(b: *std.Build) void {
     phase2_multi_language_tests.linkSystemLibrary("tree-sitter");
     phase2_multi_language_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     phase2_multi_language_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    phase2_multi_language_tests.linkLibrary(ts_parser_lib);
+    phase2_multi_language_tests.linkLibrary(py_parser_lib);
+    phase2_multi_language_tests.linkLibrary(js_parser_lib);
+    phase2_multi_language_tests.linkLibrary(rust_parser_lib);
+    phase2_multi_language_tests.linkLibrary(go_parser_lib);
+    phase2_multi_language_tests.linkLibrary(zig_parser_lib);
+    phase2_multi_language_tests.linkLibrary(c_parser_lib);
+    phase2_multi_language_tests.linkLibrary(cpp_parser_lib);
+    phase2_multi_language_tests.linkLibrary(java_parser_lib);
 
     const run_phase2_multi_language_tests = b.addRunArtifact(phase2_multi_language_tests);
 
@@ -666,6 +954,15 @@ pub fn build(b: *std.Build) void {
     phase2_strategy_comparison_tests.linkSystemLibrary("tree-sitter");
     phase2_strategy_comparison_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     phase2_strategy_comparison_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    phase2_strategy_comparison_tests.linkLibrary(ts_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(py_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(js_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(rust_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(go_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(zig_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(c_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(cpp_parser_lib);
+    phase2_strategy_comparison_tests.linkLibrary(java_parser_lib);
 
     const run_phase2_strategy_comparison_tests = b.addRunArtifact(phase2_strategy_comparison_tests);
 
@@ -686,6 +983,15 @@ pub fn build(b: *std.Build) void {
     phase2_constraint_quality_tests.linkSystemLibrary("tree-sitter");
     phase2_constraint_quality_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     phase2_constraint_quality_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    phase2_constraint_quality_tests.linkLibrary(ts_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(py_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(js_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(rust_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(go_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(zig_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(c_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(cpp_parser_lib);
+    phase2_constraint_quality_tests.linkLibrary(java_parser_lib);
 
     const run_phase2_constraint_quality_tests = b.addRunArtifact(phase2_constraint_quality_tests);
 
@@ -830,6 +1136,15 @@ pub fn build(b: *std.Build) void {
     clew_bench.linkSystemLibrary("tree-sitter");
     clew_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     clew_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    clew_bench.linkLibrary(ts_parser_lib);
+    clew_bench.linkLibrary(py_parser_lib);
+    clew_bench.linkLibrary(js_parser_lib);
+    clew_bench.linkLibrary(rust_parser_lib);
+    clew_bench.linkLibrary(go_parser_lib);
+    clew_bench.linkLibrary(zig_parser_lib);
+    clew_bench.linkLibrary(c_parser_lib);
+    clew_bench.linkLibrary(cpp_parser_lib);
+    clew_bench.linkLibrary(java_parser_lib);
 
     const run_clew_bench = b.addRunArtifact(clew_bench);
     const clew_bench_step = b.step("bench-clew", "Run Clew extraction benchmarks");
@@ -917,6 +1232,15 @@ pub fn build(b: *std.Build) void {
     multi_lang_bench.linkSystemLibrary("tree-sitter");
     multi_lang_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     multi_lang_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    multi_lang_bench.linkLibrary(ts_parser_lib);
+    multi_lang_bench.linkLibrary(py_parser_lib);
+    multi_lang_bench.linkLibrary(js_parser_lib);
+    multi_lang_bench.linkLibrary(rust_parser_lib);
+    multi_lang_bench.linkLibrary(go_parser_lib);
+    multi_lang_bench.linkLibrary(zig_parser_lib);
+    multi_lang_bench.linkLibrary(c_parser_lib);
+    multi_lang_bench.linkLibrary(cpp_parser_lib);
+    multi_lang_bench.linkLibrary(java_parser_lib);
 
     const run_multi_lang_bench = b.addRunArtifact(multi_lang_bench);
     const multi_lang_bench_step = b.step("bench-multi-lang", "Run multi-language extraction benchmarks");
@@ -959,6 +1283,15 @@ pub fn build(b: *std.Build) void {
     memory_bench.linkSystemLibrary("tree-sitter");
     memory_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     memory_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    memory_bench.linkLibrary(ts_parser_lib);
+    memory_bench.linkLibrary(py_parser_lib);
+    memory_bench.linkLibrary(js_parser_lib);
+    memory_bench.linkLibrary(rust_parser_lib);
+    memory_bench.linkLibrary(go_parser_lib);
+    memory_bench.linkLibrary(zig_parser_lib);
+    memory_bench.linkLibrary(c_parser_lib);
+    memory_bench.linkLibrary(cpp_parser_lib);
+    memory_bench.linkLibrary(java_parser_lib);
 
     const run_memory_bench = b.addRunArtifact(memory_bench);
     const memory_bench_step = b.step("bench-memory", "Run memory usage benchmarks");
@@ -1004,6 +1337,15 @@ pub fn build(b: *std.Build) void {
     pipeline_bench.linkSystemLibrary("tree-sitter");
     pipeline_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     pipeline_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    pipeline_bench.linkLibrary(ts_parser_lib);
+    pipeline_bench.linkLibrary(py_parser_lib);
+    pipeline_bench.linkLibrary(js_parser_lib);
+    pipeline_bench.linkLibrary(rust_parser_lib);
+    pipeline_bench.linkLibrary(go_parser_lib);
+    pipeline_bench.linkLibrary(zig_parser_lib);
+    pipeline_bench.linkLibrary(c_parser_lib);
+    pipeline_bench.linkLibrary(cpp_parser_lib);
+    pipeline_bench.linkLibrary(java_parser_lib);
 
     const run_pipeline_bench = b.addRunArtifact(pipeline_bench);
     const pipeline_bench_step = b.step("bench-pipeline", "Run end-to-end pipeline benchmarks");
@@ -1027,6 +1369,15 @@ pub fn build(b: *std.Build) void {
     regression_test.linkSystemLibrary("tree-sitter");
     regression_test.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     regression_test.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    regression_test.linkLibrary(ts_parser_lib);
+    regression_test.linkLibrary(py_parser_lib);
+    regression_test.linkLibrary(js_parser_lib);
+    regression_test.linkLibrary(rust_parser_lib);
+    regression_test.linkLibrary(go_parser_lib);
+    regression_test.linkLibrary(zig_parser_lib);
+    regression_test.linkLibrary(c_parser_lib);
+    regression_test.linkLibrary(cpp_parser_lib);
+    regression_test.linkLibrary(java_parser_lib);
 
     const run_regression_test = b.addRunArtifact(regression_test);
     const regression_test_step = b.step("bench-regression", "Run performance regression tests");
