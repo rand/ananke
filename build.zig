@@ -25,19 +25,17 @@ pub fn build(b: *std.Build) void {
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
 
-    // Tree-sitter support disabled pending Zig 0.15.x compatibility in upstream
-    // TODO: Re-enable once z-tree-sitter fixes enum literal names
-    // const zts = b.dependency("zts", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    //     .typescript = true,
-    //     .python = true,
-    //     .javascript = true,
-    //     .rust = true,
-    //     .go = true,
-    //     .java = true,
-    //     .zig = true,
-    // });
+    // Tree-sitter support via direct C FFI
+    // Note: Requires tree-sitter libraries to be installed via:
+    // macOS: brew install tree-sitter
+    // Linux: apt-get install libtree-sitter-dev or similar
+
+    // Tree-sitter module for direct C FFI bindings
+    const tree_sitter_mod = b.addModule("tree_sitter", .{
+        .root_source_file = b.path("src/clew/tree_sitter/parser.zig"),
+        .target = target,
+        .link_libc = true,
+    });
 
     // Core Ananke modules
     // Note: We need to create modules first, then add imports after
@@ -64,12 +62,12 @@ pub fn build(b: *std.Build) void {
     const clew_mod = b.addModule("clew", .{
         .root_source_file = b.path("src/clew/clew.zig"),
         .target = target,
+        .link_libc = true,
     });
     clew_mod.addImport("ananke", ananke_mod);
     clew_mod.addImport("http", http_mod);
     clew_mod.addImport("claude", claude_mod);
-    // TODO: Re-enable when z-tree-sitter is Zig 0.15.x compatible
-    // clew_mod.addImport("zts", zts.module("zts"));
+    clew_mod.addImport("tree_sitter", tree_sitter_mod);
 
     // Braid: Constraint compilation engine
     const braid_mod = b.addModule("braid", .{
@@ -187,6 +185,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/ffi/zig_ffi.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "ananke", .module = ananke_mod },
                 .{ .name = "clew", .module = clew_mod },
@@ -194,6 +193,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    lib.linkSystemLibrary("tree-sitter");
+    lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    lib.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     b.installArtifact(lib);
 
     // Here we define an executable. An executable needs to have a root module
@@ -225,6 +227,7 @@ pub fn build(b: *std.Build) void {
             // definition if desireable (e.g. firmware for embedded devices).
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             // List of modules available for import in source files part of the
             // root module.
             .imports = &.{
@@ -246,6 +249,11 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+
+    // Link tree-sitter libraries
+    exe.linkSystemLibrary("tree-sitter");
+    exe.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    exe.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -371,6 +379,24 @@ pub fn build(b: *std.Build) void {
 
     const run_pattern_tests = b.addRunArtifact(pattern_tests);
 
+    // Tree-sitter FFI tests
+    const tree_sitter_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/tree_sitter_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    tree_sitter_tests.linkSystemLibrary("tree-sitter");
+    tree_sitter_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    tree_sitter_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+
+    const run_tree_sitter_tests = b.addRunArtifact(tree_sitter_tests);
+
     // Graph algorithm tests for Braid constraint compilation
     const graph_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -493,6 +519,22 @@ pub fn build(b: *std.Build) void {
 
     const run_e2e_tests = b.addRunArtifact(e2e_tests);
 
+    // New comprehensive E2E test suite with fixtures
+    const new_e2e_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/e2e_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_new_e2e_tests = b.addRunArtifact(new_e2e_tests);
+
     // CLI tests
     const cli_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -556,6 +598,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_clew_tests.step);
     test_step.dependOn(&run_cache_tests.step);
     test_step.dependOn(&run_pattern_tests.step);
+    test_step.dependOn(&run_tree_sitter_tests.step);
     test_step.dependOn(&run_graph_tests.step);
     test_step.dependOn(&run_json_schema_tests.step);
     test_step.dependOn(&run_grammar_tests.step);
@@ -564,12 +607,14 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_token_mask_tests.step);
     test_step.dependOn(&run_integration_tests.step);
     test_step.dependOn(&run_e2e_tests.step);
+    test_step.dependOn(&run_new_e2e_tests.step);
     test_step.dependOn(&run_cli_tests.step);
     test_step.dependOn(&run_cli_integration_tests.step);
 
     // E2E test step (can be run separately)
     const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
     e2e_test_step.dependOn(&run_e2e_tests.step);
+    e2e_test_step.dependOn(&run_new_e2e_tests.step);
 
     // CLI test step (can be run separately)
     const cli_test_step = b.step("test-cli", "Run CLI tests");

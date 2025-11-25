@@ -1,0 +1,29 @@
+# Ananke Configuration File
+
+[modal]
+# endpoint = "https://your-app.modal.run"
+# API key should be stored in environment variable ANANKE_MODAL_API_KEY
+# or set here (not recommended for security)
+
+[claude]
+# Claude API configuration for semantic analysis
+# API key should be stored in environment variable ANTHROPIC_API_KEY
+# or set here (not recommended for security)
+# endpoint = "https://api.anthropic.com/v1/messages"
+model = "claude-sonnet-4-5-20250929"
+enabled = false
+
+[defaults]
+language = "typescript"
+max_tokens = 4096
+temperature = 0.7
+confidence_threshold = 0.5
+output_format = "pretty"
+
+[extract]
+use_claude = false
+patterns = ["all"]
+
+[compile]
+priority = "medium"
+formats = ["json-schema"]

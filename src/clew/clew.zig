@@ -21,6 +21,9 @@ const extractors = @import("extractors.zig");
 // Import test assertion parser
 const test_assertions = @import("parsers/test_assertions.zig");
 
+// Tree-sitter C FFI module (optional, returns errors if parsers not installed)
+pub const tree_sitter = @import("tree_sitter");
+
 // Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
 const structural_parsing_enabled = true;
 
