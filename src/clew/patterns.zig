@@ -513,6 +513,195 @@ pub const rust_patterns = LanguagePatterns{
 };
 
 // ============================================================================
+// Go Patterns
+// ============================================================================
+
+const go_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "func (",
+        .constraint_kind = .syntactic,
+        .description = "Method with receiver",
+    },
+    .{
+        .pattern = "func ",
+        .constraint_kind = .syntactic,
+        .description = "Function definition",
+    },
+};
+
+const go_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "error",
+        .constraint_kind = .type_safety,
+        .description = "Error type",
+    },
+    .{
+        .pattern = "interface{",
+        .constraint_kind = .type_safety,
+        .description = "Interface definition",
+    },
+    .{
+        .pattern = "type ",
+        .constraint_kind = .type_safety,
+        .description = "Type definition",
+    },
+    .{
+        .pattern = "*",
+        .constraint_kind = .type_safety,
+        .description = "Pointer type",
+    },
+    .{
+        .pattern = "[]",
+        .constraint_kind = .type_safety,
+        .description = "Slice type",
+    },
+    .{
+        .pattern = "map[",
+        .constraint_kind = .type_safety,
+        .description = "Map type",
+    },
+};
+
+const go_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "go ",
+        .constraint_kind = .semantic,
+        .description = "Goroutine launch",
+    },
+    .{
+        .pattern = "chan ",
+        .constraint_kind = .semantic,
+        .description = "Channel type",
+    },
+    .{
+        .pattern = "<-",
+        .constraint_kind = .semantic,
+        .description = "Channel operation",
+    },
+    .{
+        .pattern = "select {",
+        .constraint_kind = .semantic,
+        .description = "Select statement",
+    },
+};
+
+const go_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "if err != nil",
+        .constraint_kind = .semantic,
+        .description = "Error check",
+    },
+    .{
+        .pattern = "error",
+        .constraint_kind = .semantic,
+        .description = "Error type usage",
+    },
+    .{
+        .pattern = "panic(",
+        .constraint_kind = .semantic,
+        .description = "Panic call",
+    },
+    .{
+        .pattern = "recover()",
+        .constraint_kind = .semantic,
+        .description = "Recover call",
+    },
+};
+
+const go_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "import (",
+        .constraint_kind = .architectural,
+        .description = "Multi-line import",
+    },
+    .{
+        .pattern = "import \"",
+        .constraint_kind = .architectural,
+        .description = "Single import",
+    },
+    .{
+        .pattern = "package ",
+        .constraint_kind = .architectural,
+        .description = "Package declaration",
+    },
+};
+
+const go_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "type ",
+        .constraint_kind = .syntactic,
+        .description = "Type declaration",
+    },
+    .{
+        .pattern = "struct {",
+        .constraint_kind = .syntactic,
+        .description = "Struct definition",
+    },
+    .{
+        .pattern = "interface {",
+        .constraint_kind = .syntactic,
+        .description = "Interface definition",
+    },
+};
+
+const go_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "`json:",
+        .constraint_kind = .syntactic,
+        .description = "JSON struct tag",
+    },
+    .{
+        .pattern = "`",
+        .constraint_kind = .syntactic,
+        .description = "Struct tag",
+    },
+    .{
+        .pattern = "//go:",
+        .constraint_kind = .syntactic,
+        .description = "Compiler directive",
+    },
+};
+
+const go_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "make(",
+        .constraint_kind = .operational,
+        .description = "Make allocation",
+    },
+    .{
+        .pattern = "new(",
+        .constraint_kind = .operational,
+        .description = "New allocation",
+    },
+    .{
+        .pattern = "defer ",
+        .constraint_kind = .operational,
+        .description = "Defer statement",
+    },
+    .{
+        .pattern = "&",
+        .constraint_kind = .operational,
+        .description = "Address-of operator",
+    },
+    .{
+        .pattern = "context.Context",
+        .constraint_kind = .operational,
+        .description = "Context usage",
+    },
+};
+
+pub const go_patterns = LanguagePatterns{
+    .function_decl = &go_function_patterns,
+    .type_annotation = &go_type_patterns,
+    .async_pattern = &go_async_patterns,
+    .error_handling = &go_error_patterns,
+    .imports = &go_import_patterns,
+    .class_struct = &go_class_patterns,
+    .metadata = &go_metadata_patterns,
+    .memory_management = &go_memory_patterns,
+};
+
+// ============================================================================
 // Zig Patterns
 // ============================================================================
 
@@ -708,6 +897,8 @@ pub fn getPatternsForLanguage(language: []const u8) ?LanguagePatterns {
         return python_patterns;
     } else if (std.mem.eql(u8, language, "rust") or std.mem.eql(u8, language, "rs")) {
         return rust_patterns;
+    } else if (std.mem.eql(u8, language, "go")) {
+        return go_patterns;
     } else if (std.mem.eql(u8, language, "zig")) {
         return zig_patterns;
     }
