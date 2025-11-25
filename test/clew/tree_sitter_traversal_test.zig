@@ -600,13 +600,15 @@ test "Traversal: handles comments-only source" {
 test "Traversal: handles deeply nested structures" {
     const allocator = testing.allocator;
 
+    // Valid TypeScript with nested classes and functions
     const source =
         \\class A {
-        \\    class B {
-        \\        function c() {
-        \\            function d() {
+        \\    innerClass = class B {
+        \\        method() {
+        \\            function nested() {
         \\                return 42;
         \\            }
+        \\            return nested();
         \\        }
         \\    }
         \\}
@@ -624,6 +626,6 @@ test "Traversal: handles deeply nested structures" {
     const types = try traversal_helpers.extractTypes(allocator, root);
     defer allocator.free(types);
 
-    // Should find nested classes
+    // Should find at least the outer class (class A)
     try testing.expect(types.len >= 1);
 }
