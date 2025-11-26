@@ -15,6 +15,12 @@ pub fn build(b: *std.Build) void {
     // Optimization options
     const optimize = b.standardOptimizeOption(.{});
 
+    // Build options for mechanical sympathy optimizations
+    const enable_lto = b.option(bool, "lto", "Enable Link-Time Optimization for release builds") orelse (optimize != .Debug);
+    const cpu_native = b.option(bool, "cpu-native", "Enable native CPU features (-march=native)") orelse false;
+    // TODO: Apply strip_symbols to executables (requires updating exe configuration)
+    // const strip_symbols = b.option(bool, "strip", "Strip debug symbols from release builds") orelse (optimize == .ReleaseSmall);
+
     // Build option to enable WASM-specific features
     const wasm_build = b.option(bool, "wasm", "Build for WebAssembly target") orelse false;
 
@@ -24,6 +30,32 @@ pub fn build(b: *std.Build) void {
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
     // in this directory.
+
+    // Helper function to generate C compiler flags based on optimization level
+    // Enables aggressive optimizations for release builds with LTO and CPU-specific features
+    const getCFlags = struct {
+        fn get(opt: std.builtin.OptimizeMode, lto: bool, native: bool) []const []const u8 {
+            return switch (opt) {
+                .Debug => &.{ "-std=c11", "-O0", "-g", "-fno-sanitize=undefined" },
+                .ReleaseSafe => if (lto)
+                    &.{ "-std=c11", "-O2", "-flto", "-fno-omit-frame-pointer", "-fno-sanitize=undefined" }
+                else
+                    &.{ "-std=c11", "-O2", "-fno-omit-frame-pointer", "-fno-sanitize=undefined" },
+                .ReleaseFast => if (lto and native)
+                    &.{ "-std=c11", "-O3", "-flto", "-march=native", "-mtune=native", "-fno-sanitize=undefined" }
+                else if (lto)
+                    &.{ "-std=c11", "-O3", "-flto", "-fno-sanitize=undefined" }
+                else if (native)
+                    &.{ "-std=c11", "-O3", "-march=native", "-mtune=native", "-fno-sanitize=undefined" }
+                else
+                    &.{ "-std=c11", "-O3", "-fno-sanitize=undefined" },
+                .ReleaseSmall => if (lto)
+                    &.{ "-std=c11", "-Os", "-flto", "-fno-sanitize=undefined" }
+                else
+                    &.{ "-std=c11", "-Os", "-fno-sanitize=undefined" },
+            };
+        }
+    }.get;
 
     // Tree-sitter support via direct C FFI
     // Note: Requires tree-sitter libraries to be installed via:
@@ -53,7 +85,7 @@ pub fn build(b: *std.Build) void {
     ts_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-typescript/typescript/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // Python parser
@@ -70,7 +102,7 @@ pub fn build(b: *std.Build) void {
     py_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-python/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // JavaScript parser
@@ -87,7 +119,7 @@ pub fn build(b: *std.Build) void {
     js_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-javascript/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // Rust parser
@@ -104,7 +136,7 @@ pub fn build(b: *std.Build) void {
     rust_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-rust/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // Go parser
@@ -121,7 +153,7 @@ pub fn build(b: *std.Build) void {
     go_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-go/src"),
         .files = &.{"parser.c"},
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // Zig parser
@@ -138,7 +170,7 @@ pub fn build(b: *std.Build) void {
     zig_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-zig/src"),
         .files = &.{"parser.c"},
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // C parser
@@ -155,7 +187,7 @@ pub fn build(b: *std.Build) void {
     c_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-c/src"),
         .files = &.{"parser.c"},
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // C++ parser
@@ -172,7 +204,7 @@ pub fn build(b: *std.Build) void {
     cpp_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-cpp/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // Java parser
@@ -189,7 +221,7 @@ pub fn build(b: *std.Build) void {
     java_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-java/src"),
         .files = &.{"parser.c"},
-        .flags = &.{"-std=c11", "-fno-sanitize=undefined"},
+        .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
 
     // Core Ananke modules
