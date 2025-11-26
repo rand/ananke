@@ -21,6 +21,12 @@ pub const types = struct {
     pub const intent = @import("types/intent.zig");
 };
 
+// Re-export utility modules
+pub const utils = struct {
+    pub const ring_queue = @import("utils/ring_queue.zig");
+    pub const RingQueue = ring_queue.RingQueue;
+};
+
 // Re-export commonly used types at top level for convenience
 pub const Constraint = types.constraint.Constraint;
 pub const ConstraintID = types.constraint.ConstraintID;

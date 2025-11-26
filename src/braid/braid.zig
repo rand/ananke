@@ -4,6 +4,7 @@ const std = @import("std");
 
 // Import types from root module
 const root = @import("ananke");
+const RingQueue = root.utils.RingQueue;
 const Constraint = root.types.constraint.Constraint;
 const ConstraintIR = root.types.constraint.ConstraintIR;
 const ConstraintSet = root.types.constraint.ConstraintSet;
@@ -1462,14 +1463,14 @@ pub const ConstraintGraph = struct {
         }
 
         // Find all nodes with in-degree 0
-        var queue = try std.ArrayList(usize).initCapacity(self.allocator, self.nodes.items.len);
-        defer queue.deinit(self.allocator);
+        var queue = try RingQueue(usize).init(self.allocator, 16);
+        defer queue.deinit();
 
         {
             var it = in_degree.iterator();
             while (it.next()) |entry| {
                 if (entry.value_ptr.* == 0) {
-                    try queue.append(self.allocator, entry.key_ptr.*);
+                    try queue.enqueue(entry.key_ptr.*);
                 }
             }
         }
@@ -1478,8 +1479,8 @@ pub const ConstraintGraph = struct {
         var result = try std.ArrayList(usize).initCapacity(self.allocator, self.nodes.items.len);
         var processed_count: usize = 0;
 
-        while (queue.items.len > 0) {
-            const node_id = queue.orderedRemove(0);
+        while (!queue.isEmpty()) {
+            const node_id = try queue.dequeue();
             try result.append(self.allocator, node_id);
             processed_count += 1;
 
@@ -1490,7 +1491,7 @@ pub const ConstraintGraph = struct {
                     if (to_degree > 0) {
                         try in_degree.put(edge.to, to_degree - 1);
                         if (to_degree - 1 == 0) {
-                            try queue.append(self.allocator, edge.to);
+                            try queue.enqueue(edge.to);
                         }
                     }
                 }
