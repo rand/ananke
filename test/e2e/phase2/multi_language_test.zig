@@ -99,11 +99,11 @@ test "Multi-Language: All supported languages" {
         .{ .name = "go", .code = user_service_go, .has_ts_support = false },
         .{ .name = "zig", .code = user_service_zig, .has_ts_support = false },
     };
+    const allocator = testing.allocator;
     std.debug.print("\n=== All Languages Test ===\n", .{});
     for (languages) |lang| {
         var extractor = try HybridExtractor.init(allocator, .tree_sitter_with_fallback);
-    defer extractor.deinit();
-    defer extractor.deinit();
+        defer extractor.deinit();
         var result = try extractor.extract(lang.code, lang.name);
         defer result.deinitFull(allocator);
         
@@ -145,6 +145,7 @@ test "Multi-Language: Compare TypeScript vs Python patterns" {
         defer if (name_lower.ptr != c.name.ptr) allocator.free(name_lower);
         if (std.mem.indexOf(u8, name_lower, "class") != null) ts_has_class = true;
         if (std.mem.indexOf(u8, name_lower, "async") != null) ts_has_async = true;
+    }
     for (py_constraints.constraints.items) |c| {
         const name_lower2 = try std.ascii.allocLowerString(allocator, c.name);
         defer allocator.free(name_lower2);
@@ -190,6 +191,7 @@ test "Multi-Language: Aggregate constraints from multiple files" {
 }
 // Language-Specific Features
 test "Multi-Language: TypeScript-specific features" {
+    const allocator = testing.allocator;
     const ts_specific =
         \\interface Config {
         \\    timeout: number;
@@ -205,14 +207,20 @@ test "Multi-Language: TypeScript-specific features" {
         \\    }
         \\};
     ;
+    var clew = try Clew.init(allocator);
+    defer clew.deinit();
     var constraints = try clew.extractFromCode(ts_specific, "typescript");
+    defer constraints.deinit();
     std.debug.print("\n=== TypeScript-Specific Features ===\n", .{});
     std.debug.print("Extracted {} constraints\n", .{constraints.constraints.items.len});
     // Should detect generics, union types, arrow functions
     for (constraints.constraints.items) |c| {
         std.debug.print("  - {s}\n", .{c.name});
+    }
     std.debug.print("✓ TypeScript-specific patterns extracted\n", .{});
+}
 test "Multi-Language: Python-specific features" {
+    const allocator = testing.allocator;
     const py_specific =
         \\from typing import Protocol, TypeVar
         \\from dataclasses import dataclass
@@ -227,20 +235,36 @@ test "Multi-Language: Python-specific features" {
         \\        return await fn()
         \\    except Exception as e:
         \\        raise ValueError(f"Failed: {e}")
+    ;
+    var clew = try Clew.init(allocator);
+    defer clew.deinit();
     var constraints = try clew.extractFromCode(py_specific, "python");
+    defer constraints.deinit();
     std.debug.print("\n=== Python-Specific Features ===\n", .{});
     // Should detect dataclasses, protocols, type variables
     std.debug.print("✓ Python-specific patterns extracted\n", .{});
+}
 // Performance Comparison
 test "Multi-Language: Extraction performance comparison" {
+    const allocator = testing.allocator;
+    const languages = [_]struct {
+        name: []const u8,
+        code: []const u8,
+    }{
         .{ .name = "typescript", .code = user_service_typescript },
         .{ .name = "python", .code = user_service_python },
         .{ .name = "rust", .code = user_service_rust },
+    };
+    var clew = try Clew.init(allocator);
+    defer clew.deinit();
     std.debug.print("\n=== Multi-Language Performance ===\n", .{});
+    for (languages) |lang| {
         const start = std.time.milliTimestamp();
         var constraints = try clew.extractFromCode(lang.code, lang.name);
         defer constraints.deinit();
         const elapsed = std.time.milliTimestamp() - start;
         std.debug.print("{s:12} - {}ms, {} constraints\n",
             .{lang.name, elapsed, constraints.constraints.items.len});
+    }
     std.debug.print("✓ Performance comparison complete\n", .{});
+}
