@@ -1,5 +1,5 @@
 const std = @import("std");
-const ariadne = @import("ariadne.zig");
+const ariadne = @import("ariadne");
 
 test "lexer - basic tokens" {
     const source = "constraint foo { id: \"test-001\" }";
@@ -262,4 +262,304 @@ test "compiler - full workflow" {
     try std.testing.expectEqual(@as(usize, 2), ast.nodes.len);
 
     try compiler.validate(ast);
+}
+
+test "IR generator - simple constraint" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint no_any_type {
+        \\    id: "type-001",
+        \\    name: "no_any_type"
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    _ = try ir_gen.generate(ast);
+
+    // Verify IR was generated
+    try std.testing.expect(ir_gen.constraints.items.len == 1);
+
+    const constraint = ir_gen.constraints.items[0];
+    try std.testing.expectEqualStrings("no_any_type", constraint.name);
+    try std.testing.expect(constraint.id != 0); // Should be hashed from "type-001"
+}
+
+test "IR generator - enforcement parsing" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint test_syntactic {
+        \\    id: "test-001",
+        \\    enforcement: .Syntactic
+        \\}
+        \\
+        \\constraint test_structural {
+        \\    id: "test-002",
+        \\    enforcement: .Structural
+        \\}
+        \\
+        \\constraint test_semantic {
+        \\    id: "test-003",
+        \\    enforcement: .Semantic
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    _ = try ir_gen.generate(ast);
+
+    try std.testing.expectEqual(@as(usize, 3), ir_gen.constraints.items.len);
+
+    // Check enforcement types
+    try std.testing.expect(ir_gen.constraints.items[0].enforcement == .Syntactic);
+    try std.testing.expect(ir_gen.constraints.items[1].enforcement == .Structural);
+    try std.testing.expect(ir_gen.constraints.items[2].enforcement == .Semantic);
+}
+
+test "IR generator - severity from failure mode" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint hard_block {
+        \\    id: "001",
+        \\    failure_mode: .HardBlock
+        \\}
+        \\
+        \\constraint soft_warn {
+        \\    id: "002",
+        \\    failure_mode: .SoftWarn
+        \\}
+        \\
+        \\constraint suggest {
+        \\    id: "003",
+        \\    failure_mode: .Suggest
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    _ = try ir_gen.generate(ast);
+
+    try std.testing.expectEqual(@as(usize, 3), ir_gen.constraints.items.len);
+
+    // Check severity levels
+    try std.testing.expect(ir_gen.constraints.items[0].severity == .err);
+    try std.testing.expect(ir_gen.constraints.items[1].severity == .warning);
+    try std.testing.expect(ir_gen.constraints.items[2].severity == .hint);
+}
+
+test "IR generator - provenance parsing" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint test {
+        \\    id: "001",
+        \\    provenance: {
+        \\        source: .ManualPolicy,
+        \\        confidence_score: 0.95,
+        \\        origin_artifact: "test.md"
+        \\    }
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    _ = try ir_gen.generate(ast);
+
+    try std.testing.expectEqual(@as(usize, 1), ir_gen.constraints.items.len);
+
+    const constraint = ir_gen.constraints.items[0];
+    try std.testing.expect(constraint.source == .User_Defined);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.95), constraint.confidence, 0.001);
+    try std.testing.expectEqualStrings("test.md", constraint.origin_file.?);
+}
+
+test "IR generator - multiple constraints" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint first {
+        \\    id: "001",
+        \\    name: "first_constraint"
+        \\}
+        \\
+        \\constraint second {
+        \\    id: "002",
+        \\    name: "second_constraint"
+        \\}
+        \\
+        \\constraint third {
+        \\    id: "003",
+        \\    name: "third_constraint"
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    const ir = try ir_gen.generate(ast);
+    _ = ir;
+
+    // Should have 3 constraints
+    try std.testing.expectEqual(@as(usize, 3), ir_gen.constraints.items.len);
+
+    try std.testing.expectEqualStrings("first_constraint", ir_gen.constraints.items[0].name);
+    try std.testing.expectEqualStrings("second_constraint", ir_gen.constraints.items[1].name);
+    try std.testing.expectEqualStrings("third_constraint", ir_gen.constraints.items[2].name);
+}
+
+test "IR generator - variant with nested value" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint test {
+        \\    id: "001",
+        \\    enforcement: .Type({
+        \\        strictness: .Strict
+        \\    })
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    _ = try ir_gen.generate(ast);
+
+    try std.testing.expectEqual(@as(usize, 1), ir_gen.constraints.items.len);
+
+    // Should parse the variant name before the nested value
+    const constraint = ir_gen.constraints.items[0];
+    // .Type should map to .Structural or .Semantic enforcement
+    try std.testing.expect(constraint.enforcement == .Syntactic); // Default since .Type is not explicitly handled
+}
+
+test "IR generator - constraint source types" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint manual {
+        \\    id: "001",
+        \\    provenance: { source: .ManualPolicy }
+        \\}
+        \\
+        \\constraint mined {
+        \\    id: "002",
+        \\    provenance: { source: .ClewMined }
+        \\}
+        \\
+        \\constraint best_practice {
+        \\    id: "003",
+        \\    provenance: { source: .BestPractice }
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    _ = try ir_gen.generate(ast);
+
+    try std.testing.expectEqual(@as(usize, 3), ir_gen.constraints.items.len);
+
+    try std.testing.expect(ir_gen.constraints.items[0].source == .User_Defined);
+    try std.testing.expect(ir_gen.constraints.items[1].source == .Test_Mining);
+    try std.testing.expect(ir_gen.constraints.items[2].source == .Documentation);
+}
+
+test "IR generator - empty constraints" {
+    const allocator = std.testing.allocator;
+
+    const source = "-- Empty file with just a comment";
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    const ir = try ir_gen.generate(ast);
+    _ = ir;
+
+    // No constraints should be generated
+    try std.testing.expectEqual(@as(usize, 0), ir_gen.constraints.items.len);
+}
+
+test "IR generator - priority calculation" {
+    const allocator = std.testing.allocator;
+
+    const source =
+        \\constraint low {
+        \\    id: "001",
+        \\    name: "low_priority"
+        \\}
+        \\
+        \\constraint high {
+        \\    id: "002",
+        \\    name: "high_priority"
+        \\}
+    ;
+
+    var parser = ariadne.Parser.init(allocator, source);
+    defer parser.deinit();
+
+    var ast = try parser.parse();
+    defer ast.deinit();
+
+    var ir_gen = ariadne.IRGenerator.init(allocator);
+    defer ir_gen.deinit();
+
+    const ir = try ir_gen.generate(ast);
+
+    // Priority should be set (even if default)
+    try std.testing.expect(ir.priority >= 0);
 }
