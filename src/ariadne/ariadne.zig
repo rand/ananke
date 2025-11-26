@@ -406,6 +406,10 @@ pub const Lexer = struct {
         return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_';
     }
 
+    fn isUpper(c: u8) bool {
+        return c >= 'A' and c <= 'Z';
+    }
+
     fn isAlphaNumeric(c: u8) bool {
         return isAlpha(c) or isDigit(c);
     }
@@ -443,7 +447,13 @@ pub const Parser = struct {
 
     pub fn parse(self: *Parser) !AST {
         var nodes = std.ArrayList(ASTNode){};
-        errdefer nodes.deinit(self.allocator);
+        errdefer {
+            // Clean up any nodes that were allocated before the error
+            for (nodes.items) |node| {
+                self.freeNode(node);
+            }
+            nodes.deinit(self.allocator);
+        }
 
         // Prime the pump
         try self.advance();
@@ -463,6 +473,31 @@ pub const Parser = struct {
             .nodes = try nodes.toOwnedSlice(self.allocator),
             .allocator = self.allocator,
         };
+    }
+
+    fn freeNode(self: *Parser, node: ASTNode) void {
+        switch (node) {
+            .module_decl => |decl| {
+                self.allocator.free(decl.name);
+            },
+            .import_stmt => |stmt| {
+                self.allocator.free(stmt.path);
+                self.allocator.free(stmt.symbols);
+            },
+            .constraint_def => |def| {
+                for (def.properties) |prop| {
+                    AST.freeValue(self.allocator, prop.value);
+                }
+                self.allocator.free(def.properties);
+            },
+            .public_const => |const_decl| {
+                AST.freeValue(self.allocator, const_decl.value);
+            },
+            .function_def => |func| {
+                self.allocator.free(func.params);
+            },
+            .comment => {},
+        }
     }
 
     fn parseTopLevel(self: *Parser) !ASTNode {
@@ -814,27 +849,47 @@ pub const Parser = struct {
 
         try path.appendSlice(self.allocator, start);
 
-        while (self.check(.dot)) {
-            // Peek ahead to see if this is followed by an identifier
-            // If not, it's probably part of an import like "std.{...}"
-            const saved_lexer = self.lexer;
-            _ = self.lexer.nextToken() catch break; // consume dot
-            const next_tok = self.lexer.nextToken() catch {
-                self.lexer = saved_lexer;
-                break;
-            };
+        // Handle dotted paths like "api.security" or "std.clew"
+        // The lexer tokenizes ".security" as a variant token, so we need to handle both:
+        // - .dot followed by identifier (when followed by non-alpha like {)
+        // - .variant tokens (which include the dot)
+        while (true) {
+            if (self.check(.variant)) {
+                // Variant token like ".security" - strip the leading dot and append
+                const variant_lexeme = self.current_token.lexeme;
+                if (variant_lexeme.len > 1 and variant_lexeme[0] == '.') {
+                    try path.append(self.allocator, '.');
+                    try path.appendSlice(self.allocator, variant_lexeme[1..]);
+                    try self.advance();
+                } else {
+                    break;
+                }
+            } else if (self.check(.dot)) {
+                // Peek ahead to see if next token is identifier
+                const saved_current = self.current_token;
+                const saved_previous = self.previous_token;
+                const saved_lexer = self.lexer;
 
-            // If next token after dot is not identifier, stop here
-            if (next_tok.type != .identifier) {
+                _ = try self.advance(); // consume dot
+                const is_identifier = self.check(.identifier);
+
+                // Restore parser state
+                self.current_token = saved_current;
+                self.previous_token = saved_previous;
                 self.lexer = saved_lexer;
+
+                if (!is_identifier) {
+                    break;
+                }
+
+                // Actually consume dot and identifier
+                _ = try self.advance();
+                try path.append(self.allocator, '.');
+                const segment = try self.expectIdentifier();
+                try path.appendSlice(self.allocator, segment);
+            } else {
                 break;
             }
-
-            // Otherwise, it's part of the path - actually consume the dot
-            _ = try self.advance();
-            try path.append(self.allocator, '.');
-            const segment = try self.expectIdentifier();
-            try path.appendSlice(self.allocator, segment);
         }
 
         return try self.allocator.dupe(u8, path.items);
@@ -1127,9 +1182,15 @@ pub const AST = struct {
                     self.allocator.free(stmt.symbols);
                 },
                 .constraint_def => |def| {
+                    // Free properties recursively
+                    for (def.properties) |prop| {
+                        freeValue(self.allocator, prop.value);
+                    }
                     self.allocator.free(def.properties);
                 },
-                .public_const => {},
+                .public_const => |const_decl| {
+                    freeValue(self.allocator, const_decl.value);
+                },
                 .function_def => |func| {
                     self.allocator.free(func.params);
                 },
@@ -1137,6 +1198,28 @@ pub const AST = struct {
             }
         }
         self.allocator.free(self.nodes);
+    }
+
+    fn freeValue(allocator: std.mem.Allocator, value: Value) void {
+        switch (value) {
+            .array => |arr| {
+                for (arr) |item| {
+                    freeValue(allocator, item);
+                }
+                allocator.free(arr);
+            },
+            .object => |obj| {
+                for (obj) |prop| {
+                    freeValue(allocator, prop.value);
+                }
+                allocator.free(obj);
+            },
+            .variant_with_value => |vwv| {
+                freeValue(allocator, vwv.value.*);
+                allocator.destroy(vwv.value);
+            },
+            else => {},
+        }
     }
 };
 
