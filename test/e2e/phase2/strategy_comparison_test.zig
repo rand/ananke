@@ -49,7 +49,6 @@ test "Strategy: tree_sitter_only extracts AST constraints" {
     
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer extractor.deinit();
-    defer extractor.deinit();
     var result = try extractor.extract(comprehensive_typescript, "typescript");
     defer result.deinitFull(allocator);
     std.debug.print("\n=== Strategy: tree_sitter_only ===\n", .{});
@@ -76,7 +75,6 @@ test "Strategy: pattern_only extracts pattern constraints" {
     const allocator = testing.allocator;
 
     var extractor = try HybridExtractor.init(allocator, .pattern_only);
-    defer extractor.deinit();
     defer extractor.deinit();
     var result = try extractor.extract(comprehensive_typescript, "typescript");
     defer result.deinitFull(allocator);
@@ -105,7 +103,6 @@ test "Strategy: tree_sitter_with_fallback prefers AST" {
 
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_with_fallback);
     defer extractor.deinit();
-    defer extractor.deinit();
     var result = try extractor.extract(comprehensive_typescript, "typescript");
     defer result.deinitFull(allocator);
 
@@ -129,7 +126,6 @@ test "Strategy: combined merges AST and patterns" {
     const allocator = testing.allocator;
 
     var extractor = try HybridExtractor.init(allocator, .combined);
-    defer extractor.deinit();
     defer extractor.deinit();
     var result = try extractor.extract(comprehensive_typescript, "typescript");
     defer result.deinitFull(allocator);
@@ -161,6 +157,7 @@ test "Strategy: combined merges AST and patterns" {
 }
 // Strategy Comparison: Coverage
 test "Strategy Comparison: Combined has best coverage" {
+    const allocator = testing.allocator;
     std.debug.print("\n=== Coverage Comparison ===\n", .{});
     // Extract with all strategies
     var ts_only = try HybridExtractor.init(allocator, .tree_sitter_only);
@@ -194,6 +191,7 @@ test "Strategy Comparison: Combined has best coverage" {
 }
 // Confidence Score Analysis
 test "Strategy Comparison: Confidence score distribution" {
+    const allocator = testing.allocator;
     std.debug.print("\n=== Confidence Distribution by Strategy ===\n", .{});
     const strategies = [_]struct {
         name: []const u8,
@@ -205,19 +203,22 @@ test "Strategy Comparison: Confidence score distribution" {
     };
     for (strategies) |strat| {
         var extractor = try HybridExtractor.init(allocator, strat.strategy);
-    defer extractor.deinit();
+        defer extractor.deinit();
         var result = try extractor.extract(comprehensive_typescript, "typescript");
         defer result.deinitFull(allocator);
         if (result.constraints.len == 0) {
             std.debug.print("\n{s}: No constraints\n", .{strat.name});
             continue;
+        }
         // Calculate min, max, average confidence
         var min_conf: f32 = 1.0;
         var max_conf: f32 = 0.0;
         var total_conf: f32 = 0.0;
+        for (result.constraints) |c| {
             if (c.confidence < min_conf) min_conf = c.confidence;
             if (c.confidence > max_conf) max_conf = c.confidence;
             total_conf += c.confidence;
+        }
         const avg_conf = total_conf / @as(f32, @floatFromInt(result.constraints.len));
         std.debug.print("\n{s}:\n", .{strat.name});
         std.debug.print("  Min: {d:.2}, Max: {d:.2}, Avg: {d:.2}\n",
@@ -239,33 +240,49 @@ test "Strategy: Fallback for unsupported language" {
         .{ts_result.tree_sitter_available, ts_result.constraints.len});
     try testing.expect(!ts_result.tree_sitter_available);
     // tree_sitter_with_fallback should fall back to patterns
+    var with_fallback = try HybridExtractor.init(allocator, .tree_sitter_with_fallback);
+    defer with_fallback.deinit();
     var fallback_result = try with_fallback.extract(kotlin_code, "kotlin");
+    defer fallback_result.deinitFull(allocator);
     std.debug.print("tree_sitter_with_fallback - Available: {}, Count: {}\n",
         .{fallback_result.tree_sitter_available, fallback_result.constraints.len});
     try testing.expect(!fallback_result.tree_sitter_available);
     std.debug.print("✓ Fallback behavior verified\n", .{});
+}
 // Deduplication in Combined Strategy
 test "Strategy: Combined deduplicates constraints" {
+    const allocator = testing.allocator;
+    var combined = try HybridExtractor.init(allocator, .combined);
+    defer combined.deinit();
     var result = try combined.extract(comprehensive_typescript, "typescript");
+    defer result.deinitFull(allocator);
     std.debug.print("\n=== Deduplication Test ===\n", .{});
     std.debug.print("Total constraints: {}\n", .{result.constraints.len});
     // Check for exact duplicates (same name and kind)
     var seen = std.StringHashMap(void).init(allocator);
-    defer seen.deinit();
+    defer {
+        var iter = seen.keyIterator();
+        while (iter.next()) |key| {
+            allocator.free(key.*);
+        }
+        seen.deinit();
+    }
     var duplicate_count: usize = 0;
     for (result.constraints) |c| {
-        const key = try std.fmt.allocPrint(allocator, "{s}_{s}", 
+        const key = try std.fmt.allocPrint(allocator, "{s}_{s}",
             .{c.name, @tagName(c.kind)});
-        defer allocator.free(key);
         if (seen.contains(key)) {
             duplicate_count += 1;
             std.debug.print("  Duplicate: {s}\n", .{key});
-        try seen.put(try allocator.dupe(u8, key), {});
-    // Clean up seen keys
-    var iter = seen.keyIterator();
-    while (iter.next()) |key| {
-        allocator.free(key.*);
+            allocator.free(key);
+        } else {
+            try seen.put(key, {});
+        }
+    }
     std.debug.print("Duplicates found: {}\n", .{duplicate_count});
     if (duplicate_count == 0) {
         std.debug.print("✓ No duplicates - deduplication working\n", .{});
+    } else {
         std.debug.print("⚠ Found {} duplicates\n", .{duplicate_count});
+    }
+}
