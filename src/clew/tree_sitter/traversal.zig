@@ -3,6 +3,79 @@ const parser = @import("parser.zig");
 const Node = parser.Node;
 const Allocator = std.mem.Allocator;
 
+// ============================================================================
+// Ring Queue - O(1) FIFO queue for BFS traversal
+// ============================================================================
+
+/// High-performance ring buffer queue with O(1) enqueue/dequeue.
+/// Replaces ArrayList.orderedRemove(0) which is O(n).
+fn RingQueue(comptime T: type) type {
+    return struct {
+        const Self = @This();
+        
+        items: []T,
+        head: usize,
+        tail: usize,
+        count: usize,
+        allocator: Allocator,
+        
+        fn init(allocator: Allocator, initial_capacity: usize) !Self {
+            const capacity = std.math.ceilPowerOfTwo(usize, @max(initial_capacity, 4)) catch return error.OutOfMemory;
+            const items = try allocator.alloc(T, capacity);
+            return Self{
+                .items = items,
+                .head = 0,
+                .tail = 0,
+                .count = 0,
+                .allocator = allocator,
+            };
+        }
+        
+        fn deinit(self: *Self) void {
+            self.allocator.free(self.items);
+        }
+        
+        fn enqueue(self: *Self, item: T) !void {
+            if (self.count == self.items.len) {
+                try self.grow();
+            }
+            self.items[self.tail] = item;
+            self.tail = (self.tail + 1) & (self.items.len - 1);
+            self.count += 1;
+        }
+        
+        fn dequeue(self: *Self) !T {
+            if (self.count == 0) return error.EmptyQueue;
+            const item = self.items[self.head];
+            self.head = (self.head + 1) & (self.items.len - 1);
+            self.count -= 1;
+            return item;
+        }
+        
+        fn isEmpty(self: *Self) bool {
+            return self.count == 0;
+        }
+        
+        fn grow(self: *Self) !void {
+            const old_capacity = self.items.len;
+            const new_capacity = old_capacity * 2;
+            var new_items = try self.allocator.alloc(T, new_capacity);
+            
+            var i: usize = 0;
+            var current = self.head;
+            while (i < self.count) : (i += 1) {
+                new_items[i] = self.items[current];
+                current = (current + 1) & (old_capacity - 1);
+            }
+            
+            self.allocator.free(self.items);
+            self.items = new_items;
+            self.head = 0;
+            self.tail = self.count;
+        }
+    };
+}
+
 /// Visitor callback for AST traversal
 /// Returns true to continue traversal, false to stop
 pub const VisitorFn = *const fn (node: Node, depth: u32, context: ?*anyopaque) anyerror!bool;
@@ -84,20 +157,21 @@ pub const Traversal = struct {
         _ = try visitor(node, depth, context);
     }
 
-    /// Level-order (breadth-first) traversal
+    /// Level-order (breadth-first) traversal using O(1) ring buffer queue.
+    /// Replaces O(n) ArrayList.orderedRemove(0) with O(1) dequeue operation.
     fn traverseLevelOrder(
         self: Traversal,
         root: Node,
         visitor: VisitorFn,
         context: ?*anyopaque,
     ) !void {
-        var queue = std.ArrayList(struct { node: Node, depth: u32 }){};
-        defer queue.deinit(self.allocator);
+        var queue = try RingQueue(struct { node: Node, depth: u32 }).init(self.allocator, 16);
+        defer queue.deinit();
 
-        try queue.append(self.allocator, .{ .node = root, .depth = 0 });
+        try queue.enqueue(.{ .node = root, .depth = 0 });
 
-        while (queue.items.len > 0) {
-            const item = queue.orderedRemove(0);
+        while (!queue.isEmpty()) {
+            const item = try queue.dequeue();
             const should_continue = try visitor(item.node, item.depth, context);
             if (!should_continue) return;
 
@@ -106,7 +180,7 @@ pub const Traversal = struct {
             var i: u32 = 0;
             while (i < child_count) : (i += 1) {
                 if (item.node.namedChild(i)) |child| {
-                    try queue.append(self.allocator, .{ .node = child, .depth = item.depth + 1 });
+                    try queue.enqueue(.{ .node = child, .depth = item.depth + 1 });
                 }
             }
         }
@@ -134,9 +208,9 @@ pub const Traversal = struct {
         };
 
         const visitor = struct {
-            fn visit(node: Node, depth: u32, context: ?*anyopaque) !bool {
+            fn visit(node: Node, depth: u32, context_ptr: ?*anyopaque) !bool {
                 _ = depth;
-                const c: *Context = @ptrCast(@alignCast(context.?));
+                const c: *Context = @ptrCast(@alignCast(context_ptr.?));
                 if (c.predicate(node)) {
                     try c.results.append(c.allocator, node);
                 }
@@ -165,9 +239,9 @@ pub const Traversal = struct {
         };
 
         const visitor = struct {
-            fn visit(node: Node, depth: u32, context: ?*anyopaque) !bool {
+            fn visit(node: Node, depth: u32, context_ptr: ?*anyopaque) !bool {
                 _ = depth;
-                const c: *Context = @ptrCast(@alignCast(context.?));
+                const c: *Context = @ptrCast(@alignCast(context_ptr.?));
                 if (c.predicate(node)) {
                     c.result = node;
                     return false; // Stop traversal
@@ -201,9 +275,9 @@ pub const Traversal = struct {
         errdefer ctx.results.deinit(self.allocator);
 
         const visitor = struct {
-            fn visit(node: Node, depth: u32, context: ?*anyopaque) !bool {
+            fn visit(node: Node, depth: u32, context_ptr: ?*anyopaque) !bool {
                 _ = depth;
-                const c: *Context = @ptrCast(@alignCast(context.?));
+                const c: *Context = @ptrCast(@alignCast(context_ptr.?));
                 if (std.mem.eql(u8, node.nodeType(), c.node_type)) {
                     try c.results.append(c.allocator, node);
                 }
@@ -239,8 +313,8 @@ pub const Traversal = struct {
         };
 
         const visitor = struct {
-            fn visit(node: Node, depth: u32, context: ?*anyopaque) !bool {
-                const c: *Context = @ptrCast(@alignCast(context.?));
+            fn visit(node: Node, depth: u32, context_ptr: ?*anyopaque) !bool {
+                const c: *Context = @ptrCast(@alignCast(context_ptr.?));
 
                 // Print indentation
                 var i: u32 = 0;
