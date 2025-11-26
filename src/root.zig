@@ -25,6 +25,7 @@ pub const types = struct {
 pub const utils = struct {
     pub const ring_queue = @import("utils/ring_queue.zig");
     pub const RingQueue = ring_queue.RingQueue;
+    pub const StringInterner = @import("utils/string_interner.zig").StringInterner;
 };
 
 // Re-export commonly used types at top level for convenience
