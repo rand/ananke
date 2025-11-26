@@ -36,6 +36,7 @@
 
 pub mod ffi;
 pub mod modal_client;
+pub mod python;
 
 use anyhow::{Context, Result};
 use lru::LruCache;

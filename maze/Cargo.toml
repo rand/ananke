@@ -74,6 +74,10 @@ xxhash-rust = { version = "0.8", features = ["xxh3"] }
 # LRU cache
 lru = "0.12"
 
+# Python bindings
+pyo3 = { version = "0.20", features = ["extension-module", "abi3-py311"] }
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 mockito = "1.7"
