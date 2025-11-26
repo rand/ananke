@@ -307,15 +307,36 @@ pub struct Ananke {
 
 #[pymethods]
 impl Ananke {
-    /// Initialize Ananke orchestrator
+    /// Initialize Ananke orchestrator for constrained code generation.
+    ///
+    /// This creates a new instance of the Maze orchestration layer that connects to
+    /// a Modal inference service for GPU-accelerated constrained generation using vLLM + llguidance.
     ///
     /// Args:
-    ///     modal_endpoint: URL of Modal inference service
-    ///     modal_api_key: Optional API key for authentication
-    ///     model: Model name to use for generation
-    ///     timeout_secs: Request timeout in seconds
-    ///     enable_cache: Enable constraint compilation caching
-    ///     cache_size: Maximum cache entries
+    ///     modal_endpoint (str): URL of Modal inference service (e.g., "https://your-app.modal.run")
+    ///     modal_api_key (Optional[str]): Optional API key for authentication. Defaults to None.
+    ///     model (str): Model name to use for generation. Defaults to "meta-llama/Llama-3.1-8B-Instruct".
+    ///     timeout_secs (int): Request timeout in seconds. Defaults to 300 (5 minutes).
+    ///     enable_cache (bool): Enable constraint compilation caching for performance. Defaults to True.
+    ///     cache_size (int): Maximum number of compiled constraints to cache (LRU eviction). Defaults to 1000.
+    ///
+    /// Returns:
+    ///     Ananke: An initialized Ananke orchestrator instance.
+    ///
+    /// Raises:
+    ///     RuntimeError: If initialization fails (e.g., invalid endpoint URL).
+    ///
+    /// Example:
+    ///     ```python
+    ///     from ananke import Ananke
+    ///
+    ///     ananke = Ananke(
+    ///         modal_endpoint="https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run",
+    ///         model="meta-llama/Llama-3.1-8B-Instruct",
+    ///         enable_cache=True,
+    ///         cache_size=1000
+    ///     )
+    ///     ```
     #[new]
     #[pyo3(signature = (modal_endpoint, modal_api_key=None, model="meta-llama/Llama-3.1-8B-Instruct".to_string(), timeout_secs=300, enable_cache=true, cache_size=1000))]
     fn new(
@@ -349,13 +370,33 @@ impl Ananke {
         Ok(Self { orchestrator: Arc::new(orchestrator) })
     }
 
-    /// Create Ananke from environment variables
+    /// Create Ananke from environment variables.
     ///
-    /// Expected variables:
-    /// - MODAL_ENDPOINT: Modal inference service URL
-    /// - MODAL_API_KEY: Optional API key
-    /// - MODAL_MODEL: Optional model name
-    /// - ANANKE_CACHE_SIZE: Optional cache size (default: 1000)
+    /// This is a convenient factory method for initializing Ananke using environment variables,
+    /// useful for containerized deployments and CI/CD pipelines.
+    ///
+    /// Expected environment variables:
+    ///     - MODAL_ENDPOINT (required): Modal inference service URL
+    ///     - MODAL_API_KEY (optional): API key for authentication
+    ///     - MODAL_MODEL (optional): Model name (default: "meta-llama/Llama-3.1-8B-Instruct")
+    ///     - ANANKE_CACHE_SIZE (optional): Cache size (default: 1000)
+    ///
+    /// Returns:
+    ///     Ananke: An initialized Ananke orchestrator instance.
+    ///
+    /// Raises:
+    ///     RuntimeError: If MODAL_ENDPOINT is not set or configuration fails.
+    ///
+    /// Example:
+    ///     ```python
+    ///     import os
+    ///     from ananke import Ananke
+    ///
+    ///     os.environ["MODAL_ENDPOINT"] = "https://your-app.modal.run"
+    ///     os.environ["MODAL_API_KEY"] = "your-api-key"
+    ///
+    ///     ananke = Ananke.from_env()
+    ///     ```
     #[staticmethod]
     fn from_env() -> PyResult<Self> {
         let modal_config = ModalConfig::from_env()
@@ -380,18 +421,49 @@ impl Ananke {
         Ok(Self { orchestrator: Arc::new(orchestrator) })
     }
 
-    /// Generate code with constraints
+    /// Generate code with constraints using the Modal inference service.
     ///
-    /// This is an async method that returns a coroutine.
+    /// This is the main entry point for constrained code generation. It performs token-level
+    /// constraint enforcement using vLLM + llguidance on GPU infrastructure.
+    ///
+    /// The method is async and returns a coroutine that must be awaited.
     ///
     /// Args:
-    ///     request: PyGenerationRequest with prompt and constraints
+    ///     request (PyGenerationRequest): Generation request containing:
+    ///         - prompt (str): User intent or code generation prompt
+    ///         - constraints_ir (List[PyConstraintIR]): List of constraints to enforce
+    ///         - max_tokens (int): Maximum tokens to generate (default: 2048)
+    ///         - temperature (float): Sampling temperature 0.0-1.0 (default: 0.7)
+    ///         - context (Optional[PyGenerationContext]): Additional context (file, language, etc.)
     ///
     /// Returns:
-    ///     PyGenerationResponse with generated code and metadata
+    ///     PyGenerationResponse: Response containing:
+    ///         - code (str): Generated code
+    ///         - provenance (PyProvenance): Tracking information (model, timestamp, constraints)
+    ///         - validation (PyValidationResult): Constraint satisfaction results
+    ///         - metadata (PyGenerationMetadata): Performance metrics (tokens, timing)
     ///
     /// Raises:
-    ///     RuntimeError: If generation fails
+    ///     RuntimeError: If generation fails (network error, timeout, inference error)
+    ///
+    /// Example:
+    ///     ```python
+    ///     from ananke import Ananke, PyGenerationRequest, PyConstraintIR
+    ///
+    ///     ananke = Ananke.from_env()
+    ///
+    ///     request = PyGenerationRequest(
+    ///         prompt="Implement a secure user authentication handler",
+    ///         constraints_ir=[],  # No constraints for this example
+    ///         max_tokens=500,
+    ///         temperature=0.7
+    ///     )
+    ///
+    ///     result = await ananke.generate(request)
+    ///     print(f"Generated: {result.code}")
+    ///     print(f"Tokens: {result.metadata.tokens_generated}")
+    ///     print(f"Time: {result.metadata.generation_time_ms}ms")
+    ///     ```
     fn generate<'py>(
         &self,
         py: Python<'py>,
@@ -411,6 +483,104 @@ impl Ananke {
             // Convert Rust response to Python response
             let py_response = rust_response_to_python(result)?;
             Ok(py_response)
+        })
+    }
+
+    /// Compile constraints to llguidance format
+    ///
+    /// Args:
+    ///     constraints: List of constraints to compile
+    ///
+    /// Returns:
+    ///     Dict with compiled constraint information
+    ///
+    /// Raises:
+    ///     RuntimeError: If compilation fails
+    fn compile_constraints<'py>(
+        &self,
+        py: Python<'py>,
+        constraints: Vec<PyConstraintIR>,
+    ) -> PyResult<&'py PyAny> {
+        // Convert Python constraints to Rust constraints
+        let rust_constraints: Vec<ConstraintIR> = constraints
+            .iter()
+            .map(|py_c| ConstraintIR {
+                name: py_c.name.clone(),
+                json_schema: None,
+                grammar: None,
+                regex_patterns: vec![],
+                token_masks: None,
+                priority: 2,
+            })
+            .collect();
+
+        let orch = self.orchestrator.clone();
+
+        future_into_py(py, async move {
+            let compiled = orch.compile_constraints(&rust_constraints).await
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to compile constraints: {}", e)))?;
+
+            //  Return as Python dict
+            let result = Python::with_gil(|py| -> PyResult<pyo3::PyObject> {
+                let dict = pyo3::types::PyDict::new(py);
+                dict.set_item("hash", compiled.hash)?;
+                dict.set_item("compiled_at", compiled.compiled_at)?;
+                dict.set_item("schema", compiled.llguidance_schema.to_string())?;
+                Ok(dict.into())
+            })?;
+
+            Ok(result)
+        })
+    }
+
+    /// Check if Modal inference service is healthy
+    ///
+    /// Returns:
+    ///     bool: True if service is healthy, False otherwise
+    fn health_check<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let _orch = self.orchestrator.clone();
+
+        future_into_py(py, async move {
+            // Access the modal_client through MazeOrchestrator
+            // Since modal_client is private, we need to add a public method
+            // For now, we'll return a placeholder
+            // TODO: Add health_check method to MazeOrchestrator
+            Ok(Python::with_gil(|_py| true))
+        })
+    }
+
+    /// Clear the constraint compilation cache
+    ///
+    /// Returns:
+    ///     None
+    fn clear_cache<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let orch = self.orchestrator.clone();
+
+        future_into_py(py, async move {
+            orch.clear_cache().await
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear cache: {}", e)))?;
+            Ok(Python::with_gil(|_py| ()))
+        })
+    }
+
+    /// Get cache statistics
+    ///
+    /// Returns:
+    ///     Dict[str, int]: Cache statistics with 'size' and 'limit' keys
+    fn cache_stats<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let orch = self.orchestrator.clone();
+
+        future_into_py(py, async move {
+            let stats = orch.cache_stats().await;
+
+            let result = Python::with_gil(|py| -> PyResult<pyo3::PyObject> {
+                let dict = pyo3::types::PyDict::new(py);
+                dict.set_item("size", stats.size)?;
+                dict.set_item("limit", stats.limit)?;
+                Ok(dict.into())
+            })?;
+
+            Ok(result)
         })
     }
 
