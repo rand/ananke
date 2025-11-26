@@ -46,7 +46,8 @@ fn extractHybrid(
     errdefer all_constraints.deinit(constraint_allocator);
 
     // 1. Extract AST-based constraints using HybridExtractor
-    var hybrid_extractor = HybridExtractor.init(allocator, .tree_sitter_with_fallback);
+    var hybrid_extractor = try HybridExtractor.init(allocator, .tree_sitter_with_fallback);
+    defer hybrid_extractor.deinit();
 
     // Normalize language name for tree-sitter
     const ts_language = if (std.mem.eql(u8, language, "ts"))
@@ -57,19 +58,11 @@ fn extractHybrid(
         language;
 
     var ast_result = try hybrid_extractor.extract(source, ts_language);
-    // Note: ast_result owns its constraint strings (allocated with allocator)
-    // We'll transfer ownership by duplicating to constraint_allocator, then clean up originals
-    defer {
-        // Free the AST constraint strings (allocated with regular allocator)
-        for (ast_result.constraints) |constraint| {
-            allocator.free(constraint.name);
-            allocator.free(constraint.description);
-        }
-        // Free the constraints slice
-        ast_result.deinit(allocator);
-    }
+    // NOTE: With string interning, strings are owned by hybrid_extractor.interner
+    // Don't free individual strings - they'll be freed when hybrid_extractor.deinit() is called
+    defer ast_result.deinit(allocator);
 
-    // Add AST constraints to our collection (duplicate strings for ownership)
+    // Add AST constraints to our collection (duplicate strings to constraint_allocator for ownership)
     for (ast_result.constraints) |ast_constraint| {
         const new_constraint = @import("ananke").types.constraint.Constraint{
             .kind = ast_constraint.kind,
@@ -99,32 +92,19 @@ fn extractHybrid(
     // The arena will be freed when Clew.deinit() is called, so we don't manually free
     const pattern_constraints = try structure.toConstraints(constraint_allocator);
 
-    // 3. Merge pattern constraints, avoiding duplicates
+    // Merge pattern constraints, avoiding duplicates
     for (pattern_constraints) |pattern_constraint| {
+        // Simple duplicate check based on name
         var is_duplicate = false;
-
-        // Check for duplicates based on name and kind
         for (all_constraints.items) |existing| {
-            if (std.mem.eql(u8, existing.name, pattern_constraint.name) and
-                existing.kind == pattern_constraint.kind) {
+            if (std.mem.eql(u8, existing.name, pattern_constraint.name)) {
                 is_duplicate = true;
                 break;
             }
         }
 
         if (!is_duplicate) {
-            // Duplicate the constraint for our collection
-            const new_constraint = @import("ananke").types.constraint.Constraint{
-                .kind = pattern_constraint.kind,
-                .severity = pattern_constraint.severity,
-                .name = try constraint_allocator.dupe(u8, pattern_constraint.name),
-                .description = try constraint_allocator.dupe(u8, pattern_constraint.description),
-                .source = pattern_constraint.source,
-                .confidence = pattern_constraint.confidence,
-                .frequency = pattern_constraint.frequency,
-                .origin_line = pattern_constraint.origin_line,
-            };
-            try all_constraints.append(constraint_allocator, new_constraint);
+            try all_constraints.append(constraint_allocator, pattern_constraint);
         }
     }
 

@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const Constraint = @import("ananke").types.constraint.Constraint;
 const ConstraintKind = @import("ananke").types.constraint.ConstraintKind;
 const Severity = @import("ananke").types.constraint.Severity;
+const StringInterner = @import("ananke").utils.StringInterner;
 
 // Import tree-sitter components
 const tree_sitter = @import("tree_sitter");
@@ -38,11 +39,11 @@ pub const ExtractionResult = struct {
     }
 
     /// Free all constraint strings and the slice (use when not transferring ownership)
+    /// NOTE: With string interning, individual strings are NOT freed here
+    /// The StringInterner owns all interned strings
     pub fn deinitFull(self: *ExtractionResult, allocator: Allocator) void {
-        for (self.constraints) |constraint| {
-            allocator.free(constraint.name);
-            allocator.free(constraint.description);
-        }
+        // When using string interning, we DON'T free individual strings
+        // They're owned by the interner and freed in its deinit()
         allocator.free(self.constraints);
         if (self.tree_sitter_errors) |errors| {
             allocator.free(errors);
@@ -54,12 +55,18 @@ pub const ExtractionResult = struct {
 pub const HybridExtractor = struct {
     allocator: Allocator,
     strategy: ExtractionStrategy,
+    interner: StringInterner,
 
-    pub fn init(allocator: Allocator, strategy: ExtractionStrategy) HybridExtractor {
+    pub fn init(allocator: Allocator, strategy: ExtractionStrategy) !HybridExtractor {
         return .{
             .allocator = allocator,
             .strategy = strategy,
+            .interner = try StringInterner.init(allocator),
         };
+    }
+
+    pub fn deinit(self: *HybridExtractor) void {
+        self.interner.deinit();
     }
 
     /// Extract constraints using the configured strategy
@@ -188,10 +195,8 @@ pub const HybridExtractor = struct {
         // Always run pattern-based extraction for additional coverage
         const pattern_constraints = try self.extractWithPatterns(source, language_name);
         defer {
-            // Free the pattern constraints slice
+            // Free the pattern constraints slice (strings are owned by interner)
             self.allocator.free(pattern_constraints);
-            // NOTE: Individual constraint strings are freed separately to avoid double-free
-            // See cleanup loop below for used constraints and duplicate cleanup
         }
 
         // Track which pattern constraints are used to avoid memory leaks
@@ -223,15 +228,8 @@ pub const HybridExtractor = struct {
             }
         }
 
-        // Free strings for unused (duplicate) pattern constraints to prevent memory leaks
-        // Used constraints stay alive because their copies are in all_constraints,
-        // and they will be freed via deinitFull() when the result is cleaned up
-        for (pattern_constraints, 0..) |constraint, idx| {
-            if (!pattern_constraints_used.items[idx]) {
-                self.allocator.free(constraint.name);
-                self.allocator.free(constraint.description);
-            }
-        }
+        // NOTE: With string interning, we don't free unused constraint strings
+        // The interner owns all strings and will free them in its deinit()
 
         return ExtractionResult{
             .constraints = try all_constraints.toOwnedSlice(self.allocator),
@@ -279,15 +277,21 @@ pub const HybridExtractor = struct {
         }
 
         for (func_ids) |func_id| {
+            // OPTIMIZATION: Intern both name and description template
+            const interned_name = try self.interner.intern(func_id.name);
+            const description = try std.fmt.allocPrint(
+                self.allocator,
+                "Function declaration: {s}",
+                .{func_id.name},
+            );
+            defer self.allocator.free(description);
+            const interned_desc = try self.interner.intern(description);
+            
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
-                .name = try self.allocator.dupe(u8, func_id.name),
-                .description = try std.fmt.allocPrint(
-                    self.allocator,
-                    "Function declaration: {s}",
-                    .{func_id.name},
-                ),
+                .name = interned_name,
+                .description = interned_desc,
                 .source = .AST_Pattern,
                 .confidence = 0.95, // Tree-sitter AST has higher confidence
                 .frequency = 1,
@@ -306,15 +310,21 @@ pub const HybridExtractor = struct {
         }
 
         for (type_ids) |type_id| {
+            // OPTIMIZATION: Intern type names and descriptions
+            const interned_name = try self.interner.intern(type_id.name);
+            const description = try std.fmt.allocPrint(
+                self.allocator,
+                "Type declaration: {s}",
+                .{type_id.name},
+            );
+            defer self.allocator.free(description);
+            const interned_desc = try self.interner.intern(description);
+            
             const constraint = Constraint{
                 .kind = .type_safety,
                 .severity = .info,
-                .name = try self.allocator.dupe(u8, type_id.name),
-                .description = try std.fmt.allocPrint(
-                    self.allocator,
-                    "Type declaration: {s}",
-                    .{type_id.name},
-                ),
+                .name = interned_name,
+                .description = interned_desc,
                 .source = .Type_System,
                 .confidence = 0.95,
                 .frequency = 1,
@@ -327,15 +337,21 @@ pub const HybridExtractor = struct {
         defer self.allocator.free(imports);
 
         if (imports.len > 0) {
+            // OPTIMIZATION: Intern common constraint name
+            const interned_name = try self.interner.intern("ast_imports");
+            const description = try std.fmt.allocPrint(
+                self.allocator,
+                "Code has {} import statements (AST)",
+                .{imports.len},
+            );
+            defer self.allocator.free(description);
+            const interned_desc = try self.interner.intern(description);
+            
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
-                .name = try self.allocator.dupe(u8, "ast_imports"),
-                .description = try std.fmt.allocPrint(
-                    self.allocator,
-                    "Code has {} import statements (AST)",
-                    .{imports.len},
-                ),
+                .name = interned_name,
+                .description = interned_desc,
                 .source = .AST_Pattern,
                 .confidence = 0.95,
                 .frequency = @intCast(imports.len),
@@ -354,11 +370,7 @@ pub const HybridExtractor = struct {
     ) ![]Constraint {
         var constraints = std.ArrayList(Constraint){};
         errdefer {
-            // Clean up any partially allocated constraints in case of error
-            for (constraints.items) |constraint| {
-                self.allocator.free(constraint.name);
-                self.allocator.free(constraint.description);
-            }
+            // With string interning, we DON'T free individual strings
             constraints.deinit(self.allocator);
         }
 
@@ -402,16 +414,22 @@ pub const HybridExtractor = struct {
             }
             try seen_patterns.put(try self.allocator.dupe(u8, key), {});
 
+            // OPTIMIZATION: Intern constraint name and description
+            const interned_name = try self.interner.intern(match.rule.description);
+            const description = try std.fmt.allocPrint(
+                self.allocator,
+                "{s} detected at line {} (pattern)",
+                .{ match.rule.description, match.line },
+            );
+            defer self.allocator.free(description);
+            const interned_desc = try self.interner.intern(description);
+
             // Create constraint from pattern match
             const constraint = Constraint{
                 .kind = match.rule.constraint_kind,
                 .severity = .info,
-                .name = try self.allocator.dupe(u8, match.rule.description),
-                .description = try std.fmt.allocPrint(
-                    self.allocator,
-                    "{s} detected at line {} (pattern)",
-                    .{ match.rule.description, match.line },
-                ),
+                .name = interned_name,
+                .description = interned_desc,
                 .source = .AST_Pattern,
                 .origin_line = match.line,
                 .confidence = 0.75, // Pattern matching has lower confidence than AST
@@ -421,6 +439,11 @@ pub const HybridExtractor = struct {
         }
 
         return try constraints.toOwnedSlice(self.allocator);
+    }
+    
+    /// Print string interning statistics for performance analysis
+    pub fn printInternerStats(self: *const HybridExtractor) void {
+        self.interner.printStats();
     }
 };
 
