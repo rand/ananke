@@ -137,7 +137,6 @@ test "Full Pipeline: TypeScript constraint quality checks" {
 
     var extractor = try HybridExtractor.init(allocator, .combined);
     defer extractor.deinit();
-    defer extractor.deinit();
     var result = try extractor.extract(typescript_real_world, "typescript");
     defer result.deinitFull(allocator);
 
@@ -205,7 +204,6 @@ test "Full Pipeline: Python metadata and provenance" {
 
     var extractor = try HybridExtractor.init(allocator, .combined);
     defer extractor.deinit();
-    defer extractor.deinit();
     var result = try extractor.extract(python_real_world, "python");
     defer result.deinitFull(allocator);
 
@@ -251,12 +249,11 @@ test "Full Pipeline: Very large source file" {
     defer clew.deinit();
     // Generate large source (repeat pattern 100 times)
     var large_source = try std.ArrayList(u8).initCapacity(allocator, 10000);
-    defer large_source.deinit();
+    defer large_source.deinit(allocator);
     var i: usize = 0;
     while (i < 100) : (i += 1) {
-        const writer = large_source.writer(allocator);
-        try writer.writeAll(typescript_real_world);
-        try large_source.append('\n');
+        try large_source.appendSlice(allocator, typescript_real_world);
+        try large_source.append(allocator, '\n');
     }
     const start = std.time.milliTimestamp();
     var constraints = try clew.extractFromCode(large_source.items, "typescript");

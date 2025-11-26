@@ -44,7 +44,6 @@ test "HybridExtractor: tree_sitter_only strategy succeeds for supported language
     const allocator = testing.allocator;
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer extractor.deinit();
-    defer extractor.deinit();
     var result = try extractor.extract(typescript_sample, "typescript");
     defer result.deinitFull(allocator);
     // Should succeed with tree-sitter
@@ -68,7 +67,6 @@ test "HybridExtractor: tree_sitter_only strategy fails gracefully for unsupporte
 
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer extractor.deinit();
-    defer extractor.deinit();
     var result = try extractor.extract(unsupported_language_sample, "kotlin");
     defer result.deinitFull(allocator);
 
@@ -82,7 +80,6 @@ test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
     const allocator = testing.allocator;
 
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
-    defer extractor.deinit();
     defer extractor.deinit();
     var result = try extractor.extract(typescript_sample, "typescript");
     defer result.deinitFull(allocator);
@@ -107,7 +104,6 @@ test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
     const allocator = testing.allocator;
 
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
-    defer extractor.deinit();
     defer extractor.deinit();
     var result = try extractor.extract(typescript_sample, "typescript");
     defer result.deinitFull(allocator);
@@ -335,17 +331,30 @@ test "HybridExtractor: handles empty source code" {
     try testing.expectEqual(ExtractionStrategy.combined, result.strategy_used);
 }
 test "HybridExtractor: handles malformed source code" {
+    const allocator = testing.allocator;
     const malformed = "function foo( { // incomplete";
+    var extractor = try HybridExtractor.init(allocator, .combined);
+    defer extractor.deinit();
     var result = try extractor.extract(malformed, "typescript");
+    defer result.deinitFull(allocator);
     // Tree-sitter should report parse error
     // Should have errors reported
+}
 test "HybridExtractor: handles very large source files" {
+    const allocator = testing.allocator;
     // Generate a large source file
-    var large_source = std.ArrayList(u8){};
+    var large_source = try std.ArrayList(u8).initCapacity(allocator, 10000);
     defer large_source.deinit(allocator);
     var i: usize = 0;
     while (i < 100) : (i += 1) {
         try large_source.appendSlice(allocator, typescript_sample);
         try large_source.append(allocator, '\n');
+    }
+
+    var extractor = try HybridExtractor.init(allocator, .combined);
+    defer extractor.deinit();
     var result = try extractor.extract(large_source.items, "typescript");
+    defer result.deinitFull(allocator);
     // Should handle large files successfully
+    try testing.expect(result.constraints.len > 0);
+}
