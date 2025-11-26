@@ -7,6 +7,9 @@ const root = @import("ananke");
 const Constraint = root.types.constraint.Constraint;
 const ConstraintIR = root.types.constraint.ConstraintIR;
 const ConstraintKind = root.types.constraint.ConstraintKind;
+const EnforcementType = root.types.constraint.EnforcementType;
+const Severity = root.types.constraint.Severity;
+const ConstraintSource = root.types.constraint.ConstraintSource;
 
 /// Ariadne DSL compiler
 pub const AriadneCompiler = struct {
@@ -934,22 +937,176 @@ pub const SemanticAnalyzer = struct {
 /// IR Generator - converts AST to ConstraintIR
 pub const IRGenerator = struct {
     allocator: std.mem.Allocator,
+    constraints: std.ArrayList(Constraint),
 
     pub fn init(allocator: std.mem.Allocator) IRGenerator {
-        return .{ .allocator = allocator };
+        return .{
+            .allocator = allocator,
+            .constraints = std.ArrayList(Constraint){},
+        };
     }
 
     pub fn deinit(self: *IRGenerator) void {
-        _ = self;
+        self.constraints.deinit(self.allocator);
     }
 
     pub fn generate(self: *IRGenerator, ast: AST) !ConstraintIR {
-        _ = self;
-        _ = ast;
+        // Extract all constraint definitions from AST
+        for (ast.nodes) |node| {
+            switch (node) {
+                .constraint_def => |def| {
+                    const constraint = try self.processConstraintDef(def);
+                    try self.constraints.append(self.allocator, constraint);
+                },
+                else => {}, // Skip module declarations, imports, etc.
+            }
+        }
 
-        // TODO: Implement full IR generation
-        // For now, return empty IR
-        return ConstraintIR{};
+        // Convert constraints to ConstraintIR
+        return try self.buildConstraintIR();
+    }
+
+    fn processConstraintDef(self: *IRGenerator, def: ConstraintDef) !Constraint {
+        var constraint = Constraint{
+            .id = 0, // Will be set from properties
+            .name = def.name,
+            .description = "",
+            .kind = .syntactic,
+            .severity = .err,
+        };
+
+        // Process properties to populate constraint fields
+        for (def.properties) |prop| {
+            try self.processProperty(&constraint, prop);
+        }
+
+        return constraint;
+    }
+
+    fn processProperty(self: *IRGenerator, constraint: *Constraint, prop: Property) !void {
+        const key = prop.key;
+
+        if (std.mem.eql(u8, key, "id")) {
+            // Extract constraint ID
+            if (prop.value == .string) {
+                // For now, use a hash of the string as the ID
+                constraint.id = std.hash.Wyhash.hash(0, prop.value.string);
+            }
+        } else if (std.mem.eql(u8, key, "name")) {
+            if (prop.value == .string) {
+                constraint.name = prop.value.string;
+            }
+        } else if (std.mem.eql(u8, key, "description")) {
+            if (prop.value == .string) {
+                constraint.description = prop.value.string;
+            }
+        } else if (std.mem.eql(u8, key, "enforcement")) {
+            // Parse enforcement type from variant
+            if (prop.value == .variant) {
+                constraint.enforcement = try self.parseEnforcement(prop.value.variant);
+            } else if (prop.value == .variant_with_value) {
+                constraint.enforcement = try self.parseEnforcement(prop.value.variant_with_value.name);
+            }
+        } else if (std.mem.eql(u8, key, "provenance")) {
+            // Parse provenance information
+            if (prop.value == .object) {
+                try self.parseProvenance(constraint, prop.value.object);
+            }
+        } else if (std.mem.eql(u8, key, "failure_mode")) {
+            // Parse failure mode to determine severity
+            if (prop.value == .variant) {
+                constraint.severity = try self.parseFailureMode(prop.value.variant);
+            } else if (prop.value == .variant_with_value) {
+                constraint.severity = try self.parseFailureMode(prop.value.variant_with_value.name);
+            }
+        }
+    }
+
+    fn parseEnforcement(self: *IRGenerator, variant: []const u8) !EnforcementType {
+        _ = self;
+        if (std.mem.eql(u8, variant, ".Syntactic")) {
+            return .Syntactic;
+        } else if (std.mem.eql(u8, variant, ".Structural")) {
+            return .Structural;
+        } else if (std.mem.eql(u8, variant, ".Semantic")) {
+            return .Semantic;
+        } else if (std.mem.eql(u8, variant, ".Performance")) {
+            return .Performance;
+        } else if (std.mem.eql(u8, variant, ".Security")) {
+            return .Security;
+        }
+        return .Syntactic; // Default
+    }
+
+    fn parseFailureMode(self: *IRGenerator, variant: []const u8) !Severity {
+        _ = self;
+        if (std.mem.eql(u8, variant, ".HardBlock")) {
+            return .err;
+        } else if (std.mem.eql(u8, variant, ".SoftWarn")) {
+            return .warning;
+        } else if (std.mem.eql(u8, variant, ".Warn")) {
+            return .warning;
+        } else if (std.mem.eql(u8, variant, ".AutoFix")) {
+            return .warning;
+        } else if (std.mem.eql(u8, variant, ".Suggest")) {
+            return .hint;
+        }
+        return .err; // Default
+    }
+
+    fn parseProvenance(self: *IRGenerator, constraint: *Constraint, properties: []const Property) !void {
+        for (properties) |prop| {
+            if (std.mem.eql(u8, prop.key, "source")) {
+                if (prop.value == .variant) {
+                    constraint.source = try self.parseConstraintSource(prop.value.variant);
+                }
+            } else if (std.mem.eql(u8, prop.key, "confidence_score")) {
+                if (prop.value == .number) {
+                    constraint.confidence = @floatCast(prop.value.number);
+                }
+            } else if (std.mem.eql(u8, prop.key, "origin_artifact")) {
+                if (prop.value == .string) {
+                    constraint.origin_file = prop.value.string;
+                }
+            }
+        }
+    }
+
+    fn parseConstraintSource(self: *IRGenerator, variant: []const u8) !ConstraintSource {
+        _ = self;
+        if (std.mem.eql(u8, variant, ".ManualPolicy")) {
+            return .User_Defined;
+        } else if (std.mem.eql(u8, variant, ".ClewMined")) {
+            return .Test_Mining;
+        } else if (std.mem.eql(u8, variant, ".BestPractice")) {
+            return .Documentation;
+        } else if (std.mem.eql(u8, variant, ".PerformancePolicy")) {
+            return .Telemetry;
+        }
+        return .User_Defined; // Default
+    }
+
+    fn buildConstraintIR(self: *IRGenerator) !ConstraintIR {
+        var ir = ConstraintIR{};
+
+        // For a basic implementation, we'll build a simple ConstraintIR
+        // In a full implementation, this would analyze the constraints and generate:
+        // - JSON Schema for type constraints
+        // - Grammar for syntactic constraints
+        // - Regex patterns for pattern matching
+        // - Token masks for forbidden/required tokens
+
+        // Set priority based on highest constraint priority
+        var max_priority: u32 = 0;
+        for (self.constraints.items) |constraint| {
+            const priority = constraint.getPriorityValue();
+            if (priority > max_priority) {
+                max_priority = priority;
+            }
+        }
+        ir.priority = max_priority;
+
+        return ir;
     }
 };
 

@@ -270,6 +270,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/ariadne/ariadne.zig"),
         .target = target,
     });
+    ariadne_mod.addImport("ananke", ananke_mod);
 
     // Now add imports to ananke_mod
     ananke_mod.addImport("clew", clew_mod);
@@ -1081,6 +1082,21 @@ pub fn build(b: *std.Build) void {
 
     const run_cli_integration_tests = b.addRunArtifact(cli_integration_tests);
 
+    // Ariadne DSL tests
+    const ariadne_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/ariadne/test_parser.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ariadne", .module = ariadne_mod },
+            },
+        }),
+    });
+    ariadne_tests.root_module.addImport("ananke", ananke_mod);
+
+    const run_ariadne_tests = b.addRunArtifact(ariadne_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -1109,6 +1125,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phase2_constraint_quality_tests.step);
     test_step.dependOn(&run_cli_tests.step);
     test_step.dependOn(&run_cli_integration_tests.step);
+    test_step.dependOn(&run_ariadne_tests.step);
 
     // E2E test step (can be run separately)
     const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
