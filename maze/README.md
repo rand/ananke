@@ -36,6 +36,92 @@ Maze is the Rust orchestration layer for Ananke that coordinates between Zig-bas
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Python API & CLI
+
+Maze provides Python bindings via PyO3 and a comprehensive CLI for easy integration:
+
+### Quick Start - Python
+
+```bash
+# Install Python package
+cd python
+pip install -e .
+
+# Set endpoint
+export ANANKE_MODAL_ENDPOINT="https://your-inference-service.modal.run"
+```
+
+```python
+import asyncio
+from ananke import Ananke, PyGenerationRequest, PyGenerationContext
+
+async def main():
+    # Initialize from environment
+    ananke = Ananke.from_env()
+
+    # Create request
+    request = PyGenerationRequest(
+        prompt="def fibonacci(n):\n    '''Calculate nth Fibonacci number'''",
+        constraints_ir=[],
+        max_tokens=200,
+        temperature=0.7,
+        context=PyGenerationContext(
+            current_file="example.py",
+            language="python",
+            project_root="."
+        )
+    )
+
+    # Generate
+    response = await ananke.generate(request)
+    print(response.code)
+
+asyncio.run(main())
+```
+
+### Quick Start - CLI
+
+```bash
+# Install CLI
+pip install -e .
+
+# Check configuration
+ananke config
+
+# Health check
+ananke health
+
+# Generate code
+ananke generate "def hello_world():" --max-tokens 50
+
+# Generate with JSON Schema constraints
+cat > user_schema.json << 'EOF'
+{
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "age": {"type": "integer"}
+  },
+  "required": ["name"]
+}
+EOF
+
+ananke generate "Create a user:" --constraints user_schema.json --max-tokens 100
+
+# View cache stats
+ananke cache
+
+# Clear cache
+ananke cache --clear
+```
+
+### Documentation
+
+- **[Python API Reference](../docs/PYTHON_API.md)** - Complete Python API documentation
+- **[CLI User Guide](../docs/CLI_GUIDE.md)** - Command-line interface guide
+- **[Troubleshooting Guide](../docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Python Examples](./examples/python/)** - 6+ runnable examples
+
 ## Key Responsibilities
 
 ### 1. **Constraint Compilation**
