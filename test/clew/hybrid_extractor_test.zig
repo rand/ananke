@@ -16,10 +16,14 @@ const typescript_sample =
     \\
     \\async function getUser(id: number): Promise<User> {
     \\    return { id, name: "test" };
+    \\}
+    \\
     \\class UserService {
     \\    async fetchUser(id: number): Promise<User> {
     \\        return getUser(id);
     \\    }
+    \\}
+    \\
     \\export { User, UserService };
 ;
 const python_sample =
