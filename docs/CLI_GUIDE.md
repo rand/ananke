@@ -1,712 +1,915 @@
 # Ananke CLI Guide
 
-Complete guide to using the Ananke command-line interface for constraint-driven code generation.
+Complete guide to using the Ananke command-line interface for constraint-driven code generation via Modal inference.
 
 ## Table of Contents
 
+- [Overview](#overview)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
 - [Configuration](#configuration)
+  - [Environment Variables](#environment-variables)
 - [Commands](#commands)
-  - [extract](#extract)
-  - [compile](#compile)
-  - [generate](#generate)
-  - [validate](#validate)
-  - [init](#init)
-  - [version](#version)
-  - [help](#help)
-- [Workflows](#workflows)
-- [Advanced Usage](#advanced-usage)
+  - [config](#config) - Show configuration
+  - [generate](#generate) - Generate code with optional constraints
+  - [compile](#compile) - Compile constraints to llguidance format
+  - [health](#health) - Check inference service health
+  - [cache](#cache) - View or clear constraint compilation cache
+- [Common Workflows](#common-workflows)
+  - [Basic Code Generation](#basic-code-generation)
+  - [Generation with Constraints](#generation-with-constraints)
+  - [Cache Management](#cache-management)
+  - [Batch Processing](#batch-processing)
+  - [CI/CD Integration](#cicd-integration)
+- [Constraint Format](#constraint-format)
+- [Tips and Best Practices](#tips-and-best-practices)
 - [Troubleshooting](#troubleshooting)
+
+## Overview
+
+The Ananke CLI provides command-line access to constraint-driven code generation powered by vLLM and llguidance. It allows you to:
+
+- Generate code based on natural language prompts
+- Apply constraints (JSON schemas, grammars, regex patterns) to guide generation
+- Compile constraints for reuse and validation
+- Check inference service health
+- Manage constraint compilation cache for performance
+
+The CLI communicates with a Modal inference endpoint to perform actual code generation and constraint compilation.
 
 ## Installation
 
-### From Source
+### Python Package
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/ananke.git
-cd ananke
-
-# Build and install
-zig build install
+# From the Ananke project root
+cd maze
+maturin develop
 
 # Verify installation
 ananke --version
 ```
 
-The binary will be installed to `zig-out/bin/ananke`. Add this to your PATH:
-
-```bash
-export PATH="$PWD/zig-out/bin:$PATH"
-```
-
 ### Requirements
 
-- Zig 0.15.1 or later
-- Modal account (for code generation features)
-- Rust 1.70+ (for Maze orchestrator)
+- Python 3.8+
+- Click (for CLI framework)
+- Ananke Python bindings (installed via `maturin develop`)
+- Modal account and deployment (for inference)
 
-## Quick Start
+### Help and Version
 
-1. **Initialize configuration**:
-   ```bash
-   ananke init
-   ```
+```bash
+# Show version
+ananke --version
 
-2. **Extract constraints from code**:
-   ```bash
-   ananke extract src/main.ts --format pretty
-   ```
+# Show general help
+ananke --help
 
-3. **Save constraints to file**:
-   ```bash
-   ananke extract src/main.ts --format json -o constraints.json
-   ```
-
-4. **Compile constraints to IR**:
-   ```bash
-   ananke compile constraints.json -o compiled.cir
-   ```
-
-5. **Validate code**:
-   ```bash
-   ananke validate src/main.ts -c constraints.json
-   ```
+# Show help for a specific command
+ananke <command> --help
+```
 
 ## Configuration
 
-Ananke uses `.ananke.toml` for configuration. Create it with:
-
-```bash
-ananke init
-```
-
-### Configuration File Format
-
-```toml
-# .ananke.toml
-
-[modal]
-# Modal inference endpoint (required for generation)
-endpoint = "https://your-app.modal.run"
-# API key (preferably set via environment variable)
-# api_key = "your-key-here"
-
-[defaults]
-# Default source language
-language = "typescript"
-
-# Generation parameters
-max_tokens = 4096
-temperature = 0.7
-
-# Extraction parameters
-confidence_threshold = 0.5
-
-# Output format: json, yaml, pretty, ariadne
-output_format = "pretty"
-
-[extract]
-# Enable Claude API for semantic analysis
-use_claude = false
-
-# Pattern groups to extract
-patterns = ["all"]
-
-[compile]
-# Constraint priority: low, medium, high, critical
-priority = "medium"
-
-# Output formats for compilation
-formats = ["json-schema"]
-```
+The Ananke CLI uses environment variables for configuration. No configuration file is needed.
 
 ### Environment Variables
 
-Override configuration with environment variables:
+Set these variables to configure the CLI:
 
 ```bash
+# Modal inference endpoint (required)
 export ANANKE_MODAL_ENDPOINT="https://your-app.modal.run"
+
+# Modal API key (optional, some endpoints may not require it)
 export ANANKE_MODAL_API_KEY="your-api-key"
-export ANANKE_LANGUAGE="python"
+
+# Model name (optional, defaults to meta-llama/Llama-3.1-8B-Instruct)
+export ANANKE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
+```
+
+#### ANANKE_MODAL_ENDPOINT
+
+The URL of your Modal inference endpoint. This must be set before using `generate` or `compile` commands.
+
+```bash
+export ANANKE_MODAL_ENDPOINT="https://your-org-ananke.modal.run"
+```
+
+#### ANANKE_MODAL_API_KEY
+
+Optional API key for authentication with your Modal endpoint. Not always required, depending on endpoint configuration.
+
+```bash
+export ANANKE_MODAL_API_KEY="modal_token_abc123"
+```
+
+#### ANANKE_MODEL
+
+The LLM model to use for generation. Defaults to `meta-llama/Llama-3.1-8B-Instruct`.
+
+```bash
+export ANANKE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
+```
+
+### Quick Setup Script
+
+Create a `.env.local` file in your project:
+
+```bash
+#!/bin/bash
+# .env.local - Source this to set up CLI environment
+export ANANKE_MODAL_ENDPOINT="https://your-org-ananke.modal.run"
+export ANANKE_MODAL_API_KEY="your-api-key"
+export ANANKE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
+```
+
+Then source it before running commands:
+
+```bash
+source .env.local
+ananke config
 ```
 
 ## Commands
 
-### extract
+### config
 
-Extract constraints from source code using pattern matching and optional LLM analysis.
+Display current Ananke configuration settings.
 
 **Usage:**
 ```bash
-ananke extract <file> [options]
+ananke config [OPTIONS]
 ```
 
-**Arguments:**
-- `<file>` - Source file to extract constraints from
-
 **Options:**
-- `--language <lang>` - Source language (auto-detected if not specified)
-- `--format <fmt>` - Output format: json, yaml, pretty, ariadne (default: pretty)
-- `--output, -o <file>` - Write output to file instead of stdout
-- `--confidence <min>` - Minimum confidence threshold 0.0-1.0 (default: 0.5)
-- `--use-claude` - Enable Claude API for semantic analysis
-- `--verbose, -v` - Verbose output
-- `--help, -h` - Show help message
+- `--endpoint` - Modal inference endpoint URL (from ANANKE_MODAL_ENDPOINT env var)
+- `--api-key` - Modal API key (from ANANKE_MODAL_API_KEY env var)
+- `--model` - Model name (from ANANKE_MODEL env var)
+
+**Description:**
+
+Shows the current configuration including the Modal endpoint, selected model, and whether an API key is configured. Useful for verifying your setup is correct.
 
 **Examples:**
 
-Extract with pretty output:
 ```bash
-ananke extract src/main.ts
+# Show configuration from environment variables
+ananke config
+
+# Override endpoint for this command
+ananke config --endpoint https://different-endpoint.modal.run
 ```
 
-Extract to JSON file:
-```bash
-ananke extract src/auth.py --format json -o constraints.json
+**Output:**
+
+```
+Ananke Configuration:
+  Endpoint: https://your-app.modal.run
+  Model:    meta-llama/Llama-3.1-8B-Instruct
+  API Key:  (configured)
 ```
 
-Extract with confidence filtering:
+---
+
+### generate
+
+Generate code based on a prompt, with optional constraints.
+
+**Usage:**
 ```bash
-ananke extract lib.rs --confidence 0.7 --format pretty
+ananke generate <PROMPT> [OPTIONS]
 ```
 
-Extract using Claude analysis:
+**Arguments:**
+- `<PROMPT>` - Natural language description of code to generate (required, quoted string)
+
+**Options:**
+- `--max-tokens N` - Maximum tokens to generate (default: 2048, range: 1-8192)
+- `--temperature F` - Sampling temperature 0.0-2.0 (default: 0.7, higher = more creative)
+- `--constraints FILE` - JSON file containing constraints to apply
+- `--output, -o FILE` - Save output to file (default: stdout)
+- `--endpoint URL` - Modal inference endpoint (overrides ANANKE_MODAL_ENDPOINT)
+- `--api-key KEY` - Modal API key (overrides ANANKE_MODAL_API_KEY)
+- `--model NAME` - Model name (overrides ANANKE_MODEL)
+
+**Description:**
+
+Generates code using the specified prompt and optional constraints. The generation is performed by the Modal inference service. Output includes the generated code, token count, constraint satisfaction status, and metadata.
+
+**Examples:**
+
+Simple code generation:
+
 ```bash
-ananke extract src/complex.ts --use-claude --format ariadne
+ananke generate "Write a Python function to calculate factorial"
 ```
 
-**Supported Languages:**
-- TypeScript/JavaScript (.ts, .tsx, .js, .jsx)
-- Python (.py)
-- Rust (.rs)
-- Go (.go)
-- Zig (.zig)
-- Java (.java)
-- C/C++ (.c, .cpp, .cc)
+With output file:
+
+```bash
+ananke generate "Create a TypeScript REST API handler" -o handler.ts
+```
+
+With constraints:
+
+```bash
+ananke generate "Write a function to parse JSON" \
+  --constraints schema.json \
+  --max-tokens 1024
+```
+
+Custom sampling:
+
+```bash
+# Deterministic (low temperature)
+ananke generate "Implement binary search in Rust" \
+  --temperature 0.2 \
+  --max-tokens 2048 \
+  -o search.rs
+
+# Creative (high temperature)
+ananke generate "Generate creative variable names for a data structure" \
+  --temperature 1.5
+```
+
+Saving to JSON:
+
+```bash
+ananke generate "Write a hello world program" -o output.json
+```
+
+If output file ends with `.json`, the full response is saved as JSON:
+
+```json
+{
+  "generated_text": "...",
+  "finish_reason": "length|stop_sequence",
+  "tokens_generated": 256,
+  "constraint_satisfied": true,
+  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "timestamp": "2024-11-26T10:30:45Z"
+}
+```
+
+If output file has a different extension, only the generated code is saved.
+
+**Output Format:**
+
+By default, output is sent to stdout with a formatted display:
+
+```
+================================================================================
+Generated Code:
+================================================================================
+<generated code here>
+================================================================================
+Tokens: 342 | Finish: length | Constraints: satisfied
+```
+
+---
 
 ### compile
 
-Compile constraints to intermediate representation (IR) for use with llguidance.
+Compile constraints to llguidance format for reuse and validation.
 
 **Usage:**
 ```bash
-ananke compile <constraints-file> [options]
+ananke compile <CONSTRAINTS_FILE> [OPTIONS]
 ```
 
 **Arguments:**
-- `<constraints-file>` - JSON/YAML file containing constraints
+- `<CONSTRAINTS_FILE>` - JSON file containing constraints (required)
 
 **Options:**
-- `--format <fmt>` - Output format: json, yaml (default: json)
-- `--output, -o <file>` - Write compiled IR to file
-- `--priority <level>` - Priority: low, medium, high, critical (default: medium)
-- `--verbose, -v` - Verbose output
-- `--help, -h` - Show help message
+- `--output, -o FILE` - Write compiled constraints to file (default: stdout)
+- `--endpoint URL` - Modal inference endpoint (overrides ANANKE_MODAL_ENDPOINT)
+- `--api-key KEY` - Modal API key (overrides ANANKE_MODAL_API_KEY)
+- `--model NAME` - Model name (overrides ANANKE_MODEL)
+
+**Description:**
+
+Compiles constraints from a JSON file to the llguidance format used by the inference engine. Useful for:
+- Validating constraint syntax before use
+- Caching compiled constraints for faster generation
+- Inspecting the compiled output
+
+The compilation hash can be used to identify identical constraint sets.
 
 **Examples:**
 
-Compile constraints:
+Basic compilation:
+
 ```bash
 ananke compile constraints.json
 ```
 
-Compile with high priority:
+Save compiled constraints:
+
 ```bash
-ananke compile rules.yaml --priority high -o compiled.cir
+ananke compile constraints.json -o compiled.json
 ```
 
-Verbose compilation:
+Verify constraints before use:
+
 ```bash
-ananke compile constraints.json --verbose --format json
+ananke compile my-rules.json
+# If successful, no errors are shown
+# If there are syntax errors, error message is displayed
 ```
 
-**Constraint File Format:**
+**Output Format:**
+
+Default (stdout):
 
 ```json
 {
-  "name": "my_constraints",
-  "constraints": [
-    {
-      "kind": "type_safety",
-      "severity": "error",
-      "name": "avoid_any_type",
-      "description": "Avoid using 'any' type in TypeScript",
-      "confidence": 0.95
-    },
-    {
-      "kind": "security",
-      "severity": "warning",
-      "name": "validate_input",
-      "description": "Always validate user input",
-      "confidence": 0.85
-    }
-  ]
+  "hash": "sha256_hash_of_constraints",
+  "compiled_at": "2024-11-26T10:30:45Z",
+  "schema_preview": "..."
 }
 ```
 
-### generate
+---
 
-Generate code with constraints using Modal inference service.
+### health
+
+Check the health status of the Modal inference service.
 
 **Usage:**
 ```bash
-ananke generate <prompt> [options]
+ananke health [OPTIONS]
 ```
 
-**Arguments:**
-- `<prompt>` - Natural language prompt describing what to generate
-
 **Options:**
-- `--constraints, -c <file>` - Load constraints from file
-- `--language <lang>` - Target language (default: from config)
-- `--output, -o <file>` - Write generated code to file
-- `--max-tokens <n>` - Maximum tokens to generate (default: 4096)
-- `--temperature <f>` - Sampling temperature 0.0-1.0 (default: 0.7)
-- `--verbose, -v` - Verbose output
-- `--help, -h` - Show help message
+- `--endpoint URL` - Modal inference endpoint (overrides ANANKE_MODAL_ENDPOINT)
+- `--api-key KEY` - Modal API key (overrides ANANKE_MODAL_API_KEY)
+- `--model NAME` - Model name (overrides ANANKE_MODEL)
+
+**Description:**
+
+Performs a health check against the Modal inference service to verify it is running and accessible. Returns exit code 0 if healthy, 1 if unhealthy.
 
 **Examples:**
+
+Check service health:
+
+```bash
+ananke health
+```
+
+Output on success:
+
+```
+Status: HEALTHY
+Endpoint: https://your-app.modal.run
+Model: meta-llama/Llama-3.1-8B-Instruct
+```
+
+Output on failure:
+
+```
+Status: UNHEALTHY
+```
+
+Using in scripts:
+
+```bash
+if ananke health; then
+  echo "Service is ready, starting generation..."
+  ananke generate "Create a user model"
+else
+  echo "Service is down, aborting"
+  exit 1
+fi
+```
+
+---
+
+### cache
+
+View or clear the constraint compilation cache.
+
+**Usage:**
+```bash
+ananke cache [OPTIONS]
+```
+
+**Options:**
+- `--clear` - Clear the cache (boolean flag)
+- `--endpoint URL` - Modal inference endpoint (overrides ANANKE_MODAL_ENDPOINT)
+- `--api-key KEY` - Modal API key (overrides ANANKE_MODAL_API_KEY)
+- `--model NAME` - Model name (overrides ANANKE_MODEL)
+
+**Description:**
+
+Shows statistics about the constraint compilation cache, or clears it if `--clear` is specified. The cache stores compiled constraints for faster subsequent compilations.
+
+**Examples:**
+
+View cache statistics:
+
+```bash
+ananke cache
+```
+
+Output:
+
+```
+Cache Statistics:
+  Size:  42 entries
+  Limit: 1000 entries
+  Usage: 4.2%
+```
+
+Clear the cache:
+
+```bash
+ananke cache --clear
+```
+
+Output:
+
+```
+Cache cleared successfully
+```
+
+When to clear cache:
+
+- After updating constraint definitions
+- When cache hits the limit
+- When troubleshooting constraint-related issues
+
+---
+
+## Common Workflows
+
+### Basic Code Generation
+
+Generate code with just a prompt:
+
+```bash
+# Set up environment
+export ANANKE_MODAL_ENDPOINT="https://your-app.modal.run"
+
+# Generate simple function
+ananke generate "Create a function that reverses a string in Python"
+
+# Save to file
+ananke generate "Write a REST API handler" -o handler.py
+```
+
+### Generation with Constraints
+
+Define constraints in a JSON file and use them to guide generation:
+
+**constraints.json:**
+```json
+{
+  "name": "api_constraints",
+  "json_schema": {
+    "type": "object",
+    "properties": {
+      "method": {"enum": ["GET", "POST", "PUT", "DELETE"]},
+      "status_code": {"type": "integer"}
+    },
+    "required": ["method", "status_code"]
+  }
+}
+```
 
 Generate with constraints:
+
 ```bash
-ananke generate "create authentication handler" -c rules.json -o auth.ts
+ananke generate "Create an API handler" --constraints constraints.json -o api.py
 ```
 
-Generate in specific language:
-```bash
-ananke generate "implement binary search" --language rust -o search.rs
+Multiple constraints:
+
+```json
+[
+  {
+    "name": "type_safety",
+    "json_schema": {"type": "object", "additionalProperties": false}
+  },
+  {
+    "name": "naming_conventions",
+    "regex_patterns": ["^[a-z_][a-z0-9_]*$"]
+  }
+]
 ```
 
-Custom generation parameters:
-```bash
-ananke generate "build REST API client" \
-  --language python \
-  --max-tokens 2048 \
-  --temperature 0.5 \
-  -c api_constraints.json
-```
+### Cache Management
 
-**Note:** This command requires Maze inference service deployed on Modal. See deployment guide for setup.
-
-### validate
-
-Validate code against a set of constraints.
-
-**Usage:**
-```bash
-ananke validate <code-file> [options]
-```
-
-**Arguments:**
-- `<code-file>` - Source code file to validate
-
-**Options:**
-- `--constraints, -c <file>` - Validate against constraints from file
-- `--strict` - Treat warnings as errors
-- `--report <file>` - Write validation report to file
-- `--verbose, -v` - Verbose output
-- `--help, -h` - Show help message
-
-**Examples:**
-
-Validate against constraints:
-```bash
-ananke validate src/auth.ts -c constraints.json
-```
-
-Strict validation:
-```bash
-ananke validate lib.rs --strict -c rules.json
-```
-
-Generate report:
-```bash
-ananke validate src/api.py -c constraints.json --report validation.txt
-```
-
-Auto-extract constraints:
-```bash
-# If no constraints file provided, extracts from code itself
-ananke validate src/main.ts --verbose
-```
-
-**Exit Codes:**
-- `0` - Validation passed
-- `1` - User error (missing arguments, etc.)
-- `5` - Validation failed (constraint violations found)
-
-### init
-
-Initialize `.ananke.toml` configuration file.
-
-**Usage:**
-```bash
-ananke init [options]
-```
-
-**Options:**
-- `--config <file>` - Configuration file path (default: .ananke.toml)
-- `--modal-endpoint <url>` - Set Modal inference endpoint
-- `--force` - Overwrite existing configuration file
-- `--help, -h` - Show help message
-
-**Examples:**
-
-Create default config:
-```bash
-ananke init
-```
-
-Custom config location:
-```bash
-ananke init --config my-config.toml
-```
-
-Initialize with Modal endpoint:
-```bash
-ananke init --modal-endpoint https://my-app.modal.run
-```
-
-Force overwrite:
-```bash
-ananke init --force
-```
-
-### version
-
-Show version information.
-
-**Usage:**
-```bash
-ananke version [options]
-```
-
-**Options:**
-- `--verbose, -v` - Show detailed version information
-- `--help, -h` - Show help message
-
-**Examples:**
-
-Basic version:
-```bash
-ananke version
-```
-
-Detailed version:
-```bash
-ananke version --verbose
-```
-
-### help
-
-Show help for commands.
-
-**Usage:**
-```bash
-ananke help [command]
-```
-
-**Examples:**
-
-General help:
-```bash
-ananke help
-```
-
-Command-specific help:
-```bash
-ananke help extract
-ananke help compile
-ananke help validate
-```
-
-## Workflows
-
-### Basic Extract-Compile-Validate Workflow
+For repeated generation with the same constraints:
 
 ```bash
-# 1. Extract constraints
-ananke extract src/main.ts --format json -o constraints.json
+# Compile once and cache
+ananke compile my-constraints.json -o compiled.json
 
-# 2. Compile to IR
-ananke compile constraints.json -o compiled.cir
+# Use cached constraints multiple times
+ananke generate "Create user handler" --constraints compiled.json
+ananke generate "Create product handler" --constraints compiled.json
+ananke generate "Create order handler" --constraints compiled.json
 
-# 3. Validate code
-ananke validate src/main.ts -c constraints.json
-```
+# Check cache statistics
+ananke cache
 
-### Constraint-Driven Development
-
-```bash
-# 1. Extract constraints from existing high-quality code
-ananke extract reference/best_practices.ts --confidence 0.8 -o rules.json
-
-# 2. Use constraints to validate new code
-ananke validate new_feature/handler.ts -c rules.json --strict
-
-# 3. Generate code following extracted patterns
-ananke generate "create similar handler for users" \
-  -c rules.json \
-  --language typescript \
-  -o new_feature/user_handler.ts
-```
-
-### Multi-Language Project
-
-```bash
-# Extract constraints from multiple languages
-ananke extract backend/api.py --format json -o python_rules.json
-ananke extract frontend/app.ts --format json -o ts_rules.json
-
-# Compile separately
-ananke compile python_rules.json -o python.cir
-ananke compile ts_rules.json -o typescript.cir
-
-# Validate each part
-ananke validate backend/**/*.py -c python_rules.json
-ananke validate frontend/**/*.ts -c ts_rules.json
-```
-
-### CI/CD Integration
-
-```bash
-#!/bin/bash
-# .github/workflows/validate.sh
-
-set -e
-
-echo "Extracting constraints from main branch..."
-ananke extract src/main.ts --format json -o constraints.json
-
-echo "Validating new code..."
-for file in $(git diff --name-only main...HEAD | grep '\.ts$'); do
-  echo "Validating $file..."
-  ananke validate "$file" -c constraints.json --strict || exit 1
-done
-
-echo "All files validated successfully!"
-```
-
-## Advanced Usage
-
-### Custom Output Formats
-
-**JSON** - Machine-readable format for tools:
-```bash
-ananke extract src/main.ts --format json | jq '.constraints[] | select(.severity=="error")'
-```
-
-**YAML** - Human-readable format:
-```bash
-ananke extract src/main.ts --format yaml > constraints.yaml
-```
-
-**Pretty** - Colored terminal output:
-```bash
-ananke extract src/main.ts --format pretty | less -R
-```
-
-**Ariadne** - DSL format for constraint composition:
-```bash
-ananke extract src/main.ts --format ariadne > constraints.ar
-```
-
-### Piping and Chaining
-
-Extract and compile in one command:
-```bash
-ananke extract src/main.ts --format json | \
-ananke compile /dev/stdin -o compiled.cir
-```
-
-Filter constraints by confidence:
-```bash
-ananke extract src/main.ts --format json | \
-jq '.constraints[] | select(.confidence > 0.8)' | \
-ananke compile /dev/stdin
+# Clear cache if needed
+ananke cache --clear
 ```
 
 ### Batch Processing
 
-Process multiple files:
-```bash
-for file in src/**/*.ts; do
-  echo "Processing $file..."
-  ananke extract "$file" --format json >> all_constraints.json
-done
-```
+Generate multiple pieces of code in sequence:
 
-Validate entire directory:
-```bash
-find src -name '*.ts' -exec ananke validate {} -c constraints.json \;
-```
-
-### Using with Git Hooks
-
-Pre-commit hook (`.git/hooks/pre-commit`):
 ```bash
 #!/bin/bash
+set -e
 
-# Extract constraints from main.ts
-ananke extract src/main.ts --format json -o /tmp/constraints.json
+export ANANKE_MODAL_ENDPOINT="https://your-app.modal.run"
 
-# Validate staged TypeScript files
-for file in $(git diff --cached --name-only --diff-filter=ACM | grep '\.ts$'); do
-  if ! ananke validate "$file" -c /tmp/constraints.json --strict; then
-    echo "Validation failed for $file"
-    exit 1
-  fi
+# Create output directory
+mkdir -p generated
+
+# Generate multiple related files
+ananke generate "Create user model class" -o generated/user.py
+ananke generate "Create user repository interface" -o generated/user_repo.py
+ananke generate "Create user service" -o generated/user_service.py
+
+echo "Generated files:"
+ls -la generated/
+```
+
+### CI/CD Integration
+
+Integrate code generation into your CI/CD pipeline:
+
+**.github/workflows/generate.yml:**
+```yaml
+name: Generate Code
+
+on: [push]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Ananke
+        run: |
+          cd maze
+          pip install maturin
+          maturin develop
+
+      - name: Check service health
+        env:
+          ANANKE_MODAL_ENDPOINT: ${{ secrets.ANANKE_MODAL_ENDPOINT }}
+          ANANKE_MODAL_API_KEY: ${{ secrets.ANANKE_MODAL_API_KEY }}
+        run: ananke health
+
+      - name: Generate code
+        env:
+          ANANKE_MODAL_ENDPOINT: ${{ secrets.ANANKE_MODAL_ENDPOINT }}
+          ANANKE_MODAL_API_KEY: ${{ secrets.ANANKE_MODAL_API_KEY }}
+        run: |
+          ananke generate "Create user handler" -o src/handlers/user.py
+          ananke generate "Create product handler" -o src/handlers/product.py
+
+      - name: Commit generated files
+        run: |
+          git config user.name "Ananke Bot"
+          git config user.email "bot@ananke.dev"
+          git add src/handlers/
+          git commit -m "chore: regenerated code with Ananke" || true
+          git push
+```
+
+---
+
+## Constraint Format
+
+Constraints guide code generation to ensure output follows specific patterns, schemas, or rules.
+
+### JSON Schema Constraints
+
+Define what the generated output should match:
+
+```json
+{
+  "name": "json_output",
+  "json_schema": {
+    "type": "object",
+    "properties": {
+      "id": {"type": "integer"},
+      "name": {"type": "string"},
+      "email": {"type": "string", "format": "email"},
+      "status": {"enum": ["active", "inactive"]}
+    },
+    "required": ["id", "name", "email"]
+  }
+}
+```
+
+### Grammar Constraints
+
+Specify BNF-style grammar:
+
+```json
+{
+  "name": "function_signature",
+  "grammar": "def <name>(<params>) -> <return_type>: ..."
+}
+```
+
+### Regex Pattern Constraints
+
+Match output against regular expressions:
+
+```json
+{
+  "name": "naming_convention",
+  "regex_patterns": [
+    "^def [a-z_][a-z0-9_]*.*:",
+    "^class [A-Z][a-zA-Z0-9_]*.*:"
+  ]
+}
+```
+
+### Multiple Constraints
+
+Combine different constraint types:
+
+```json
+[
+  {
+    "name": "schema_validation",
+    "json_schema": {
+      "type": "object",
+      "properties": {"method": {"type": "string"}},
+      "required": ["method"]
+    }
+  },
+  {
+    "name": "naming_patterns",
+    "regex_patterns": ["^[a-z_][a-z0-9_]*"]
+  }
+]
+```
+
+---
+
+## Tips and Best Practices
+
+### Generation Quality
+
+**Use specific, detailed prompts:**
+```bash
+# Good - specific and detailed
+ananke generate "Create a Python async function to fetch user data from a REST API with retry logic and timeout handling"
+
+# Less effective - vague
+ananke generate "Create a function"
+```
+
+**Adjust temperature for task type:**
+```bash
+# Deterministic tasks (parsing, calculation)
+ananke generate "Parse CSV data to JSON" --temperature 0.2
+
+# Creative tasks (naming, design)
+ananke generate "Generate creative class names for a game" --temperature 1.2
+
+# Balanced (default for most tasks)
+ananke generate "Write a REST API handler" --temperature 0.7
+```
+
+**Use appropriate token limits:**
+```bash
+# Small functions
+ananke generate "Write a hash function" --max-tokens 256
+
+# Medium implementations
+ananke generate "Implement a data parser" --max-tokens 1024
+
+# Complex modules
+ananke generate "Build a caching layer" --max-tokens 4096
+```
+
+### Constraint Design
+
+**Start with broad constraints, refine iteratively:**
+
+```bash
+# First pass - basic structure
+ananke compile constraints.json
+
+# Inspect output, refine constraints.json
+# Second pass - refined
+ananke compile constraints.json
+```
+
+**Validate constraints before heavy use:**
+
+```bash
+# Test compilation
+ananke compile constraints.json
+
+# Generate a small test
+ananke generate "Small test prompt" --constraints constraints.json --max-tokens 100
+
+# Then use for full generation
+ananke generate "Full prompt" --constraints constraints.json
+```
+
+### Performance Optimization
+
+**Reuse compiled constraints:**
+
+```bash
+# Compile once
+ananke compile constraints.json -o cached.json
+
+# Reuse many times (faster than recompiling)
+for i in {1..10}; do
+  ananke generate "Prompt $i" --constraints cached.json
 done
 ```
+
+**Cache frequently used constraint sets:**
+
+```bash
+# Keep compiled versions in version control
+git add cached_constraints/
+git commit -m "Add compiled constraint cache"
+
+# Reuse in CI/CD
+ananke generate "Prompt" --constraints cached_constraints/api_rules.json
+```
+
+**Monitor cache usage:**
+
+```bash
+# Check cache size
+ananke cache
+
+# Clear if needed
+ananke cache --clear
+```
+
+### Service Health Monitoring
+
+**Check health before batch operations:**
+
+```bash
+#!/bin/bash
+set -e
+
+if ! ananke health; then
+  echo "Service unavailable, aborting batch"
+  exit 1
+fi
+
+# Proceed with generation
+for file in prompts/*.txt; do
+  ananke generate "$(cat $file)" -o "output/$(basename $file).py"
+done
+```
+
+---
 
 ## Troubleshooting
 
 ### Common Issues
 
-**1. "File not found" error**
+**ANANKE_MODAL_ENDPOINT not set**
 
-Make sure the file path is correct and the file exists:
-```bash
-ls -la src/main.ts
-ananke extract src/main.ts
+```
+Error: Ananke module not installed or endpoint not configured.
 ```
 
-**2. "Permission denied" error**
+Solution: Set the environment variable before running commands:
 
-Check file permissions:
-```bash
-chmod +r src/main.ts
-```
-
-**3. "Invalid format" error**
-
-Use one of the supported formats:
-```bash
-ananke extract src/main.ts --format json  # ✓ Valid
-ananke extract src/main.ts --format xml   # ✗ Invalid
-```
-
-**4. "Modal endpoint not configured" error**
-
-Set the Modal endpoint:
 ```bash
 export ANANKE_MODAL_ENDPOINT="https://your-app.modal.run"
-# or
-ananke init --modal-endpoint https://your-app.modal.run
+ananke config  # Verify it's set
+ananke generate "Your prompt"
 ```
 
-**5. "Validation failed" with no details**
+**Connection refused**
 
-Use verbose mode to see details:
-```bash
-ananke validate src/main.ts -c constraints.json --verbose
+```
+Error: Generation failed: Connection refused
 ```
 
-### Debug Mode
+Solution: Check your endpoint URL is correct and the service is running:
 
-Enable verbose output for all commands:
 ```bash
-ananke extract src/main.ts --verbose
-ananke compile constraints.json --verbose
-ananke validate src/main.ts -c constraints.json --verbose
+ananke health  # Check if service is responsive
+```
+
+Verify the endpoint URL:
+
+```bash
+ananke config --endpoint https://your-app.modal.run
+```
+
+**Constraint compilation fails**
+
+```
+Error: Compilation failed: Invalid constraint format
+```
+
+Solution: Validate your constraint file format:
+
+```bash
+# Check file is valid JSON
+jq . constraints.json
+
+# Look for required fields
+cat constraints.json | jq 'keys'
+```
+
+**Out of memory during generation**
+
+```
+Error: Generation failed: Out of memory
+```
+
+Solution: Reduce `--max-tokens`:
+
+```bash
+# Current (too large)
+ananke generate "Prompt" --max-tokens 8192
+
+# Reduced
+ananke generate "Prompt" --max-tokens 2048
+```
+
+**Timeout during generation**
+
+```
+Error: Generation failed: Request timeout
+```
+
+Solution: Check service health and try with a shorter prompt:
+
+```bash
+ananke health
+
+# Simpler prompt might be faster
+ananke generate "Small focused prompt" --max-tokens 1024
+```
+
+### Debug Techniques
+
+**Verify configuration:**
+
+```bash
+ananke config
+# Output should show your endpoint and model
+```
+
+**Test with minimal input:**
+
+```bash
+# Simplest possible generation
+ananke generate "Hello" --max-tokens 10
+```
+
+**Check service health:**
+
+```bash
+ananke health
+# Should show HEALTHY status
+```
+
+**Inspect constraint format:**
+
+```bash
+# Validate JSON
+jq . constraints.json
+
+# Try compilation
+ananke compile constraints.json
+```
+
+**Enable verbose output (if available):**
+
+```bash
+# Some commands support verbose flags
+ananke generate "Prompt" -v
 ```
 
 ### Getting Help
 
-- Run `ananke help <command>` for command-specific help
-- Check GitHub issues: https://github.com/your-org/ananke/issues
-- Read the docs: https://ananke.dev/docs
-
-### Performance Tips
-
-1. **Use confidence filtering** to reduce constraint count:
-   ```bash
-   ananke extract src/main.ts --confidence 0.7
-   ```
-
-2. **Cache compiled IR** instead of recompiling:
-   ```bash
-   # Compile once
-   ananke compile constraints.json -o cached.cir
-
-   # Reuse for multiple validations
-   ananke validate file1.ts -c cached.cir
-   ananke validate file2.ts -c cached.cir
-   ```
-
-3. **Process files in parallel**:
-   ```bash
-   find src -name '*.ts' | parallel ananke extract {} --format json
-   ```
-
-## Exit Codes
-
-- `0` - Success
-- `1` - User error (invalid arguments, missing files)
-- `2` - System error (unexpected error)
-- `3` - File not found
-- `4` - Permission denied
-- `5` - Validation failed
-
-## Output Format Reference
-
-### JSON Schema
-
-```json
-{
-  "name": "string",
-  "constraints": [
-    {
-      "id": "number",
-      "kind": "syntactic|type_safety|semantic|architectural|operational|security",
-      "severity": "error|warning|info|hint",
-      "name": "string",
-      "description": "string",
-      "source": "string",
-      "priority": "Low|Medium|High|Critical",
-      "confidence": "number (0.0-1.0)",
-      "frequency": "number"
-    }
-  ]
-}
-```
-
-### YAML Format
-
-```yaml
-name: constraint_set_name
-constraints:
-  - id: 1
-    kind: type_safety
-    severity: error
-    name: avoid_any_type
-    description: Avoid using 'any' type
-    confidence: 0.95
-```
-
-### Ariadne DSL
-
-```ariadne
-constraint_set "my_constraints" {
-  type_safety error "avoid_any_type" {
-    description: "Avoid using 'any' type in TypeScript"
-    confidence: 0.95
-    priority: High
-  }
-
-  security warning "validate_input" {
-    description: "Always validate user input"
-    confidence: 0.85
-    priority: High
-  }
-}
-```
-
-## Further Reading
-
-- [Architecture Guide](ARCHITECTURE.md)
-- [API Documentation](API.md)
-- [Deployment Guide](DEPLOYMENT.md)
-- [Contributing Guide](CONTRIBUTING.md)
+- **Command help**: `ananke <command> --help`
+- **General help**: `ananke --help`
+- **Version**: `ananke --version`
+- **Service status**: `ananke health`
