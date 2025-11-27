@@ -1498,4 +1498,78 @@ pub fn build(b: *std.Build) void {
     bench_all_zig_step.dependOn(memory_bench_step);
     bench_all_zig_step.dependOn(ffi_roundtrip_bench_step);
     bench_all_zig_step.dependOn(pipeline_bench_step);
+
+    // ============================================================================
+    // Phase 8b: Comprehensive Performance Benchmark Suite
+    // ============================================================================
+
+    // Phase 8b benchmark modules
+    const extraction_bench_mod = b.addModule("extraction_benchmarks", .{
+        .root_source_file = b.path("bench/extraction_benchmarks.zig"),
+        .target = target,
+    });
+    extraction_bench_mod.addImport("ananke", ananke_mod);
+    extraction_bench_mod.addImport("clew", clew_mod);
+
+    const compilation_bench_mod = b.addModule("compilation_benchmarks", .{
+        .root_source_file = b.path("bench/compilation_benchmarks.zig"),
+        .target = target,
+    });
+    compilation_bench_mod.addImport("ananke", ananke_mod);
+    compilation_bench_mod.addImport("braid", braid_mod);
+
+    const cache_bench_mod = b.addModule("cache_benchmarks", .{
+        .root_source_file = b.path("bench/cache_benchmarks.zig"),
+        .target = target,
+    });
+    cache_bench_mod.addImport("ananke", ananke_mod);
+    cache_bench_mod.addImport("braid", braid_mod);
+
+    const e2e_bench_mod = b.addModule("e2e_benchmarks", .{
+        .root_source_file = b.path("bench/e2e_benchmarks.zig"),
+        .target = target,
+    });
+    e2e_bench_mod.addImport("ananke", ananke_mod);
+    e2e_bench_mod.addImport("clew", clew_mod);
+    e2e_bench_mod.addImport("braid", braid_mod);
+
+    // Phase 8b main benchmark runner
+    const phase8b_bench = b.addExecutable(.{
+        .name = "benchmark_runner",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/benchmark_runner.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "extraction_benchmarks", .module = extraction_bench_mod },
+                .{ .name = "compilation_benchmarks", .module = compilation_bench_mod },
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+                .{ .name = "cache_benchmarks", .module = cache_bench_mod },
+                .{ .name = "e2e_benchmarks", .module = e2e_bench_mod },
+            },
+        }),
+    });
+    b.installArtifact(phase8b_bench);
+    phase8b_bench.linkSystemLibrary("tree-sitter");
+    phase8b_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    phase8b_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    phase8b_bench.linkLibrary(ts_parser_lib);
+    phase8b_bench.linkLibrary(py_parser_lib);
+    phase8b_bench.linkLibrary(js_parser_lib);
+    phase8b_bench.linkLibrary(rust_parser_lib);
+    phase8b_bench.linkLibrary(go_parser_lib);
+    phase8b_bench.linkLibrary(zig_parser_lib);
+    phase8b_bench.linkLibrary(c_parser_lib);
+    phase8b_bench.linkLibrary(cpp_parser_lib);
+    phase8b_bench.linkLibrary(java_parser_lib);
+
+    const run_phase8b_bench = b.addRunArtifact(phase8b_bench);
+    const phase8b_bench_step = b.step("bench-phase8b", "Run Phase 8b comprehensive benchmark suite");
+    phase8b_bench_step.dependOn(&run_phase8b_bench.step);
+
+    // Add Phase 8b benchmarks to main bench step
+    bench_all_step.dependOn(phase8b_bench_step);
 }

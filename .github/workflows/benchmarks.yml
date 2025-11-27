@@ -1,0 +1,62 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Install tree-sitter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtree-sitter-dev tree-sitter
+
+      - name: Cache Zig dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/zig
+            zig-cache
+          key: zig-cache
+          restore-keys: |
+            zig-cache-
+
+      - name: Build benchmark suite
+        run: zig build bench-phase8b --summary all
+
+      - name: Run benchmarks
+        run: zig build bench-phase8b
+          
+      - name: Check benchmark results
+        id: check-results
+        run: |
+          if [ -f bench/results/latest.json ]; then
+            echo "Benchmark results generated successfully"
+            cat bench/results/latest.json
+          else
+            echo "Error: Benchmark results not found"
+            exit 1
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: bench/results/
+          retention-days: 90

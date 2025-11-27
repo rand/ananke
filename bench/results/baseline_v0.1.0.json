@@ -1,0 +1,140 @@
+{
+  "benchmark_suite": "ananke_v0.1.0",
+  "timestamp": 1764274396,
+  "environment": {
+    "os": "macos",
+    "cpu": "aarch64",
+    "ram_gb": 16,
+    "zig_version": "0.15.2"
+  },
+  "results": {
+    "extraction": {
+      "small_ts": {
+        "p50_ms": 0.01,
+        "p95_ms": 0.02,
+        "p99_ms": 0.02,
+        "max_ms": 0.02,
+        "pass": true
+      },
+      "medium_ts": {
+        "p50_ms": 0.02,
+        "p95_ms": 0.03,
+        "p99_ms": 0.03,
+        "max_ms": 0.03,
+        "pass": true
+      },
+      "large_ts": {
+        "p50_ms": 0.02,
+        "p95_ms": 0.02,
+        "p99_ms": 0.05,
+        "max_ms": 0.05,
+        "pass": true
+      },
+      "small_py": {
+        "p50_ms": 0.02,
+        "p95_ms": 0.03,
+        "p99_ms": 0.03,
+        "max_ms": 0.03,
+        "pass": true
+      },
+      "medium_py": {
+        "p50_ms": 0.02,
+        "p95_ms": 0.03,
+        "p99_ms": 0.03,
+        "max_ms": 0.03,
+        "pass": true
+      },
+      "large_py": {
+        "p50_ms": 0.03,
+        "p95_ms": 0.04,
+        "p99_ms": 0.04,
+        "max_ms": 0.04,
+        "pass": true
+      }
+    },
+    "compilation": {
+      "single_constraint": {
+        "p50_ms": 0.03,
+        "p95_ms": 0.03,
+        "p99_ms": 0.04,
+        "pass": true
+      },
+      "ten_constraints": {
+        "p50_ms": 0.06,
+        "p95_ms": 0.08,
+        "p99_ms": 0.10,
+        "pass": true
+      },
+      "hundred_constraints": {
+        "p50_ms": 0.15,
+        "p95_ms": 0.18,
+        "p99_ms": 0.21,
+        "pass": true
+      }
+    },
+    "cache": {
+      "cache_10_constraints": {
+        "speedup": 1.5,
+        "cold_us": 96,
+        "warm_us": 62,
+        "pass": false
+      },
+      "cache_50_constraints": {
+        "speedup": 0.9,
+        "cold_us": 121,
+        "warm_us": 127,
+        "pass": false
+      },
+      "cache_100_constraints": {
+        "speedup": 0.9,
+        "cold_us": 155,
+        "warm_us": 180,
+        "pass": false
+      }
+    },
+    "e2e": {
+      "e2e_small_ts": {
+        "extraction_ms": 0,
+        "compilation_ms": 0,
+        "total_ms": 0,
+        "pass": true
+      },
+      "e2e_medium_ts": {
+        "extraction_ms": 2,
+        "compilation_ms": 0,
+        "total_ms": 2,
+        "pass": true
+      },
+      "e2e_large_ts": {
+        "extraction_ms": 3,
+        "compilation_ms": 0,
+        "total_ms": 3,
+        "pass": true
+      },
+      "e2e_small_py": {
+        "extraction_ms": 0,
+        "compilation_ms": 0,
+        "total_ms": 0,
+        "pass": true
+      },
+      "e2e_medium_py": {
+        "extraction_ms": 3,
+        "compilation_ms": 0,
+        "total_ms": 3,
+        "pass": true
+      },
+      "e2e_large_py": {
+        "extraction_ms": 6,
+        "compilation_ms": 0,
+        "total_ms": 6,
+        "pass": true
+      }
+    }
+  },
+  "summary": {
+    "total_benchmarks": 18,
+    "passed": 15,
+    "failed": 3,
+    "pass_rate": 0.83
+  }
+}
