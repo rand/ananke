@@ -1127,6 +1127,64 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_cli_integration_tests.step);
     test_step.dependOn(&run_ariadne_tests.step);
 
+    // Phase 8a: TypeScript E2E pipeline tests
+    const typescript_pipeline_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/test_typescript_pipeline.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    typescript_pipeline_tests.linkSystemLibrary("tree-sitter");
+    typescript_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    typescript_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    typescript_pipeline_tests.linkLibrary(ts_parser_lib);
+    typescript_pipeline_tests.linkLibrary(py_parser_lib);
+    typescript_pipeline_tests.linkLibrary(js_parser_lib);
+    typescript_pipeline_tests.linkLibrary(rust_parser_lib);
+    typescript_pipeline_tests.linkLibrary(go_parser_lib);
+    typescript_pipeline_tests.linkLibrary(zig_parser_lib);
+    typescript_pipeline_tests.linkLibrary(c_parser_lib);
+    typescript_pipeline_tests.linkLibrary(cpp_parser_lib);
+    typescript_pipeline_tests.linkLibrary(java_parser_lib);
+
+    const run_typescript_pipeline_tests = b.addRunArtifact(typescript_pipeline_tests);
+
+    // Phase 8a: Python E2E pipeline tests
+    const python_pipeline_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/test_python_pipeline.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    python_pipeline_tests.linkSystemLibrary("tree-sitter");
+    python_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    python_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
+    python_pipeline_tests.linkLibrary(ts_parser_lib);
+    python_pipeline_tests.linkLibrary(py_parser_lib);
+    python_pipeline_tests.linkLibrary(js_parser_lib);
+    python_pipeline_tests.linkLibrary(rust_parser_lib);
+    python_pipeline_tests.linkLibrary(go_parser_lib);
+    python_pipeline_tests.linkLibrary(zig_parser_lib);
+    python_pipeline_tests.linkLibrary(c_parser_lib);
+    python_pipeline_tests.linkLibrary(cpp_parser_lib);
+    python_pipeline_tests.linkLibrary(java_parser_lib);
+
+    const run_python_pipeline_tests = b.addRunArtifact(python_pipeline_tests);
+
     // E2E test step (can be run separately)
     const e2e_test_step = b.step("test-e2e", "Run end-to-end integration tests");
     e2e_test_step.dependOn(&run_e2e_tests.step);
@@ -1135,6 +1193,8 @@ pub fn build(b: *std.Build) void {
     e2e_test_step.dependOn(&run_phase2_multi_language_tests.step);
     e2e_test_step.dependOn(&run_phase2_strategy_comparison_tests.step);
     e2e_test_step.dependOn(&run_phase2_constraint_quality_tests.step);
+    e2e_test_step.dependOn(&run_typescript_pipeline_tests.step);
+    e2e_test_step.dependOn(&run_python_pipeline_tests.step);
 
     // Phase 2 E2E test step (can be run separately)
     const phase2_test_step = b.step("test-phase2", "Run Phase 2 E2E integration tests");
