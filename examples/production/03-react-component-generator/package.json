@@ -1,0 +1,40 @@
+{
+  "name": "ananke-example-react-component-generator",
+  "version": "1.0.0",
+  "description": "Example demonstrating React component generation with Ananke",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "ananke",
+    "react",
+    "component-generation",
+    "accessibility",
+    "design-system"
+  ],
+  "author": "Ananke",
+  "license": "MIT",
+  "devDependencies": {
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "axe-core": "^4.8.3",
+    "jest-axe": "^8.0.0",
+    "jsdom": "^23.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vitest": "^1.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}
