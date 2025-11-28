@@ -23,9 +23,9 @@ pub fn build(b: *std.Build) void {
     });
 
     // Link tree-sitter and language parsers from the ananke dependency
+    // Note: tree-sitter must be installed system-wide (brew install tree-sitter on macOS,
+    // apt-get install libtree-sitter-dev on Ubuntu, pacman -S tree-sitter on Arch)
     exe.linkSystemLibrary("tree-sitter");
-    exe.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/include" });
-    exe.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/lib" });
     exe.linkLibrary(ananke.artifact("tree-sitter-typescript"));
     exe.linkLibrary(ananke.artifact("tree-sitter-python"));
     exe.linkLibrary(ananke.artifact("tree-sitter-javascript"));
