@@ -1,0 +1,19 @@
+# Python dependencies for Database Migration Generator
+
+# Core dependencies (no external packages needed - uses stdlib only)
+# The schema_diff.py script uses only Python standard library:
+# - re (regex)
+# - json (JSON processing)
+# - sys (CLI arguments)
+# - pathlib (file paths)
+# - dataclasses (data structures)
+# - typing (type hints)
+
+# Development/Testing dependencies (optional)
+pytest>=7.4.0          # For advanced testing
+pytest-cov>=4.1.0      # Test coverage
+black>=23.0.0          # Code formatting
+mypy>=1.5.0            # Type checking
+
+# PostgreSQL client (optional, for SQL validation)
+# psycopg2-binary>=2.9.0  # Uncomment if you want Python PostgreSQL access
