@@ -348,3 +348,59 @@ test "generate: invalid endpoint URL" {
     const result = generate.run(allocator, args, config);
     try testing.expectError(error.InvalidUrl, result);
 }
+
+test "generate: prompt with quotes is properly escaped" {
+    const allocator = testing.allocator;
+
+    // Start mock server
+    var mock = try MockServer.init(allocator);
+    defer mock.deinit();
+
+    const endpoint_url = try mock.getUrl(allocator);
+    defer allocator.free(endpoint_url);
+
+    var config = config_mod.Config.init(allocator);
+    defer config.deinit();
+
+    // Test with prompt containing quotes
+    const argv = [_][:0]const u8{
+        "ananke",
+        "generate",
+        "create a function that returns \"hello world\"",
+        "--endpoint",
+        endpoint_url,
+    };
+    var args = try args_mod.parse(allocator, argv[0..]);
+    defer args.deinit();
+
+    // Should successfully escape quotes and generate valid JSON
+    try generate.run(allocator, args, config);
+}
+
+test "generate: prompt with newlines is properly escaped" {
+    const allocator = testing.allocator;
+
+    // Start mock server
+    var mock = try MockServer.init(allocator);
+    defer mock.deinit();
+
+    const endpoint_url = try mock.getUrl(allocator);
+    defer allocator.free(endpoint_url);
+
+    var config = config_mod.Config.init(allocator);
+    defer config.deinit();
+
+    // Test with prompt containing newlines
+    const argv = [_][:0]const u8{
+        "ananke",
+        "generate",
+        "create:\nfunction test()\nwith multiple lines",
+        "--endpoint",
+        endpoint_url,
+    };
+    var args = try args_mod.parse(allocator, argv[0..]);
+    defer args.deinit();
+
+    // Should successfully escape newlines and generate valid JSON
+    try generate.run(allocator, args, config);
+}
