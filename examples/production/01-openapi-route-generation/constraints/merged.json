@@ -1,0 +1,1031 @@
+{
+  "constraints": [
+    {
+      "type": "metadata",
+      "source": "openapi",
+      "api_title": "User Management API",
+      "api_version": "1.0.0",
+      "description": "A comprehensive API for managing users in a multi-tenant application.\nSupports user CRUD operations, search, and profile management.\n"
+    },
+    {
+      "type": "validation",
+      "parameter": "id",
+      "schema_type": "integer",
+      "minimum": 1,
+      "format": "int64",
+      "location": "path",
+      "required": true,
+      "description": "Unique user identifier"
+    },
+    {
+      "type": "validation",
+      "parameter": "include",
+      "schema_type": "string",
+      "enum": [
+        "profile",
+        "settings",
+        "stats",
+        "all"
+      ],
+      "location": "query",
+      "required": false,
+      "description": "Optional related data to include (comma-separated)"
+    },
+    {
+      "type": "response_format",
+      "status_code": 400,
+      "description": "Invalid user ID format",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 404,
+      "description": "User not found",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 500,
+      "description": "Internal server error",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "api_contract",
+      "source": "openapi",
+      "method": "GET",
+      "path": "/users/{id}",
+      "description": "Get user by ID",
+      "operation_id": "getUserById",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "example": 42
+          }
+        },
+        {
+          "name": "include",
+          "location": "query",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "settings",
+              "stats",
+              "all"
+            ],
+            "example": "profile,stats"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "User found successfully",
+          "schema": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "400": {
+          "description": "Invalid user ID format",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "404": {
+          "description": "User not found",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        }
+      }
+    },
+    {
+      "type": "validation",
+      "parameter": "id",
+      "schema_type": "integer",
+      "minimum": 1,
+      "format": "int32",
+      "location": "path",
+      "required": true,
+      "description": ""
+    },
+    {
+      "type": "validation",
+      "parameter": "request_body",
+      "location": "body",
+      "required": true,
+      "content_type": "application/json",
+      "schema": {
+        "$ref": "#/components/schemas/UserUpdateRequest"
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 400,
+      "description": "Invalid request body",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 404,
+      "description": "User not found",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 409,
+      "description": "Email already in use",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "api_contract",
+      "source": "openapi",
+      "method": "PUT",
+      "path": "/users/{id}",
+      "description": "Update user",
+      "operation_id": "updateUser",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "request_body": {
+        "required": true,
+        "content_types": [
+          "application/json"
+        ]
+      },
+      "responses": {
+        "200": {
+          "description": "User updated successfully",
+          "schema": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "400": {
+          "description": "Invalid request body",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "404": {
+          "description": "User not found",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "409": {
+          "description": "Email already in use",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        }
+      }
+    },
+    {
+      "type": "validation",
+      "parameter": "id",
+      "schema_type": "integer",
+      "minimum": 1,
+      "format": "int32",
+      "location": "path",
+      "required": true,
+      "description": ""
+    },
+    {
+      "type": "response_format",
+      "status_code": 404,
+      "description": "User not found",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "api_contract",
+      "source": "openapi",
+      "method": "DELETE",
+      "path": "/users/{id}",
+      "description": "Delete user",
+      "operation_id": "deleteUser",
+      "parameters": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "responses": {
+        "204": {
+          "description": "User deleted successfully"
+        },
+        "404": {
+          "description": "User not found",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        }
+      }
+    },
+    {
+      "type": "validation",
+      "parameter": "page",
+      "schema_type": "integer",
+      "minimum": 1,
+      "format": "int32",
+      "location": "query",
+      "required": false,
+      "description": "Page number (1-indexed)"
+    },
+    {
+      "type": "validation",
+      "parameter": "limit",
+      "schema_type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "format": "int32",
+      "location": "query",
+      "required": false,
+      "description": "Number of users per page"
+    },
+    {
+      "type": "validation",
+      "parameter": "role",
+      "schema_type": "string",
+      "enum": [
+        "admin",
+        "user",
+        "moderator"
+      ],
+      "location": "query",
+      "required": false,
+      "description": "Filter by user role"
+    },
+    {
+      "type": "validation",
+      "parameter": "search",
+      "schema_type": "string",
+      "minLength": 2,
+      "maxLength": 100,
+      "location": "query",
+      "required": false,
+      "description": "Search users by name or email (case-insensitive)"
+    },
+    {
+      "type": "validation",
+      "parameter": "sort",
+      "schema_type": "string",
+      "enum": [
+        "createdAt:asc",
+        "createdAt:desc",
+        "name:asc",
+        "name:desc"
+      ],
+      "location": "query",
+      "required": false,
+      "description": "Sort field and direction"
+    },
+    {
+      "type": "response_format",
+      "status_code": 400,
+      "description": "Invalid query parameters",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "api_contract",
+      "source": "openapi",
+      "method": "GET",
+      "path": "/users",
+      "description": "List users",
+      "operation_id": "listUsers",
+      "parameters": [
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "example": 1
+          }
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "example": 20
+          }
+        },
+        {
+          "name": "role",
+          "location": "query",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "user",
+              "moderator"
+            ]
+          }
+        },
+        {
+          "name": "search",
+          "location": "query",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "john"
+          }
+        },
+        {
+          "name": "sort",
+          "location": "query",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "createdAt:asc",
+              "createdAt:desc",
+              "name:asc",
+              "name:desc"
+            ],
+            "default": "createdAt:desc"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Users retrieved successfully",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/Pagination"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid query parameters",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        }
+      }
+    },
+    {
+      "type": "validation",
+      "parameter": "request_body",
+      "location": "body",
+      "required": true,
+      "content_type": "application/json",
+      "schema": {
+        "$ref": "#/components/schemas/UserCreateRequest"
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 400,
+      "description": "Invalid request body",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "response_format",
+      "status_code": 409,
+      "description": "Email already exists",
+      "pattern": {
+        "properties": [
+          "error",
+          "message"
+        ],
+        "optional_properties": [
+          "details"
+        ]
+      }
+    },
+    {
+      "type": "api_contract",
+      "source": "openapi",
+      "method": "POST",
+      "path": "/users",
+      "description": "Create user",
+      "operation_id": "createUser",
+      "request_body": {
+        "required": true,
+        "content_types": [
+          "application/json"
+        ]
+      },
+      "responses": {
+        "201": {
+          "description": "User created successfully",
+          "schema": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "400": {
+          "description": "Invalid request body",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "409": {
+          "description": "Email already exists",
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        }
+      }
+    },
+    {
+      "type": "type_constraint",
+      "source": "openapi",
+      "name": "User",
+      "schema": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unique user identifier",
+            "example": 42
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address (unique)",
+            "example": "john.doe@example.com"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "User's full name",
+            "example": "John Doe"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "user",
+              "moderator"
+            ],
+            "description": "User's role in the system",
+            "example": "user"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when user was created",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "profile": {
+            "type": "object",
+            "description": "Optional user profile data",
+            "properties": {
+              "avatar": {
+                "type": "string",
+                "format": "uri",
+                "example": "https://example.com/avatars/42.jpg"
+              },
+              "bio": {
+                "type": "string",
+                "maxLength": 500,
+                "example": "Software engineer and coffee enthusiast"
+              }
+            }
+          }
+        }
+      },
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Unique user identifier",
+          "example": 42
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email address (unique)",
+          "example": "john.doe@example.com"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "User's full name",
+          "example": "John Doe"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "admin",
+            "user",
+            "moderator"
+          ],
+          "description": "User's role in the system",
+          "example": "user"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when user was created",
+          "example": "2024-01-15T10:30:00Z"
+        },
+        "profile": {
+          "type": "object",
+          "description": "Optional user profile data",
+          "properties": {
+            "avatar": {
+              "type": "string",
+              "format": "uri",
+              "example": "https://example.com/avatars/42.jpg"
+            },
+            "bio": {
+              "type": "string",
+              "maxLength": 500,
+              "example": "Software engineer and coffee enthusiast"
+            }
+          }
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name",
+        "role",
+        "createdAt"
+      ]
+    },
+    {
+      "type": "type_constraint",
+      "source": "openapi",
+      "name": "UserCreateRequest",
+      "schema": {
+        "type": "object",
+        "required": [
+          "email",
+          "name",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "newuser@example.com"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "New User"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "Must contain uppercase, lowercase, number, and special character",
+            "example": "SecurePassword123!"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "user",
+              "moderator"
+            ],
+            "default": "user"
+          }
+        }
+      },
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "example": "newuser@example.com"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "example": "New User"
+        },
+        "password": {
+          "type": "string",
+          "format": "password",
+          "minLength": 8,
+          "maxLength": 72,
+          "description": "Must contain uppercase, lowercase, number, and special character",
+          "example": "SecurePassword123!"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "admin",
+            "user",
+            "moderator"
+          ],
+          "default": "user"
+        }
+      },
+      "required": [
+        "email",
+        "name",
+        "password"
+      ]
+    },
+    {
+      "type": "type_constraint",
+      "source": "openapi",
+      "name": "UserUpdateRequest",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "user",
+              "moderator"
+            ]
+          }
+        }
+      },
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "admin",
+            "user",
+            "moderator"
+          ]
+        }
+      }
+    },
+    {
+      "type": "type_constraint",
+      "source": "openapi",
+      "name": "Error",
+      "schema": {
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type/category",
+            "example": "Validation failed"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message",
+            "example": "User ID must be a positive integer"
+          },
+          "details": {
+            "type": "array",
+            "description": "Optional detailed validation errors",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "issue": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "properties": {
+        "error": {
+          "type": "string",
+          "description": "Error type/category",
+          "example": "Validation failed"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "example": "User ID must be a positive integer"
+        },
+        "details": {
+          "type": "array",
+          "description": "Optional detailed validation errors",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "issue": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "error",
+        "message"
+      ]
+    },
+    {
+      "type": "type_constraint",
+      "source": "openapi",
+      "name": "Pagination",
+      "schema": {
+        "type": "object",
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current page number"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Items per page"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of items"
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of pages"
+          }
+        }
+      },
+      "properties": {
+        "page": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current page number"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Items per page"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of items"
+        },
+        "totalPages": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of pages"
+        }
+      },
+      "required": [
+        "page",
+        "limit",
+        "total",
+        "totalPages"
+      ]
+    },
+    {
+      "type": "pattern",
+      "category": "error_handling",
+      "description": "All async routes use try/catch blocks with specific error type handling",
+      "example": "try { ... } catch (error) { if (error instanceof z.ZodError) { ... } ... }"
+    },
+    {
+      "type": "pattern",
+      "category": "validation",
+      "description": "Request validation using Zod schemas before processing",
+      "example": "const params = getUserParamsSchema.parse({ id: parseInt(req.params.id, 10) })"
+    },
+    {
+      "type": "pattern",
+      "category": "response_format",
+      "description": "Consistent error response format with error, message, and optional details",
+      "example": "res.status(400).json({ error: 'Validation failed', message: '...', details: [...] })"
+    },
+    {
+      "type": "pattern",
+      "category": "database_access",
+      "description": "Database queries use async/await pattern",
+      "example": "const product = await db.products.findById(params.id)"
+    },
+    {
+      "type": "pattern",
+      "category": "http_status",
+      "description": "Use appropriate HTTP status codes: 200 (success), 400 (validation), 404 (not found), 500 (server error)",
+      "example": "return res.status(404).json({ error: 'Not found', message: '...' })"
+    },
+    {
+      "type": "validation",
+      "library": "zod",
+      "description": "Path parameters validated with Zod schemas",
+      "example": "const getProductParamsSchema = z.object({ id: z.number().int().positive() })"
+    },
+    {
+      "type": "validation",
+      "library": "zod",
+      "description": "Query parameters validated with Zod schemas supporting optional fields and defaults",
+      "example": "const listQuerySchema = z.object({ page: z.number().int().min(1).default(1) })"
+    },
+    {
+      "type": "pattern",
+      "category": "parameter_parsing",
+      "description": "Path parameters parsed from strings to appropriate types",
+      "example": "id: parseInt(req.params.id, 10)"
+    },
+    {
+      "type": "pattern",
+      "category": "pagination",
+      "description": "List endpoints return data array and pagination metadata",
+      "example": "return res.status(200).json({ data: [...], pagination: { page, limit, total, totalPages } })"
+    },
+    {
+      "type": "error_handling",
+      "error_type": "ZodError",
+      "status_code": 400,
+      "description": "Zod validation errors return 400 with structured details",
+      "example": "if (error instanceof z.ZodError) { return res.status(400).json({ error: 'Validation failed', details: error.errors.map(...) }) }"
+    },
+    {
+      "type": "error_handling",
+      "error_type": "unexpected",
+      "status_code": 500,
+      "description": "Unexpected errors logged and return 500 with generic message",
+      "example": "console.error('Error:', error); return res.status(500).json({ error: 'Internal server error', message: '...' })"
+    },
+    {
+      "type": "pattern",
+      "category": "not_found",
+      "description": "Resource not found returns 404 with descriptive message including resource ID",
+      "example": "if (!product) { return res.status(404).json({ error: 'Product not found', message: `No product exists with id ${params.id}` }) }"
+    },
+    {
+      "type": "pattern",
+      "category": "documentation",
+      "description": "Routes include JSDoc comments describing parameters and responses",
+      "example": "/** * GET /products/:id * Fetch a single product by ID */"
+    },
+    {
+      "type": "type_constraint",
+      "description": "TypeScript type annotations for Request and Response",
+      "example": "router.get('/path', async (req: Request, res: Response) => { ... })"
+    },
+    {
+      "type": "pattern",
+      "category": "filtering",
+      "description": "List endpoints support optional filtering parameters",
+      "example": "if (filters.category) { products = products.filter(p => p.category === filters.category) }"
+    }
+  ],
+  "metadata": {
+    "sources": [
+      "openapi",
+      "extracted_code"
+    ],
+    "merge_strategy": "openapi_takes_precedence_for_api_contract"
+  }
+}
