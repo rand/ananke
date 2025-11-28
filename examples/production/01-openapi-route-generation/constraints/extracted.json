@@ -1,0 +1,102 @@
+{
+  "constraints": [
+    {
+      "type": "pattern",
+      "category": "error_handling",
+      "description": "All async routes use try/catch blocks with specific error type handling",
+      "example": "try { ... } catch (error) { if (error instanceof z.ZodError) { ... } ... }"
+    },
+    {
+      "type": "pattern",
+      "category": "validation",
+      "description": "Request validation using Zod schemas before processing",
+      "example": "const params = getUserParamsSchema.parse({ id: parseInt(req.params.id, 10) })"
+    },
+    {
+      "type": "pattern",
+      "category": "response_format",
+      "description": "Consistent error response format with error, message, and optional details",
+      "example": "res.status(400).json({ error: 'Validation failed', message: '...', details: [...] })"
+    },
+    {
+      "type": "pattern",
+      "category": "database_access",
+      "description": "Database queries use async/await pattern",
+      "example": "const product = await db.products.findById(params.id)"
+    },
+    {
+      "type": "pattern",
+      "category": "http_status",
+      "description": "Use appropriate HTTP status codes: 200 (success), 400 (validation), 404 (not found), 500 (server error)",
+      "example": "return res.status(404).json({ error: 'Not found', message: '...' })"
+    },
+    {
+      "type": "validation",
+      "library": "zod",
+      "description": "Path parameters validated with Zod schemas",
+      "example": "const getProductParamsSchema = z.object({ id: z.number().int().positive() })"
+    },
+    {
+      "type": "validation",
+      "library": "zod",
+      "description": "Query parameters validated with Zod schemas supporting optional fields and defaults",
+      "example": "const listQuerySchema = z.object({ page: z.number().int().min(1).default(1) })"
+    },
+    {
+      "type": "pattern",
+      "category": "parameter_parsing",
+      "description": "Path parameters parsed from strings to appropriate types",
+      "example": "id: parseInt(req.params.id, 10)"
+    },
+    {
+      "type": "pattern",
+      "category": "pagination",
+      "description": "List endpoints return data array and pagination metadata",
+      "example": "return res.status(200).json({ data: [...], pagination: { page, limit, total, totalPages } })"
+    },
+    {
+      "type": "error_handling",
+      "error_type": "ZodError",
+      "status_code": 400,
+      "description": "Zod validation errors return 400 with structured details",
+      "example": "if (error instanceof z.ZodError) { return res.status(400).json({ error: 'Validation failed', details: error.errors.map(...) }) }"
+    },
+    {
+      "type": "error_handling",
+      "error_type": "unexpected",
+      "status_code": 500,
+      "description": "Unexpected errors logged and return 500 with generic message",
+      "example": "console.error('Error:', error); return res.status(500).json({ error: 'Internal server error', message: '...' })"
+    },
+    {
+      "type": "pattern",
+      "category": "not_found",
+      "description": "Resource not found returns 404 with descriptive message including resource ID",
+      "example": "if (!product) { return res.status(404).json({ error: 'Product not found', message: `No product exists with id ${params.id}` }) }"
+    },
+    {
+      "type": "pattern",
+      "category": "documentation",
+      "description": "Routes include JSDoc comments describing parameters and responses",
+      "example": "/** * GET /products/:id * Fetch a single product by ID */"
+    },
+    {
+      "type": "type_constraint",
+      "description": "TypeScript type annotations for Request and Response",
+      "example": "router.get('/path', async (req: Request, res: Response) => { ... })"
+    },
+    {
+      "type": "pattern",
+      "category": "filtering",
+      "description": "List endpoints support optional filtering parameters",
+      "example": "if (filters.category) { products = products.filter(p => p.category === filters.category) }"
+    }
+  ],
+  "metadata": {
+    "source": "input/existing_routes.ts",
+    "language": "typescript",
+    "framework": "express",
+    "validation_library": "zod",
+    "extracted_at": "2025-11-27T21:45:00Z"
+  }
+}
