@@ -15,10 +15,12 @@ pub const Config = struct {
 
     // Default settings
     default_language: []const u8 = "typescript",
+    default_language_owned: bool = false, // Track if default_language was allocated
     max_tokens: u32 = 4096,
     temperature: f32 = 0.7,
     confidence_threshold: f32 = 0.5,
     output_format: []const u8 = "pretty",
+    output_format_owned: bool = false, // Track if output_format was allocated
 
     // Extract settings
     extract_patterns: []const []const u8 = &.{"all"},
@@ -26,6 +28,7 @@ pub const Config = struct {
 
     // Compile settings
     compile_priority: []const u8 = "medium",
+    compile_priority_owned: bool = false, // Track if compile_priority was allocated
     compile_formats: []const []const u8 = &.{"json-schema"},
 
     pub fn init(allocator: std.mem.Allocator) Config {
@@ -47,7 +50,16 @@ pub const Config = struct {
         if (self.claude_endpoint) |endpoint| {
             self.allocator.free(endpoint);
         }
-        // Note: Other fields are string literals or owned by caller
+        // Free owned string fields
+        if (self.default_language_owned) {
+            self.allocator.free(self.default_language);
+        }
+        if (self.output_format_owned) {
+            self.allocator.free(self.output_format);
+        }
+        if (self.compile_priority_owned) {
+            self.allocator.free(self.compile_priority);
+        }
     }
 
     /// Load configuration from file
@@ -137,7 +149,11 @@ pub const Config = struct {
         } else |_| {}
 
         if (std.process.getEnvVarOwned(self.allocator, "ANANKE_LANGUAGE")) |lang| {
+            if (self.default_language_owned) {
+                self.allocator.free(self.default_language);
+            }
             self.default_language = lang;
+            self.default_language_owned = true;
         } else |_| {}
     }
 
@@ -195,7 +211,11 @@ pub const Config = struct {
                 }
             } else if (std.mem.eql(u8, sec, "defaults")) {
                 if (std.mem.eql(u8, key, "language")) {
-                    self.default_language = value;
+                    if (self.default_language_owned) {
+                        self.allocator.free(self.default_language);
+                    }
+                    self.default_language = try self.allocator.dupe(u8, value);
+                    self.default_language_owned = true;
                 } else if (std.mem.eql(u8, key, "max_tokens")) {
                     self.max_tokens = try std.fmt.parseInt(u32, value, 10);
                 } else if (std.mem.eql(u8, key, "temperature")) {
@@ -203,7 +223,11 @@ pub const Config = struct {
                 } else if (std.mem.eql(u8, key, "confidence_threshold")) {
                     self.confidence_threshold = try std.fmt.parseFloat(f32, value);
                 } else if (std.mem.eql(u8, key, "output_format")) {
-                    self.output_format = value;
+                    if (self.output_format_owned) {
+                        self.allocator.free(self.output_format);
+                    }
+                    self.output_format = try self.allocator.dupe(u8, value);
+                    self.output_format_owned = true;
                 }
             } else if (std.mem.eql(u8, sec, "extract")) {
                 if (std.mem.eql(u8, key, "use_claude")) {
@@ -211,7 +235,11 @@ pub const Config = struct {
                 }
             } else if (std.mem.eql(u8, sec, "compile")) {
                 if (std.mem.eql(u8, key, "priority")) {
-                    self.compile_priority = value;
+                    if (self.compile_priority_owned) {
+                        self.allocator.free(self.compile_priority);
+                    }
+                    self.compile_priority = try self.allocator.dupe(u8, value);
+                    self.compile_priority_owned = true;
                 }
             }
         }
