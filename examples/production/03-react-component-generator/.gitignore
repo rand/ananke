@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Generated files
+output/*.tsx
+!output/.gitkeep
+constraints/*.json
+!constraints/.gitkeep
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
