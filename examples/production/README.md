@@ -193,7 +193,7 @@ All examples follow the same 4-phase pipeline:
 ### Phase 1: Extract
 Extract constraints from existing code using Ananke's static analysis:
 ```bash
-ananke extract input/existing_code.* --language [typescript|python] -o constraints/extracted.json
+ananke extract input/existing_code.* --language [typescript|python] --format json -o constraints/extracted.json
 ```
 
 ### Phase 2: Merge
