@@ -171,6 +171,9 @@ pub const ConstraintIR = struct {
     /// Priority for conflict resolution
     priority: u32 = 0,
 
+    /// true if this IR owns grammar strings (from clone), false if borrowed from interner
+    owns_grammar_strings: bool = false,
+
     /// Free all allocated memory in this ConstraintIR
     pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
         // Free json_schema if present
@@ -198,24 +201,35 @@ pub const ConstraintIR = struct {
             }
         }
 
-        // Free grammar rules if present
+        // Free grammar rules if present and owned
         if (self.grammar) |grammar| {
-            allocator.free(grammar.start_symbol);
-            for (grammar.rules) |rule| {
-                allocator.free(rule.lhs);
-                for (rule.rhs) |rhs_item| {
-                    allocator.free(rhs_item);
+            if (self.owns_grammar_strings) {
+                // We own the strings - free them
+                allocator.free(grammar.start_symbol);
+                for (grammar.rules) |rule| {
+                    allocator.free(rule.lhs);
+                    for (rule.rhs) |rhs_item| {
+                        allocator.free(rhs_item);
+                    }
+                    allocator.free(rule.rhs);
                 }
-                allocator.free(rule.rhs);
+            } else {
+                // We don't own the strings (borrowed from interner) - just free slices
+                for (grammar.rules) |rule| {
+                    allocator.free(rule.rhs);
+                }
             }
             allocator.free(grammar.rules);
         }
 
         // Free regex patterns if present
         for (self.regex_patterns) |pattern| {
-            allocator.free(pattern.pattern);
-            if (pattern.flags.len > 0) {
-                allocator.free(pattern.flags);
+            // Only free non-static patterns
+            if (!pattern.is_static) {
+                allocator.free(pattern.pattern);
+                if (pattern.flags.len > 0) {
+                    allocator.free(pattern.flags);
+                }
             }
         }
         if (self.regex_patterns.len > 0) {
@@ -246,6 +260,7 @@ pub const ConstraintIR = struct {
     pub fn clone(self: *const ConstraintIR, allocator: std.mem.Allocator) !ConstraintIR {
         var cloned = ConstraintIR{
             .priority = self.priority,
+            .owns_grammar_strings = true, // cloned IR owns its own strings
         };
 
         // Clone json_schema if present
@@ -265,6 +280,7 @@ pub const ConstraintIR = struct {
                 patterns[i] = .{
                     .pattern = try allocator.dupe(u8, pattern.pattern),
                     .flags = try allocator.dupe(u8, pattern.flags),
+                    .is_static = pattern.is_static,
                 };
             }
             cloned.regex_patterns = patterns;
@@ -430,6 +446,7 @@ pub const GrammarRule = struct {
 pub const Regex = struct {
     pattern: []const u8,
     flags: []const u8 = "",
+    is_static: bool = false, // true if pattern points to static RegexPatternPool constant
 };
 
 /// Individual token mask rule

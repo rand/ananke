@@ -4,30 +4,33 @@ const std = @import("std");
 
 /// String interner for grammar literals
 /// Deduplicates commonly used grammar strings to reduce memory usage
-/// Note: The interner does NOT own the strings - they are owned by the Grammar/IR
-/// structures. The interner just ensures that duplicate strings share the same allocation.
+/// The interner OWNS all interned strings via an arena allocator.
+/// All strings are freed at once when the interner is destroyed.
 pub const GrammarInterner = struct {
     allocator: std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
     // Maps string content to the canonical allocated copy
-    // Keys are owned by the Grammar/IR, not by this interner
+    // All strings are owned by the arena
     strings: std.StringHashMapUnmanaged([]const u8),
 
     pub fn init(allocator: std.mem.Allocator) GrammarInterner {
         return .{
             .allocator = allocator,
+            .arena = std.heap.ArenaAllocator.init(allocator),
             .strings = std.StringHashMapUnmanaged([]const u8){},
         };
     }
 
     pub fn deinit(self: *GrammarInterner) void {
-        // Don't free the strings - they are owned by Grammar/IR
-        // Just clean up the HashMap structure
+        // Free the HashMap structure
         self.strings.deinit(self.allocator);
+        // Free all interned strings at once via arena
+        self.arena.deinit();
     }
 
     /// Intern a literal string, returning a stable pointer
     /// If the string is already interned, returns the existing pointer
-    /// Otherwise, allocates a new copy and tracks it for future deduplication
+    /// Otherwise, allocates a new copy via arena and tracks it for future deduplication
     pub fn intern(self: *GrammarInterner, str: []const u8) ![]const u8 {
         // Check if we already have this string
         const gop = try self.strings.getOrPut(self.allocator, str);
@@ -36,8 +39,8 @@ pub const GrammarInterner = struct {
             // Return the existing interned string
             return gop.value_ptr.*;
         } else {
-            // Allocate a new copy
-            const owned = try self.allocator.dupe(u8, str);
+            // Allocate a new copy via arena
+            const owned = try self.arena.allocator().dupe(u8, str);
             // Update the key to point to the owned string (for proper hashing)
             gop.key_ptr.* = owned;
             gop.value_ptr.* = owned;
@@ -101,9 +104,7 @@ test "grammar interner basic" {
     // Different strings have different pointers
     try testing.expect(prog1.ptr != custom.ptr);
 
-    // Cleanup: free the interned strings (simulating Grammar cleanup)
-    allocator.free(prog1);
-    allocator.free(custom);
+    // No manual cleanup needed - interner owns all strings via arena
 }
 
 test "regex pattern pool" {
