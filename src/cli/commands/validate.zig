@@ -60,6 +60,11 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     defer allocator.free(source);
 
     // Load constraints
+    // Use an arena allocator for JSON-parsed constraints to avoid manual memory management
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
+
     var constraint_set: ?ananke.ConstraintSet = null;
     defer {
         if (constraint_set) |*cs| {
@@ -78,7 +83,8 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         };
         defer allocator.free(constraints_json);
 
-        constraint_set = parseConstraintsJson(allocator, constraints_json) catch |err| {
+        // Parse constraints using arena allocator - all strings will be freed when arena is freed
+        constraint_set = parseConstraintsJson(arena_allocator, constraints_json) catch |err| {
             cli_error.printError("Failed to parse constraints: {s}", .{@errorName(err)});
             return err;
         };
