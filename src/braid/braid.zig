@@ -597,16 +597,19 @@ pub const Braid = struct {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.CAMEL_CASE,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             } else if (std.mem.indexOf(u8, desc, "PascalCase") != null) {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.PASCAL_CASE,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             } else if (std.mem.indexOf(u8, desc, "snake_case") != null) {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.SNAKE_CASE,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             } else if (std.mem.indexOf(u8, desc, "SCREAMING_SNAKE_CASE") != null or
                 std.mem.indexOf(u8, desc, "UPPER_CASE") != null)
@@ -614,11 +617,13 @@ pub const Braid = struct {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.SCREAMING_SNAKE_CASE,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             } else if (std.mem.indexOf(u8, desc, "kebab-case") != null) {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.KEBAB_CASE,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             }
 
@@ -627,16 +632,19 @@ pub const Braid = struct {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.EMAIL,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             } else if (std.mem.indexOf(u8, desc, "URL") != null or std.mem.indexOf(u8, desc, "url") != null) {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.URL,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             } else if (std.mem.indexOf(u8, desc, "UUID") != null or std.mem.indexOf(u8, desc, "uuid") != null) {
                 try patterns.append(self.allocator, .{
                     .pattern = RegexPatternPool.UUID,
                     .flags = RegexPatternPool.EMPTY_FLAGS,
+                    .is_static = true,
                 });
             }
         }
@@ -1699,13 +1707,49 @@ const Conflict = struct {
 pub const buildJSONSchemaString = @import("json_schema_builder.zig").buildJSONSchemaString;
 
 // Public API for testing grammar building
+// Returns a Grammar with fresh allocations (not borrowed from interner)
+// Caller must free using the helper in constraint.zig or manually
 pub fn buildGrammarFromConstraints(
     allocator: std.mem.Allocator,
     constraints: []const Constraint,
 ) !Grammar {
     var braid = try Braid.init(allocator);
     defer braid.deinit();
-    return try braid.buildGrammar(constraints);
+
+    // Build grammar with interner strings
+    const grammar_with_interner = try braid.buildGrammar(constraints);
+
+    // Deep copy to create independent allocations before destroying interner
+    const owned_rules = try allocator.alloc(GrammarRule, grammar_with_interner.rules.len);
+    for (grammar_with_interner.rules, 0..) |rule, i| {
+        // Allocate and copy LHS
+        const lhs = try allocator.dupe(u8, rule.lhs);
+
+        // Allocate and copy RHS items
+        const rhs_items = try allocator.alloc([]const u8, rule.rhs.len);
+        for (rule.rhs, 0..) |rhs_item, j| {
+            rhs_items[j] = try allocator.dupe(u8, rhs_item);
+        }
+
+        owned_rules[i] = GrammarRule{
+            .lhs = lhs,
+            .rhs = rhs_items,
+        };
+    }
+
+    // Copy start symbol
+    const owned_start = try allocator.dupe(u8, grammar_with_interner.start_symbol);
+
+    // Free the interner-borrowed grammar structure (not the strings, just slices)
+    for (grammar_with_interner.rules) |rule| {
+        allocator.free(rule.rhs);
+    }
+    allocator.free(grammar_with_interner.rules);
+
+    return Grammar{
+        .rules = owned_rules,
+        .start_symbol = owned_start,
+    };
 }
 
 /// Build a combined regex pattern from constraints containing regex patterns
