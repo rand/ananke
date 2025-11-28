@@ -191,3 +191,14 @@ zig.lock
 !.gitattributes
 !.editorconfig
 ananke-example-*/
+
+# Build artifacts at root (should be in zig-out)
+/*.o
+/*.a
+
+# Backup files
+*.backup
+build.zig.backup
+
+# Test output logs at root
+test_output.log
