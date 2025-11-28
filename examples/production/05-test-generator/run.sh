@@ -63,6 +63,7 @@ echo -e "${BLUE}[2/4] Extracting pytest patterns from existing tests...${NC}"
 if [ "$ANANKE_AVAILABLE" = true ]; then
     ananke extract input/existing_tests.py \
         --language python \
+        --format json \
         -o constraints/pytest_patterns.json
     echo -e "${GREEN}✓ Extracted pytest patterns${NC}"
 else

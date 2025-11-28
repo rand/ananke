@@ -76,6 +76,7 @@ extract_patterns() {
     # Extract patterns from existing migrations
     ananke extract \
         "$EXISTING_MIGRATIONS"/*.sql \
+        --format json \
         --output "$MIGRATION_PATTERNS" \
         --focus "transaction structure, UP/DOWN sections, header format, timestamp format, comment style" \
         2>&1 || {
