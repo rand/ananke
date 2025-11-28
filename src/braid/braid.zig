@@ -443,31 +443,41 @@ pub const Braid = struct {
 
     fn optimizeGraph(self: *Braid, graph: *ConstraintGraph) !void {
         // Topological sort for optimal evaluation order
-        const sorted_indices = try graph.topologicalSort();
-        defer self.allocator.free(sorted_indices);
+        var sort_result = try graph.topologicalSort();
+        defer sort_result.deinit(self.allocator);
 
-        // First, map constraint priority enum to u32 values
-        for (graph.nodes.items) |*node| {
-            node.priority = switch (node.constraint.priority) {
-                .Critical => 100,
-                .High => 75,
-                .Medium => 50,
-                .Low => 25,
-            };
-        }
+        switch (sort_result) {
+            .success => |sorted_indices| {
+                // First, map constraint priority enum to u32 values
+                for (graph.nodes.items) |*node| {
+                    node.priority = switch (node.constraint.priority) {
+                        .Critical => 100,
+                        .High => 75,
+                        .Medium => 50,
+                        .Low => 25,
+                    };
+                }
 
-        // Then boost priority for error severity constraints
-        for (graph.nodes.items) |*node| {
-            if (node.constraint.severity == .err) {
-                node.priority += 1000;
-            }
-        }
+                // Then boost priority for error severity constraints
+                for (graph.nodes.items) |*node| {
+                    if (node.constraint.severity == .err) {
+                        node.priority += 1000;
+                    }
+                }
 
-        // Update node priorities based on topological order
-        for (sorted_indices, 0..) |node_idx, order| {
-            if (node_idx < graph.nodes.items.len) {
-                graph.nodes.items[node_idx].priority += @as(u32, @intCast(order));
-            }
+                // Update node priorities based on topological order
+                for (sorted_indices, 0..) |node_idx, order| {
+                    if (node_idx < graph.nodes.items.len) {
+                        graph.nodes.items[node_idx].priority += @as(u32, @intCast(order));
+                    }
+                }
+            },
+            .cycle_detected => |info| {
+                const error_msg = try info.formatError(graph, self.allocator);
+                defer self.allocator.free(error_msg);
+                std.log.err("Constraint compilation failed: {s}", .{error_msg});
+                return error.CyclicConstraintDependency;
+            },
         }
     }
 
@@ -1478,6 +1488,73 @@ pub const ConstraintGraph = struct {
         to: usize,
     };
 
+    /// Information about detected cycle(s)
+    pub const CycleInfo = struct {
+        partial_order: []usize,
+        unordered_nodes: []usize,
+        example_cycle: []usize,
+
+        pub fn deinit(self: *CycleInfo, allocator: std.mem.Allocator) void {
+            allocator.free(self.partial_order);
+            allocator.free(self.unordered_nodes);
+            allocator.free(self.example_cycle);
+        }
+
+        pub fn formatError(
+            self: CycleInfo,
+            graph: *const ConstraintGraph,
+            allocator: std.mem.Allocator,
+        ) ![]const u8 {
+            // Format: "Cyclic dependency detected among N constraints."
+            // "Example cycle: A -> B -> C -> A"
+            var buffer = std.ArrayList(u8){};
+            defer buffer.deinit(allocator);
+            const writer = buffer.writer(allocator);
+
+            try writer.print("Cyclic dependency detected among {} constraint(s).\n", .{self.unordered_nodes.len});
+
+            if (self.example_cycle.len > 0) {
+                try writer.writeAll("Example cycle: ");
+                for (self.example_cycle, 0..) |node_idx, i| {
+                    if (node_idx < graph.nodes.items.len) {
+                        const node = graph.nodes.items[node_idx];
+                        try writer.print("{s}", .{node.constraint.name});
+                        if (i < self.example_cycle.len - 1) {
+                            try writer.writeAll(" -> ");
+                        }
+                    }
+                }
+                // Close the cycle by showing it returns to first node
+                if (self.example_cycle.len > 0 and self.example_cycle[0] < graph.nodes.items.len) {
+                    const first_node = graph.nodes.items[self.example_cycle[0]];
+                    try writer.print(" -> {s}", .{first_node.constraint.name});
+                }
+            }
+
+            return buffer.toOwnedSlice(allocator);
+        }
+    };
+
+    /// Result of topological sort operation
+    pub const TopologicalSortResult = union(enum) {
+        success: []usize,
+        cycle_detected: CycleInfo,
+
+        pub fn deinit(self: *TopologicalSortResult, allocator: std.mem.Allocator) void {
+            switch (self.*) {
+                .success => |order| allocator.free(order),
+                .cycle_detected => |*info| info.deinit(allocator),
+            }
+        }
+
+        pub fn getOrder(self: TopologicalSortResult) ?[]usize {
+            return switch (self) {
+                .success => |order| order,
+                .cycle_detected => null,
+            };
+        }
+    };
+
     pub fn init(allocator: std.mem.Allocator) ConstraintGraph {
         return .{
             .allocator = allocator,
@@ -1501,7 +1578,7 @@ pub const ConstraintGraph = struct {
         try self.edges.append(self.allocator, .{ .from = from, .to = to });
     }
 
-    pub fn topologicalSort(self: *ConstraintGraph) ![]usize {
+    pub fn topologicalSort(self: *ConstraintGraph) !TopologicalSortResult {
         // Kahn's algorithm for topological sorting with cycle detection
         var in_degree = std.AutoHashMap(usize, usize).init(self.allocator);
         defer in_degree.deinit();
@@ -1555,27 +1632,12 @@ pub const ConstraintGraph = struct {
 
         // Check for cycles
         if (processed_count < self.nodes.items.len) {
-            std.debug.print(
-                "Warning: Cyclic dependencies detected. Processed {}/{} constraints.\n",
-                .{ processed_count, self.nodes.items.len },
-            );
-
-            // Add remaining nodes to result (partial ordering)
-            for (0..self.nodes.items.len) |i| {
-                var found = false;
-                for (result.items) |item| {
-                    if (item == i) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    try result.append(self.allocator, i);
-                }
-            }
+            const cycle_info = try self.buildCycleInfo(result.items);
+            result.deinit(self.allocator);
+            return .{ .cycle_detected = cycle_info };
         }
 
-        return try result.toOwnedSlice(self.allocator);
+        return .{ .success = try result.toOwnedSlice(self.allocator) };
     }
 
     pub fn detectCycle(self: *ConstraintGraph) !bool {
@@ -1621,6 +1683,116 @@ pub const ConstraintGraph = struct {
         }
 
         rec_stack.items[node] = false;
+        return false;
+    }
+
+    /// Build CycleInfo from partial topological sort result
+    fn buildCycleInfo(self: *ConstraintGraph, partial_order: []const usize) !CycleInfo {
+        // Identify which nodes are in the partial order and which are unordered
+        var unordered = std.ArrayList(usize){};
+        defer unordered.deinit(self.allocator);
+
+        for (0..self.nodes.items.len) |i| {
+            var found = false;
+            for (partial_order) |ordered_node| {
+                if (ordered_node == i) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                try unordered.append(self.allocator, i);
+            }
+        }
+
+        // Find an example cycle among the unordered nodes
+        const example_cycle = try self.findOneCycle(unordered.items);
+
+        // Clone partial_order for CycleInfo
+        const partial_order_copy = try self.allocator.dupe(usize, partial_order);
+
+        return CycleInfo{
+            .partial_order = partial_order_copy,
+            .unordered_nodes = try unordered.toOwnedSlice(self.allocator),
+            .example_cycle = example_cycle,
+        };
+    }
+
+    /// Find one cycle among candidate nodes using DFS
+    fn findOneCycle(self: *ConstraintGraph, candidates: []const usize) ![]usize {
+        if (candidates.len == 0) {
+            return try self.allocator.alloc(usize, 0);
+        }
+
+        // Build a set of candidate nodes for quick lookup
+        var candidate_set = std.AutoHashMap(usize, void).init(self.allocator);
+        defer candidate_set.deinit();
+        for (candidates) |node| {
+            try candidate_set.put(node, {});
+        }
+
+        // Try DFS from each candidate to find a cycle
+        for (candidates) |start_node| {
+            var visited = std.AutoHashMap(usize, void).init(self.allocator);
+            defer visited.deinit();
+
+            var path = std.ArrayList(usize){};
+            defer path.deinit(self.allocator);
+
+            if (try self.findCycleDFS(start_node, &candidate_set, &visited, &path)) {
+                // Found a cycle! Return the path
+                return try path.toOwnedSlice(self.allocator);
+            }
+        }
+
+        // No cycle found (shouldn't happen if we have unordered nodes)
+        return try self.allocator.alloc(usize, 0);
+    }
+
+    /// DFS helper for finding a cycle, restricted to candidate nodes
+    fn findCycleDFS(
+        self: *ConstraintGraph,
+        node: usize,
+        candidates: *std.AutoHashMap(usize, void),
+        visited: *std.AutoHashMap(usize, void),
+        path: *std.ArrayList(usize),
+    ) !bool {
+        // Check if we've revisited a node in the current path (cycle detected)
+        for (path.items, 0..) |path_node, idx| {
+            if (path_node == node) {
+                // Found a cycle! Keep only the cycle portion by moving elements to the front
+                const cycle_len = path.items.len - idx;
+                if (idx > 0) {
+                    // Move cycle portion to beginning using memmove (handles overlapping)
+                    std.mem.copyForwards(usize, path.items[0..cycle_len], path.items[idx..]);
+                }
+                try path.resize(self.allocator, cycle_len);
+                return true;
+            }
+        }
+
+        // Skip if already fully visited
+        if (visited.contains(node)) {
+            return false;
+        }
+
+        // Add to current path
+        try path.append(self.allocator, node);
+
+        // Visit neighbors that are also candidates
+        for (self.edges.items) |edge| {
+            if (edge.from == node and candidates.contains(edge.to)) {
+                if (try self.findCycleDFS(edge.to, candidates, visited, path)) {
+                    return true;
+                }
+            }
+        }
+
+        // Mark as fully visited
+        try visited.put(node, {});
+
+        // Backtrack
+        _ = path.pop();
         return false;
     }
 
