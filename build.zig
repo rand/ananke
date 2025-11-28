@@ -63,7 +63,6 @@ pub fn build(b: *std.Build) void {
     // Linux: apt-get install libtree-sitter-dev or similar
     //
     // The tree-sitter C library provides the core API for parsing and AST traversal.
-    // We use the system-installed version at /opt/homebrew on macOS (Apple Silicon)
     // or /usr/local on Linux. For portability across systems, you may need to adjust
     // these paths or use pkg-config to detect the correct location.
 
@@ -78,8 +77,6 @@ pub fn build(b: *std.Build) void {
 
     // Configure tree-sitter system library and include paths
     // This ensures tree_sitter/api.h can be found by @cImport in c_api.zig
-    tree_sitter_mod.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/include" });
-    tree_sitter_mod.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/lib" });
     tree_sitter_mod.linkSystemLibrary("tree-sitter", .{});
 
     // Tree-sitter language parsers as static libraries
@@ -93,7 +90,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    ts_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     ts_parser_lib.addIncludePath(b.path("vendor/tree-sitter-typescript/typescript/src"));
     // The common scanner needs to find tree_sitter/parser.h from the tsx source dir
     ts_parser_lib.addIncludePath(b.path("vendor/tree-sitter-typescript/tsx/src"));
@@ -113,7 +109,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    py_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     py_parser_lib.addIncludePath(b.path("vendor/tree-sitter-python/src"));
     py_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-python/src"),
@@ -131,7 +126,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    js_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     js_parser_lib.addIncludePath(b.path("vendor/tree-sitter-javascript/src"));
     js_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-javascript/src"),
@@ -149,7 +143,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    rust_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     rust_parser_lib.addIncludePath(b.path("vendor/tree-sitter-rust/src"));
     rust_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-rust/src"),
@@ -167,7 +160,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    go_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     go_parser_lib.addIncludePath(b.path("vendor/tree-sitter-go/src"));
     go_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-go/src"),
@@ -185,7 +177,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    zig_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     zig_parser_lib.addIncludePath(b.path("vendor/tree-sitter-zig/src"));
     zig_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-zig/src"),
@@ -203,7 +194,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    c_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     c_parser_lib.addIncludePath(b.path("vendor/tree-sitter-c/src"));
     c_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-c/src"),
@@ -221,7 +211,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    cpp_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     cpp_parser_lib.addIncludePath(b.path("vendor/tree-sitter-cpp/src"));
     cpp_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-cpp/src"),
@@ -239,7 +228,6 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    java_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
     java_parser_lib.addIncludePath(b.path("vendor/tree-sitter-java/src"));
     java_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-java/src"),
@@ -416,8 +404,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     lib.linkSystemLibrary("tree-sitter");
-    lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    lib.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     lib.linkLibrary(ts_parser_lib);
     lib.linkLibrary(py_parser_lib);
     lib.linkLibrary(js_parser_lib);
@@ -490,8 +476,6 @@ pub fn build(b: *std.Build) void {
 
     // Link tree-sitter libraries
     exe.linkSystemLibrary("tree-sitter");
-    exe.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    exe.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     exe.linkLibrary(ts_parser_lib);
     exe.linkLibrary(py_parser_lib);
     exe.linkLibrary(js_parser_lib);
@@ -594,8 +578,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     clew_tests.linkSystemLibrary("tree-sitter");
-    clew_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    clew_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     clew_tests.linkLibrary(ts_parser_lib);
     clew_tests.linkLibrary(py_parser_lib);
     clew_tests.linkLibrary(js_parser_lib);
@@ -621,8 +603,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     cache_tests.linkSystemLibrary("tree-sitter");
-    cache_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    cache_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     cache_tests.linkLibrary(ts_parser_lib);
     cache_tests.linkLibrary(py_parser_lib);
     cache_tests.linkLibrary(js_parser_lib);
@@ -648,8 +628,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     pattern_tests.linkSystemLibrary("tree-sitter");
-    pattern_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    pattern_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     pattern_tests.linkLibrary(ts_parser_lib);
     pattern_tests.linkLibrary(py_parser_lib);
     pattern_tests.linkLibrary(js_parser_lib);
@@ -675,8 +653,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     tree_sitter_tests.linkSystemLibrary("tree-sitter");
-    tree_sitter_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    tree_sitter_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     tree_sitter_tests.linkLibrary(ts_parser_lib);
     tree_sitter_tests.linkLibrary(py_parser_lib);
     tree_sitter_tests.linkLibrary(js_parser_lib);
@@ -704,8 +680,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     hybrid_extractor_tests.linkSystemLibrary("tree-sitter");
-    hybrid_extractor_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    hybrid_extractor_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     hybrid_extractor_tests.linkLibrary(ts_parser_lib);
     hybrid_extractor_tests.linkLibrary(py_parser_lib);
     hybrid_extractor_tests.linkLibrary(js_parser_lib);
@@ -731,8 +705,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     traversal_tests.linkSystemLibrary("tree-sitter");
-    traversal_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    traversal_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     traversal_tests.linkLibrary(ts_parser_lib);
     traversal_tests.linkLibrary(py_parser_lib);
     traversal_tests.linkLibrary(js_parser_lib);
@@ -758,8 +730,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     rust_go_zig_tests.linkSystemLibrary("tree-sitter");
-    rust_go_zig_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    rust_go_zig_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     rust_go_zig_tests.linkLibrary(ts_parser_lib);
     rust_go_zig_tests.linkLibrary(py_parser_lib);
     rust_go_zig_tests.linkLibrary(js_parser_lib);
@@ -876,8 +846,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     integration_tests.linkSystemLibrary("tree-sitter");
-    integration_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    integration_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     integration_tests.linkLibrary(ts_parser_lib);
     integration_tests.linkLibrary(py_parser_lib);
     integration_tests.linkLibrary(js_parser_lib);
@@ -904,8 +872,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     e2e_tests.linkSystemLibrary("tree-sitter");
-    e2e_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    e2e_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     e2e_tests.linkLibrary(ts_parser_lib);
     e2e_tests.linkLibrary(py_parser_lib);
     e2e_tests.linkLibrary(js_parser_lib);
@@ -932,8 +898,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     new_e2e_tests.linkSystemLibrary("tree-sitter");
-    new_e2e_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    new_e2e_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     new_e2e_tests.linkLibrary(ts_parser_lib);
     new_e2e_tests.linkLibrary(py_parser_lib);
     new_e2e_tests.linkLibrary(js_parser_lib);
@@ -961,8 +925,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_full_pipeline_tests.linkSystemLibrary("tree-sitter");
-    phase2_full_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    phase2_full_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     phase2_full_pipeline_tests.linkLibrary(ts_parser_lib);
     phase2_full_pipeline_tests.linkLibrary(py_parser_lib);
     phase2_full_pipeline_tests.linkLibrary(js_parser_lib);
@@ -990,8 +952,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_multi_language_tests.linkSystemLibrary("tree-sitter");
-    phase2_multi_language_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    phase2_multi_language_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     phase2_multi_language_tests.linkLibrary(ts_parser_lib);
     phase2_multi_language_tests.linkLibrary(py_parser_lib);
     phase2_multi_language_tests.linkLibrary(js_parser_lib);
@@ -1019,8 +979,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_strategy_comparison_tests.linkSystemLibrary("tree-sitter");
-    phase2_strategy_comparison_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    phase2_strategy_comparison_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     phase2_strategy_comparison_tests.linkLibrary(ts_parser_lib);
     phase2_strategy_comparison_tests.linkLibrary(py_parser_lib);
     phase2_strategy_comparison_tests.linkLibrary(js_parser_lib);
@@ -1048,8 +1006,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_constraint_quality_tests.linkSystemLibrary("tree-sitter");
-    phase2_constraint_quality_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    phase2_constraint_quality_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     phase2_constraint_quality_tests.linkLibrary(ts_parser_lib);
     phase2_constraint_quality_tests.linkLibrary(py_parser_lib);
     phase2_constraint_quality_tests.linkLibrary(js_parser_lib);
@@ -1155,8 +1111,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     typescript_pipeline_tests.linkSystemLibrary("tree-sitter");
-    typescript_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    typescript_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     typescript_pipeline_tests.linkLibrary(ts_parser_lib);
     typescript_pipeline_tests.linkLibrary(py_parser_lib);
     typescript_pipeline_tests.linkLibrary(js_parser_lib);
@@ -1184,8 +1138,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     python_pipeline_tests.linkSystemLibrary("tree-sitter");
-    python_pipeline_tests.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    python_pipeline_tests.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     python_pipeline_tests.linkLibrary(ts_parser_lib);
     python_pipeline_tests.linkLibrary(py_parser_lib);
     python_pipeline_tests.linkLibrary(js_parser_lib);
@@ -1256,8 +1208,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(clew_bench);
     clew_bench.linkSystemLibrary("tree-sitter");
-    clew_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    clew_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     clew_bench.linkLibrary(ts_parser_lib);
     clew_bench.linkLibrary(py_parser_lib);
     clew_bench.linkLibrary(js_parser_lib);
@@ -1352,8 +1302,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(multi_lang_bench);
     multi_lang_bench.linkSystemLibrary("tree-sitter");
-    multi_lang_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    multi_lang_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     multi_lang_bench.linkLibrary(ts_parser_lib);
     multi_lang_bench.linkLibrary(py_parser_lib);
     multi_lang_bench.linkLibrary(js_parser_lib);
@@ -1403,8 +1351,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(memory_bench);
     memory_bench.linkSystemLibrary("tree-sitter");
-    memory_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    memory_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     memory_bench.linkLibrary(ts_parser_lib);
     memory_bench.linkLibrary(py_parser_lib);
     memory_bench.linkLibrary(js_parser_lib);
@@ -1457,8 +1403,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(pipeline_bench);
     pipeline_bench.linkSystemLibrary("tree-sitter");
-    pipeline_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    pipeline_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     pipeline_bench.linkLibrary(ts_parser_lib);
     pipeline_bench.linkLibrary(py_parser_lib);
     pipeline_bench.linkLibrary(js_parser_lib);
@@ -1489,8 +1433,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(regression_test);
     regression_test.linkSystemLibrary("tree-sitter");
-    regression_test.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    regression_test.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     regression_test.linkLibrary(ts_parser_lib);
     regression_test.linkLibrary(py_parser_lib);
     regression_test.linkLibrary(js_parser_lib);
@@ -1567,8 +1509,6 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(phase8b_bench);
     phase8b_bench.linkSystemLibrary("tree-sitter");
-    phase8b_bench.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    phase8b_bench.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/lib" });
     phase8b_bench.linkLibrary(ts_parser_lib);
     phase8b_bench.linkLibrary(py_parser_lib);
     phase8b_bench.linkLibrary(js_parser_lib);
