@@ -117,6 +117,86 @@ Maze MUST have control over the inference process. It cannot use managed APIs (C
 
 ## Data Flow
 
+### System-Level Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Input Sources                               │
+├─────────────────┬──────────────┬─────────────┬──────────────────────┤
+│  Source Code    │  Test Files  │ Telemetry   │  Documentation       │
+│  (TS/Py/Rust)   │  (assertions)│ (prod data) │  (business rules)    │
+└────────┬────────┴──────┬───────┴──────┬──────┴────────┬─────────────┘
+         │               │              │               │
+         └───────────────┼──────────────┼───────────────┘
+                         │              │
+         ┌───────────────▼──────────────▼──────────┐
+         │  Clew: Constraint Extraction Engine    │
+         │  - Pattern Matching (O(n) in code len) │
+         │  - Optional Claude Integration          │
+         │  - 101 Built-in Patterns               │
+         └───────────────┬──────────────────────────┘
+                         │
+         ┌───────────────▼──────────────────────────┐
+         │  Extracted Constraints Set               │
+         │  - Type Safety                           │
+         │  - Security                              │
+         │  - Performance                           │
+         │  - Semantic                              │
+         │  - Architectural                         │
+         └───────────────┬──────────────────────────┘
+                         │
+    ┌────────┬───────────┼───────────┬──────────────┐
+    │        │           │           │              │
+    │  ┌─────▼─┐    ┌────▼──┐   ┌───▼──┐      ┌──┐│
+    │  │Ariadne│    │ JSON  │   │YAML  │      │? ││
+    │  │  DSL  │    │Config │   │Config│      │  ││
+    │  └───────┘    └───────┘   └──────┘      └──┘│
+    │                                             │
+    └─────────────────────┬──────────────────────┘
+                          │
+         ┌────────────────▼──────────────────────┐
+         │  Braid: Constraint Compilation       │
+         │  - Dependency Graph Analysis         │
+         │  - Conflict Detection (O(n log n))   │
+         │  - Optimization (topological sort)   │
+         │  - IR Generation                     │
+         │  - LRU Caching (~20x speedup)        │
+         └────────────────┬──────────────────────┘
+                          │
+         ┌────────────────▼──────────────────────┐
+         │  ConstraintIR (Optimized Format)     │
+         │  ├─ JSON Schema                      │
+         │  ├─ Context-Free Grammar             │
+         │  ├─ Regex Patterns                   │
+         │  ├─ Token Mask Rules                 │
+         │  └─ Priority Rules                   │
+         └────────────────┬──────────────────────┘
+                          │
+    ┌─────────────────────▼──────────────────────┐
+    │  Maze: AI Orchestration Layer              │
+    │  - FFI to Zig/Rust boundary                │
+    │  - Token-by-token validation               │
+    │  - Real-time constraint application        │
+    │  - HTTP Client (Modal/vLLM)                │
+    └─────────────────────┬──────────────────────┘
+                          │
+    ┌─────────────────────▼──────────────────────┐
+    │  Inference Service (GPU)                   │
+    │  - vLLM/SGLang Server                      │
+    │  - llguidance Token Masking                │
+    │  - Constrained Generation (~50μs/token)    │
+    └─────────────────────┬──────────────────────┘
+                          │
+    ┌─────────────────────▼──────────────────────┐
+    │  Output: Guaranteed Valid Code             │
+    │  - Satisfies all constraints               │
+    │  - Type-safe                               │
+    │  - Production-ready                        │
+    └────────────────────────────────────────────┘
+```
+
+### Detailed Component Data Flow
+
 ```mermaid
 graph LR
     A[Source Code] --> B[Clew]
@@ -131,6 +211,34 @@ graph LR
 
     CL[Claude API] -.-> |Analysis| B
     CL -.-> |Optimization| C
+```
+
+### Constraint Flow Through System
+
+```
+Input Source → Pattern Matching → Extracted Constraint
+    │              │                    │
+    └─ Language    └─ 101 Built-in     └─ (name, kind, source, priority)
+       Detection      Pattern Library
+
+Extracted Constraint → Dependency Graph → Conflict Detection
+    │                     │                  │
+    └─ Set of            └─ DAG with         └─ Conflicting pairs
+       constraints          edges between       identified
+                           constraints
+
+Conflict → Resolution Strategy → Optimized Graph
+    │          │                   │
+    └─ Manual  └─ Heuristic        └─ Topological sort
+       override    └─ LLM-assisted     └─ Optimal evaluation order
+
+Optimized Graph → IR Generation → ConstraintIR
+    │                 │              │
+    └─ Ordered       └─ JSON Schema  └─ Multi-format IR:
+       constraints       Grammar        ├─ JSON Schema
+                        Regex          ├─ Grammar
+                        Token Masks    ├─ Regex
+                                       └─ Token Masks
 ```
 
 ## Deployment Architecture
@@ -284,23 +392,131 @@ ananke generate "implement feature"
 
 ## Extensibility
 
+Ananke provides well-defined extension points for developers to add custom functionality.
+
+### Extension Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Extension Points (See docs/EXTENDING.md for detailed guide)    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Clew (Extraction Layer)                                        │
+│  ├─ Custom Language Parsers                                     │
+│  │  └─ Implement: TokenKind, tokenize(), AST extraction        │
+│  │                                                              │
+│  ├─ Custom Pattern Extractors                                  │
+│  │  └─ Implement: PatternLibrary.extract()                     │
+│  │                                                              │
+│  └─ Custom Source Extractors (APIs, Telemetry, Docs)          │
+│     └─ Implement: SourceExtractor interface                    │
+│                                                                 │
+│  Braid (Compilation Layer)                                     │
+│  ├─ Custom Constraint Types                                    │
+│  │  └─ Add to ConstraintKind enum + IR union                  │
+│  │     └─ Implement: validation + IR generation               │
+│  │                                                              │
+│  ├─ Custom Validators                                          │
+│  │  └─ Add constraint-specific validation logic               │
+│  │                                                              │
+│  └─ Custom Optimizers                                          │
+│     └─ Improve compilation for specific patterns              │
+│                                                                 │
+│  Ariadne (DSL Layer)                                            │
+│  ├─ Extend Grammar with New Syntax                             │
+│  │  └─ Add rules to ariadne.zig grammar                       │
+│  │                                                              │
+│  └─ Add DSL Features                                            │
+│     └─ Implement semantic actions for new syntax              │
+│                                                                 │
+│  Maze (Orchestration Layer)                                    │
+│  ├─ Custom Constraint Application Strategies                   │
+│  │  └─ Implement: TokenMask generation for custom IR          │
+│  │                                                              │
+│  └─ New Inference Service Integrations                         │
+│     └─ Implement: HTTP client for new backends                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### Adding New Constraint Types
-1. Define constraint in Zig type system
-2. Implement validation logic
-3. Add llguidance compilation
-4. Update Ariadne grammar (optional)
+
+**Location**: `/Users/rand/src/ananke/src/types/constraint.zig`
+
+**Steps**:
+1. Add variant to `ConstraintKind` enum
+2. Define constraint structure
+3. Add IR representation to `ConstraintIR` union
+4. Implement compilation logic in Braid
+5. Add validation and tests
+6. Document in PATTERN_REFERENCE.md
+
+**Complexity**: Moderate (2-4 hours)
+
+**Example**: See `EXTENDING.md > Adding New Constraint Types`
 
 ### Adding New Language Support
-1. Add Tree-sitter grammar
-2. Implement language-specific extractors
-3. Define language constraints
-4. Test with real codebases
+
+**Location**: `/Users/rand/src/ananke/src/clew/parsers/`
+
+**Steps**:
+1. Implement language parser (tokenizer + AST)
+2. Register in language detection
+3. Implement pattern extractors
+4. Add language-specific tests
+5. Document in USER_GUIDE.md
+
+**Complexity**: High (4-8 hours depending on language)
+
+**Supported**: TypeScript, Python, Rust, Go, Zig (partial)
+
+**Example**: See `EXTENDING.md > Adding Language Support`
+
+### Creating Custom Extractors
+
+**Location**: `/Users/rand/src/ananke/src/clew/extractors/`
+
+**Purpose**: Extract constraints from non-code sources (APIs, telemetry, docs)
+
+**Steps**:
+1. Implement extractor interface
+2. Parse source format (JSON, YAML, etc.)
+3. Generate constraints from parsed data
+4. Integrate into Clew.extract()
+5. Add tests
+
+**Complexity**: Low-Moderate (2-4 hours)
+
+**Examples**:
+- OpenAPI extractor (API contracts)
+- Prometheus extractor (monitoring rules)
+- Policy extractor (compliance rules)
+
+See `EXTENDING.md > Creating Custom Extractors`
 
 ### Adding New Models
-1. Ensure model supports logit access
+
+**Location**: Inference service configuration (Modal/vLLM)
+
+**Requirements**:
+1. Model must support logit access (needed for token masking)
+2. Requires vLLM or SGLang support
+3. Must support llguidance compatibility
+
+**Steps**:
+1. Verify model supports logit streaming
 2. Add to vLLM configuration
 3. Test llguidance compatibility
-4. Benchmark performance
+4. Benchmark performance and VRAM requirements
+5. Document in DEPLOYMENT.md
+
+**Verified Models**:
+- Qwen 2.5 Coder (32B, 7B)
+- Llama 3.1 (8B, 70B)
+- DeepSeek Coder (6.7B, 33B)
+- Mistral (7B)
+
+**Complexity**: Low (1-2 hours + benchmarking)
 
 ## Monitoring & Observability
 

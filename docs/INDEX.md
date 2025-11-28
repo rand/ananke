@@ -300,18 +300,66 @@ Integrate Ananke into your workflow.
 
 ### System Documentation
 
-#### ARCHITECTURE.md
+#### ARCHITECTURE.md (5,000+ words)
 **System design and technical details**
 
 - System components (Clew, Braid, Ariadne, Maze)
-- Data flow
+- Data flow diagrams (system-level, component, constraint flow)
 - Deployment architecture
 - Integration patterns
 - Performance characteristics
 - Security model
-- Extensibility
+- Extensibility and extension points
+- Verified models and configurations
 
 **When to use**: When you need to understand how the system works
+
+**Related**: See INTERNALS.md for deep technical dive
+
+---
+
+#### INTERNALS.md (NEW - 11,000+ words)
+**Deep technical documentation for developers and maintainers**
+
+- Core type system (Constraint, ConstraintIR, ConstraintKind)
+- Clew architecture: extraction pipeline, pattern library, language parsers
+- Braid architecture: compilation pipeline, dependency graphs, conflict resolution
+- Ariadne: DSL parsing and compilation
+- Maze: Rust orchestration layer, FFI boundary
+- Memory management strategies (arena allocation, ownership semantics)
+- Concurrency model
+- Testing strategy (unit, integration, benchmarks)
+- Performance profiling techniques
+- Debugging techniques and tools
+
+**When to use**:
+- Contributing to internals
+- Debugging complex issues
+- Optimizing performance
+- Understanding FFI boundary
+
+**Audience**: Systems engineers, maintainers, compiler developers
+
+---
+
+#### EXTENDING.md (NEW - 7,000+ words)
+**Guide for extending Ananke with custom functionality**
+
+- Adding new constraint types (6-step process with examples)
+- Adding language support (5-step process with code)
+- Creating custom extractors (API specs, telemetry, policies)
+- Contributing patterns (pattern library structure)
+- Testing extensions (unit tests, integration tests, benchmarks)
+- Performance considerations (memory, caching, complexity analysis)
+- Examples and templates
+
+**When to use**:
+- Adding custom constraint types
+- Supporting a new programming language
+- Building domain-specific extractors
+- Contributing patterns
+
+**Complexity levels**: Low (1-2 hours) to High (8+ hours)
 
 ---
 
@@ -379,13 +427,29 @@ All files in `/docs/`:
 
 ```
 docs/
-├── INDEX.md                       # This file
+├── INDEX.md                       # This file - Documentation hub
 ├── USER_GUIDE.md                  # Main user guide (7,500 words)
 ├── API.md                         # API reference (4,000 words)
 ├── FAQ.md                         # Common questions (2,500 words)
 ├── TROUBLESHOOTING.md             # Problem solutions (3,500 words)
-├── ARCHITECTURE.md                # System design (existing)
-├── IMPLEMENTATION_PLAN.md         # Dev roadmap (existing)
+├── ARCHITECTURE.md                # System design (5,000+ words, enhanced)
+├── INTERNALS.md                   # Deep technical guide (11,000+ words, NEW)
+├── EXTENDING.md                   # Extension guide (7,000+ words, NEW)
+├── IMPLEMENTATION_PLAN.md         # Dev roadmap
+├── CLI_GUIDE.md                   # CLI reference
+│
+├── api_examples/                  # Code examples
+│   ├── README.md
+│   ├── zig_basic_extraction.zig
+│   ├── zig_full_pipeline.zig
+│   ├── rust_ffi_integration.rs
+│   └── ...
+│
+├── specs/                         # Phase specifications
+│   └── phase_*.md
+│
+├── performance/                   # Benchmarking docs
+│   └── ...
 │
 └── tutorials/
     ├── README.md                  # Tutorial index
