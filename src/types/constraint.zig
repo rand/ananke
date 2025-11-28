@@ -277,11 +277,21 @@ pub const ConstraintIR = struct {
         if (self.regex_patterns.len > 0) {
             const patterns = try allocator.alloc(Regex, self.regex_patterns.len);
             for (self.regex_patterns, 0..) |pattern, i| {
-                patterns[i] = .{
-                    .pattern = try allocator.dupe(u8, pattern.pattern),
-                    .flags = try allocator.dupe(u8, pattern.flags),
-                    .is_static = pattern.is_static,
-                };
+                if (pattern.is_static) {
+                    // Static patterns: just copy the pointer, don't duplicate
+                    patterns[i] = .{
+                        .pattern = pattern.pattern,
+                        .flags = pattern.flags,
+                        .is_static = true,
+                    };
+                } else {
+                    // Non-static patterns: duplicate the strings
+                    patterns[i] = .{
+                        .pattern = try allocator.dupe(u8, pattern.pattern),
+                        .flags = try allocator.dupe(u8, pattern.flags),
+                        .is_static = false,
+                    };
+                }
             }
             cloned.regex_patterns = patterns;
         }
