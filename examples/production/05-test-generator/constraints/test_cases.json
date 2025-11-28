@@ -1,0 +1,255 @@
+{
+  "function_name": "calculate_discount",
+  "module_path": "input/function_spec.py",
+  "parameters": [
+    {
+      "name": "original_price",
+      "type": "Decimal"
+    },
+    {
+      "name": "discount_percent",
+      "type": "Decimal"
+    },
+    {
+      "name": "member_tier",
+      "type": "Optional[str]"
+    },
+    {
+      "name": "quantity",
+      "type": "int"
+    }
+  ],
+  "return_type": "Decimal",
+  "test_cases": [
+    {
+      "category": "Happy Path",
+      "description": "Basic discount",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10"
+      },
+      "expected_output": "90",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_0"
+    },
+    {
+      "category": "Happy Path",
+      "description": "No discount",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "0"
+      },
+      "expected_output": "100",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_1"
+    },
+    {
+      "category": "Happy Path",
+      "description": "Full discount",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "100"
+      },
+      "expected_output": "0",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_2"
+    },
+    {
+      "category": "Happy Path",
+      "description": "With bronze tier",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "bronze"
+      },
+      "expected_output": "88",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_3"
+    },
+    {
+      "category": "Happy Path",
+      "description": "With silver tier",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "silver"
+      },
+      "expected_output": "85",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_4"
+    },
+    {
+      "category": "Happy Path",
+      "description": "With gold tier",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "gold"
+      },
+      "expected_output": "85",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_5"
+    },
+    {
+      "category": "Happy Path",
+      "description": "With platinum tier",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "platinum"
+      },
+      "expected_output": "80",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_6"
+    },
+    {
+      "category": "Happy Path",
+      "description": "Bulk discount (5 items)",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "qty"
+      },
+      "expected_output": "5 = $85 per item (extra 5%)",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_7"
+    },
+    {
+      "category": "Happy Path",
+      "description": "Bulk discount (10 items)",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "qty"
+      },
+      "expected_output": "10 = $80 per item (extra 10%)",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_8"
+    },
+    {
+      "category": "Happy Path",
+      "description": "Combined",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "gold"
+      },
+      "expected_output": "5 = $77.50 (10% + 5% tier + 5% bulk)",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_happy_path_9"
+    },
+    {
+      "category": "Edge Cases",
+      "description": "Zero price",
+      "inputs": {
+        "original_price": "0",
+        "discount_percent": "10"
+      },
+      "expected_output": "0",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_edge_cases_10"
+    },
+    {
+      "category": "Edge Cases",
+      "description": "Very small price",
+      "inputs": {
+        "original_price": "0.01",
+        "discount_percent": "10"
+      },
+      "expected_output": "0.01",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_edge_cases_11"
+    },
+    {
+      "category": "Edge Cases",
+      "description": "Very large price",
+      "inputs": {
+        "original_price": "999999.99",
+        "discount_percent": "10"
+      },
+      "expected_output": "899999.99",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_edge_cases_12"
+    },
+    {
+      "category": "Edge Cases",
+      "description": "High quantity",
+      "inputs": {
+        "original_price": "100",
+        "discount_percent": "10",
+        "member_tier": "qty"
+      },
+      "expected_output": "1000 = $75 per item (max bulk 15%)",
+      "expected_error": null,
+      "test_id": "test_calculate_discount_edge_cases_13"
+    },
+    {
+      "category": "Error Conditions",
+      "description": "Negative price",
+      "inputs": {
+        "original_price": "-100.00"
+      },
+      "expected_output": null,
+      "expected_error": "ValueError: Price cannot be negative",
+      "test_id": "test_calculate_discount_error_conditions_14"
+    },
+    {
+      "category": "Error Conditions",
+      "description": "Negative discount",
+      "inputs": {
+        "original_price": "100.00",
+        "discount_percent": "-10"
+      },
+      "expected_output": null,
+      "expected_error": "ValueError: Discount must be between 0 and 100",
+      "test_id": "test_calculate_discount_error_conditions_15"
+    },
+    {
+      "category": "Error Conditions",
+      "description": "Discount > 100",
+      "inputs": {
+        "original_price": "100.00",
+        "discount_percent": "150"
+      },
+      "expected_output": null,
+      "expected_error": "ValueError: Discount must be between 0 and 100",
+      "test_id": "test_calculate_discount_error_conditions_16"
+    },
+    {
+      "category": "Error Conditions",
+      "description": "Invalid tier",
+      "inputs": {
+        "original_price": "100.00",
+        "discount_percent": "10",
+        "member_tier": "invalid_tier"
+      },
+      "expected_output": null,
+      "expected_error": "ValueError: Invalid member tier",
+      "test_id": "test_calculate_discount_error_conditions_17"
+    },
+    {
+      "category": "Error Conditions",
+      "description": "Zero quantity",
+      "inputs": {
+        "original_price": "100.00",
+        "discount_percent": "10",
+        "quantity": "0"
+      },
+      "expected_output": null,
+      "expected_error": "ValueError: Quantity must be at least 1",
+      "test_id": "test_calculate_discount_error_conditions_18"
+    },
+    {
+      "category": "Error Conditions",
+      "description": "Negative quantity",
+      "inputs": {
+        "original_price": "100.00",
+        "discount_percent": "10",
+        "quantity": "-1"
+      },
+      "expected_output": null,
+      "expected_error": "ValueError: Quantity must be at least 1",
+      "test_id": "test_calculate_discount_error_conditions_19"
+    }
+  ]
+}
