@@ -594,9 +594,9 @@ ananke/
 ├── beads/
 │   └── implementation-phases.bead  # Task tracking
 ├── examples/
-│   ├── pure-local/           # No external services
-│   ├── with-claude-analysis/ # Claude for analysis
-│   └── full-pipeline/        # Full end-to-end
+│   ├── 01-simple-extraction/ # No external services
+│   ├── 02-claude-analysis/   # Claude for analysis
+│   └── 04-full-pipeline/     # Full end-to-end
 └── build.zig                 # Build configuration
 ```
 
@@ -831,13 +831,13 @@ Must be controlled locally for token-level constraint enforcement:
 
 See `/examples` directory for working examples:
 
-1. **pure-local**: Constraint extraction with no external services
-2. **with-claude-analysis**: Using Claude for semantic understanding
-3. **full-pipeline**: End-to-end with generation
+1. **01-simple-extraction**: Constraint extraction with no external services
+2. **02-claude-analysis**: Using Claude for semantic understanding
+3. **04-full-pipeline**: End-to-end with generation
 
 ```bash
 # Run an example
-cd examples/pure-local
+cd examples/01-simple-extraction
 zig build
 ./zig-cache/bin/example
 ```
