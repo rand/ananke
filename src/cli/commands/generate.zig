@@ -64,7 +64,27 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
 
     // Get endpoint URL - command line overrides config
     const endpoint_override = parsed_args.getFlag("endpoint");
-    const endpoint_url = endpoint_override orelse config.modal_endpoint orelse "https://ananke--ananke-inference-inference.modal.run";
+    const endpoint_url = blk: {
+        if (endpoint_override) |url| break :blk url;
+        if (config.modal_endpoint) |url| break :blk url;
+
+        // No endpoint configured - provide helpful error
+        cli_error.printError(
+            \\Modal endpoint not configured. Please either:
+            \\  1. Add to .ananke.toml:
+            \\     [modal]
+            \\     endpoint = "https://your-username--ananke-inference-generate-api.modal.run"
+            \\
+            \\  2. Set environment variable:
+            \\     export ANANKE_MODAL_ENDPOINT="https://..."
+            \\
+            \\  3. Pass --endpoint flag:
+            \\     ananke generate "..." --endpoint "https://..."
+            \\
+            \\See docs/MODAL_SETUP.md for deployment instructions.
+        , .{});
+        return error.NoModalEndpoint;
+    };
 
     if (verbose) {
         cli_error.printInfo("Generating code for: \"{s}\"", .{prompt});

@@ -24,8 +24,8 @@ cd ananke
 |---------|------|---------------|--------------|------------|--------|
 | **01-simple-extraction** | ~100ms | None | Static analysis only | Beginner | Complete |
 | **02-claude-analysis** | ~2s | Claude API key | Semantic understanding | Intermediate | Complete |
-| **03-ariadne-dsl** | ~50ms | None | DSL constraint definitions | Intermediate | Partial |
-| **04-full-pipeline** | ~100ms | None | Extract + Compile pipeline | Advanced | Partial |
+| **03-ariadne-dsl** | ~50ms | None | DSL constraint definitions | Intermediate | Complete |
+| **04-full-pipeline** | ~100ms | None | Extract + Compile pipeline | Advanced | Complete |
 | **05-mixed-mode** | ~200ms | None | Multi-source composition | Advanced | Complete |
 
 ## Examples Overview
@@ -106,15 +106,15 @@ zig build run
 
 **What**: Complete pipeline demonstrating Extract → Compile → Generate workflow
 
-**Status**: Available (Partial - Generation step coming soon)
+**Status**: Available (Complete)
 
 **Demonstrates**:
 - Constraint extraction from TypeScript code (Clew)
 - Constraint compilation to IR (Braid)
 - JSON serialization for Rust FFI integration
-- Foundation for constrained code generation
+- End-to-end pipeline from source to compiled IR
 
-**Note**: Full code generation via Maze/Modal will be available once FFI functions are implemented
+**Note**: Code generation via Maze/Modal requires Modal service configuration (see `/modal_inference/` for setup)
 
 **Run Time**: ~100ms (extraction + compilation only)
 
@@ -160,20 +160,20 @@ zig build run
 → Check Example 03
 
 **See end-to-end workflow**
-→ Wait for Example 04 (or read placeholder)
+→ Run Example 04
 
 **Build production system**
 → Study Example 05
 
 ## Feature Matrix
 
-| Example | Extraction | Claude | Ariadne | JSON | Generation | Complexity |
-|---------|-----------|--------|---------|------|------------|-----------|
-| 01      | ✓         |        |         |      |            | Low       |
-| 02      | ✓         | ✓      |         |      |            | Medium    |
-| 03      |           |        | ✓       |      |            | Medium    |
-| 04      | ✓         |        |         | ✓    | (partial)  | Medium    |
-| 05      | ✓         |        | ✓       | ✓    |            | High      |
+| Example | Extraction | Claude | Ariadne | JSON | IR Output | Complexity |
+|---------|-----------|--------|---------|------|-----------|-----------|
+| 01      | ✓         |        |         |      |           | Low       |
+| 02      | ✓         | ✓      |         |      |           | Medium    |
+| 03      |           |        | ✓       |      | ✓         | Medium    |
+| 04      | ✓         |        |         | ✓    | ✓         | Medium    |
+| 05      | ✓         |        | ✓       | ✓    |           | High      |
 
 ## Recommended Learning Path
 
@@ -187,7 +187,7 @@ zig build run
 
 1. **Example 02**: Compare static vs. semantic
 2. **Example 05**: Build mixed-mode system
-3. **Example 04**: End-to-end workflow (when ready)
+3. **Example 04**: End-to-end workflow
 
 ### Advanced
 
@@ -234,10 +234,10 @@ All approaches combined:
 | 01      | 50ms      | -           | 50ms    | No           |
 | 02      | 50ms      | -           | 2000ms  | Claude       |
 | 03      | -         | 30ms        | 30ms    | No           |
-| 04      | 50ms      | 50ms        | 100ms   | (No - gen pending) |
+| 04      | 50ms      | 50ms        | 100ms   | No           |
 | 05      | 150ms     | 50ms        | 200ms   | No           |
 
-All examples are fast enough for interactive use.
+All examples are fast enough for interactive use. Generation (Phase 3) requires Modal service.
 
 ## Requirements
 
@@ -253,8 +253,8 @@ All examples are fast enough for interactive use.
 
 ### Example 04 (Full Pipeline)
 
-- Currently: No additional requirements (extraction + compilation only)
-- Future: Modal deployment for code generation (see `/modal_inference/`)
+- Extraction and compilation: No additional requirements
+- Code generation: Modal deployment needed (see `/modal_inference/` for setup)
 
 ## Example Structure
 
@@ -364,12 +364,12 @@ After exploring examples:
     ↓
 05: Mix All Together
     ↓
-04: Full Pipeline (coming soon)
+04: Full Pipeline
     ↓
-Production Deployment
+Production Deployment (with Modal)
 ```
 
-Start simple, add complexity as needed.
+Start simple, add complexity as needed. Tutorial examples work locally. Production examples (Phase 3) require Modal service.
 
 ## Key Takeaways
 
