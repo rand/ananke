@@ -43,7 +43,15 @@ pub const Braid = struct {
 
     /// Compile a set of constraints into ConstraintIR
     pub fn compile(self: *Braid, constraints: []const Constraint) !ConstraintIR {
-        // Build dependency graph
+        // Compute cache key
+        const cache_key = try self.computeCacheKey(constraints);
+
+        // Check cache first (fast path)
+        if (try self.cache.get(cache_key)) |cached_ir| {
+            return cached_ir; // Already cloned by cache.get()
+        }
+
+        // Cache miss - do full compilation (slow path)
         var graph = try self.buildDependencyGraph(constraints);
         defer graph.deinit();
 
@@ -81,7 +89,34 @@ pub const Braid = struct {
         try self.optimizeGraph(&graph);
 
         // Compile to IR
-        return try self.compileToIR(&graph);
+        const ir = try self.compileToIR(&graph);
+
+        // Store in cache (clone for cache storage)
+        const ir_for_cache = try ir.clone(self.allocator);
+        try self.cache.put(cache_key, ir_for_cache);
+
+        return ir;
+    }
+
+    /// Compute a content-based cache key from constraint set.
+    /// Uses canonical ordering to ensure order-independence.
+    fn computeCacheKey(self: *Braid, constraints: []const Constraint) !u64 {
+        // Sort constraints for canonical ordering
+        const sorted = try self.allocator.alloc(Constraint, constraints.len);
+        defer self.allocator.free(sorted);
+
+        @memcpy(sorted, constraints);
+        std.mem.sort(Constraint, sorted, {}, compareConstraints);
+
+        // Hash sorted constraints using Wyhash
+        var hasher = std.hash.Wyhash.init(0);
+        hashUsize(&hasher, constraints.len);
+
+        for (sorted) |constraint| {
+            hashConstraint(&hasher, constraint);
+        }
+
+        return hasher.final();
     }
 
     /// Convert ConstraintIR to llguidance-compatible format
@@ -1580,20 +1615,65 @@ pub const ConstraintGraph = struct {
     }
 };
 
-/// IR cache
+/// IR cache with performance tracking
 const IRCache = struct {
     allocator: std.mem.Allocator,
-    cache: std.AutoHashMap(u64, ConstraintIR),
+    cache: std.AutoHashMap(u64, CacheEntry),
+
+    const CacheEntry = struct {
+        ir: ConstraintIR,
+        hit_count: u64 = 0,
+    };
+
+    pub const CacheStats = struct {
+        entry_count: usize,
+        total_hits: u64,
+    };
 
     pub fn init(allocator: std.mem.Allocator) !IRCache {
         return .{
             .allocator = allocator,
-            .cache = std.AutoHashMap(u64, ConstraintIR).init(allocator),
+            .cache = std.AutoHashMap(u64, CacheEntry).init(allocator),
         };
     }
 
     pub fn deinit(self: *IRCache) void {
+        // Free all cached ConstraintIR entries
+        var iter = self.cache.valueIterator();
+        while (iter.next()) |entry| {
+            var ir = entry.ir;
+            ir.deinit(self.allocator);
+        }
         self.cache.deinit();
+    }
+
+    /// Get a cached IR, returning a clone for independent ownership.
+    /// Returns null if not found. Increments hit counter on success.
+    pub fn get(self: *IRCache, key: u64) !?ConstraintIR {
+        if (self.cache.getPtr(key)) |entry| {
+            entry.hit_count += 1;
+            return try entry.ir.clone(self.allocator);
+        }
+        return null;
+    }
+
+    /// Store an IR in the cache. Takes ownership of the IR.
+    pub fn put(self: *IRCache, key: u64, ir: ConstraintIR) !void {
+        const entry = CacheEntry{ .ir = ir, .hit_count = 0 };
+        try self.cache.put(key, entry);
+    }
+
+    /// Get cache statistics
+    pub fn stats(self: *const IRCache) CacheStats {
+        var total_hits: u64 = 0;
+        var iter = self.cache.valueIterator();
+        while (iter.next()) |entry| {
+            total_hits += entry.hit_count;
+        }
+        return .{
+            .entry_count = self.cache.count(),
+            .total_hits = total_hits,
+        };
     }
 };
 
@@ -1766,4 +1846,70 @@ pub fn deduplicateConstraints(
 /// Update constraint priority (setter function for clarity)
 pub fn updatePriority(constraint: *Constraint, new_priority: ConstraintPriority) void {
     constraint.priority = new_priority;
+}
+
+// ============================================================================
+// Cache Key Computation Helper Functions
+// ============================================================================
+
+/// Compare constraints for canonical ordering (used in cache key computation)
+fn compareConstraints(ctx: void, a: Constraint, b: Constraint) bool {
+    _ = ctx;
+
+    // Primary: kind
+    if (a.kind != b.kind) {
+        return @intFromEnum(a.kind) < @intFromEnum(b.kind);
+    }
+
+    // Secondary: description
+    const desc_cmp = std.mem.order(u8, a.description, b.description);
+    if (desc_cmp != .eq) {
+        return desc_cmp == .lt;
+    }
+
+    // Tertiary: source
+    if (a.source != b.source) {
+        return @intFromEnum(a.source) < @intFromEnum(b.source);
+    }
+
+    // Quaternary: priority
+    if (a.priority != b.priority) {
+        return a.priority.toNumeric() < b.priority.toNumeric();
+    }
+
+    // Quinary: severity
+    if (a.severity != b.severity) {
+        return @intFromEnum(a.severity) < @intFromEnum(b.severity);
+    }
+
+    // If all fields match, consider them equal
+    return false;
+}
+
+/// Hash a single constraint into the given hasher
+fn hashConstraint(hasher: *std.hash.Wyhash, c: Constraint) void {
+    // Hash kind
+    const kind_bytes = std.mem.asBytes(&@intFromEnum(c.kind));
+    hasher.update(kind_bytes);
+
+    // Hash description
+    hasher.update(c.description);
+
+    // Hash source
+    const source_bytes = std.mem.asBytes(&@intFromEnum(c.source));
+    hasher.update(source_bytes);
+
+    // Hash priority
+    const priority_bytes = std.mem.asBytes(&c.priority.toNumeric());
+    hasher.update(priority_bytes);
+
+    // Hash severity
+    const severity_bytes = std.mem.asBytes(&@intFromEnum(c.severity));
+    hasher.update(severity_bytes);
+}
+
+/// Hash a usize value into the given hasher
+fn hashUsize(hasher: *std.hash.Wyhash, value: usize) void {
+    const bytes = std.mem.asBytes(&value);
+    hasher.update(bytes);
 }

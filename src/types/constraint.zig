@@ -213,7 +213,147 @@ pub const ConstraintIR = struct {
         _ = self;
         return error.NotImplemented;
     }
+
+    /// Create a deep clone of this ConstraintIR with independent ownership.
+    /// Caller owns the returned ConstraintIR and must call deinit() on it.
+    pub fn clone(self: *const ConstraintIR, allocator: std.mem.Allocator) !ConstraintIR {
+        var cloned = ConstraintIR{
+            .priority = self.priority,
+        };
+
+        // Clone json_schema if present
+        if (self.json_schema) |schema| {
+            cloned.json_schema = try cloneJsonSchema(allocator, schema);
+        }
+
+        // Clone grammar if present
+        if (self.grammar) |grammar| {
+            cloned.grammar = try cloneGrammar(allocator, grammar);
+        }
+
+        // Clone regex_patterns array
+        if (self.regex_patterns.len > 0) {
+            const patterns = try allocator.alloc(Regex, self.regex_patterns.len);
+            for (self.regex_patterns, 0..) |pattern, i| {
+                patterns[i] = .{
+                    .pattern = try allocator.dupe(u8, pattern.pattern),
+                    .flags = try allocator.dupe(u8, pattern.flags),
+                };
+            }
+            cloned.regex_patterns = patterns;
+        }
+
+        // Clone token_masks if present
+        if (self.token_masks) |masks| {
+            cloned.token_masks = try cloneTokenMasks(allocator, masks);
+        }
+
+        return cloned;
+    }
 };
+
+/// Helper function to clone JsonSchema
+fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema {
+    var cloned = JsonSchema{
+        .type = try allocator.dupe(u8, schema.type),
+        .additional_properties = schema.additional_properties,
+    };
+
+    // Clone properties if present
+    if (schema.properties) |props| {
+        var cloned_props = std.json.ObjectMap.init(allocator);
+        var iter = props.iterator();
+        while (iter.next()) |entry| {
+            const key = try allocator.dupe(u8, entry.key_ptr.*);
+            const value = try cloneJsonValue(allocator, entry.value_ptr.*);
+            try cloned_props.put(key, value);
+        }
+        cloned.properties = cloned_props;
+    }
+
+    // Clone required array
+    if (schema.required.len > 0) {
+        const required = try allocator.alloc([]const u8, schema.required.len);
+        for (schema.required, 0..) |req, i| {
+            required[i] = try allocator.dupe(u8, req);
+        }
+        cloned.required = required;
+    }
+
+    return cloned;
+}
+
+/// Helper function to clone a JSON value
+fn cloneJsonValue(allocator: std.mem.Allocator, value: std.json.Value) !std.json.Value {
+    return switch (value) {
+        .null => .null,
+        .bool => |b| .{ .bool = b },
+        .integer => |i| .{ .integer = i },
+        .float => |f| .{ .float = f },
+        .number_string => |s| .{ .number_string = try allocator.dupe(u8, s) },
+        .string => |s| .{ .string = try allocator.dupe(u8, s) },
+        .array => |arr| {
+            var cloned_arr = std.json.Array.init(allocator);
+            for (arr.items) |item| {
+                try cloned_arr.append(try cloneJsonValue(allocator, item));
+            }
+            return .{ .array = cloned_arr };
+        },
+        .object => |obj| {
+            var cloned_obj = std.json.ObjectMap.init(allocator);
+            var iter = obj.iterator();
+            while (iter.next()) |entry| {
+                const key = try allocator.dupe(u8, entry.key_ptr.*);
+                const val = try cloneJsonValue(allocator, entry.value_ptr.*);
+                try cloned_obj.put(key, val);
+            }
+            return .{ .object = cloned_obj };
+        },
+    };
+}
+
+/// Helper function to clone Grammar
+fn cloneGrammar(allocator: std.mem.Allocator, grammar: Grammar) !Grammar {
+    const rules = try allocator.alloc(GrammarRule, grammar.rules.len);
+
+    for (grammar.rules, 0..) |rule, i| {
+        const lhs = try allocator.dupe(u8, rule.lhs);
+
+        const rhs = try allocator.alloc([]const u8, rule.rhs.len);
+        for (rule.rhs, 0..) |rhs_item, j| {
+            rhs[j] = try allocator.dupe(u8, rhs_item);
+        }
+
+        rules[i] = .{
+            .lhs = lhs,
+            .rhs = rhs,
+        };
+    }
+
+    return Grammar{
+        .rules = rules,
+        .start_symbol = try allocator.dupe(u8, grammar.start_symbol),
+    };
+}
+
+/// Helper function to clone TokenMaskRules
+fn cloneTokenMasks(allocator: std.mem.Allocator, masks: TokenMaskRules) !TokenMaskRules {
+    var cloned = TokenMaskRules{};
+
+    if (masks.allowed_tokens) |tokens| {
+        const allowed = try allocator.alloc(u32, tokens.len);
+        @memcpy(allowed, tokens);
+        cloned.allowed_tokens = allowed;
+    }
+
+    if (masks.forbidden_tokens) |tokens| {
+        const forbidden = try allocator.alloc(u32, tokens.len);
+        @memcpy(forbidden, tokens);
+        cloned.forbidden_tokens = forbidden;
+    }
+
+    return cloned;
+}
 
 /// JSON Schema representation
 pub const JsonSchema = struct {
