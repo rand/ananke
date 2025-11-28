@@ -19,21 +19,29 @@ const TokenMaskRules = root.types.constraint.TokenMaskRules;
 // Import Claude API client
 const claude_api = @import("claude");
 
+// Import string interner for performance
+const string_interner = @import("string_interner.zig");
+const GrammarInterner = string_interner.GrammarInterner;
+const RegexPatternPool = string_interner.RegexPatternPool;
+
 /// Main Braid compilation engine
 pub const Braid = struct {
     allocator: std.mem.Allocator,
     llm_client: ?*claude_api.ClaudeClient = null,
     cache: IRCache,
+    grammar_interner: GrammarInterner,
 
     pub fn init(allocator: std.mem.Allocator) !Braid {
         return .{
             .allocator = allocator,
             .cache = try IRCache.init(allocator),
+            .grammar_interner = GrammarInterner.init(allocator),
         };
     }
 
     pub fn deinit(self: *Braid) void {
         self.cache.deinit();
+        self.grammar_interner.deinit();
     }
 
     /// Set Claude client for conflict resolution
@@ -584,51 +592,51 @@ pub const Braid = struct {
                 }
             }
 
-            // Infer regex patterns from naming conventions
+            // Infer regex patterns from naming conventions using static pool
             if (std.mem.indexOf(u8, desc, "camelCase") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[a-z][a-zA-Z0-9]*$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.CAMEL_CASE,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             } else if (std.mem.indexOf(u8, desc, "PascalCase") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[A-Z][a-zA-Z0-9]*$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.PASCAL_CASE,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             } else if (std.mem.indexOf(u8, desc, "snake_case") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[a-z][a-z0-9_]*$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.SNAKE_CASE,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             } else if (std.mem.indexOf(u8, desc, "SCREAMING_SNAKE_CASE") != null or
                 std.mem.indexOf(u8, desc, "UPPER_CASE") != null)
             {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[A-Z][A-Z0-9_]*$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.SCREAMING_SNAKE_CASE,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             } else if (std.mem.indexOf(u8, desc, "kebab-case") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[a-z][a-z0-9-]*$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.KEBAB_CASE,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             }
 
-            // Infer patterns for common validation rules
+            // Infer patterns for common validation rules using static pool
             if (std.mem.indexOf(u8, desc, "email") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.EMAIL,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             } else if (std.mem.indexOf(u8, desc, "URL") != null or std.mem.indexOf(u8, desc, "url") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^https?://[a-zA-Z0-9.-]+(?:/[^\\s]*)?$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.URL,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             } else if (std.mem.indexOf(u8, desc, "UUID") != null or std.mem.indexOf(u8, desc, "uuid") != null) {
                 try patterns.append(self.allocator, .{
-                    .pattern = try self.allocator.dupe(u8, "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"),
-                    .flags = "",
+                    .pattern = RegexPatternPool.UUID,
+                    .flags = RegexPatternPool.EMPTY_FLAGS,
                 });
             }
         }
@@ -1164,23 +1172,24 @@ pub const Braid = struct {
         });
 
         // Allocate the rules slice in the main allocator so it persists
+        // Use the interner to avoid duplicating common grammar literals
         const owned_rules = try self.allocator.alloc(GrammarRule, rules.items.len);
         for (rules.items, 0..) |rule, i| {
-            // Allocate and copy RHS items first
+            // Allocate and copy RHS items using interner
             const rhs_items = try self.allocator.alloc([]const u8, rule.rhs.len);
             for (rule.rhs, 0..) |rhs_item, j| {
-                rhs_items[j] = try self.allocator.dupe(u8, rhs_item);
+                rhs_items[j] = try self.grammar_interner.intern(rhs_item);
             }
 
             owned_rules[i] = GrammarRule{
-                .lhs = try self.allocator.dupe(u8, rule.lhs),
+                .lhs = try self.grammar_interner.intern(rule.lhs),
                 .rhs = rhs_items,
             };
         }
 
         return Grammar{
             .rules = owned_rules,
-            .start_symbol = try self.allocator.dupe(u8, "program"),
+            .start_symbol = try self.grammar_interner.intern("program"),
         };
     }
 
