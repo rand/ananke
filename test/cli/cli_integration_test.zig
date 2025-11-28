@@ -5,9 +5,9 @@ const std = @import("std");
 const testing = std.testing;
 const fs = std.fs;
 
-// Import supporting modules  
-const args_mod = @import("cli_args");
-const config_mod = @import("cli_config");
+// Import supporting modules
+const args_mod = @import("args");
+const config_mod = @import("config");
 
 // Test helper for temporary directories
 const TestContext = struct {
