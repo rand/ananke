@@ -1,0 +1,29 @@
+{
+  "name": "ananke-example-database-migration-generator",
+  "version": "1.0.0",
+  "description": "Generate type-safe PostgreSQL migration scripts from schema changes using Ananke",
+  "private": true,
+  "scripts": {
+    "generate": "./run.sh",
+    "test": "./tests/test_migration.sh",
+    "validate": "python3 scripts/schema_diff.py input/schema_v1.sql input/schema_v2.sql constraints/schema_changes.json"
+  },
+  "keywords": [
+    "ananke",
+    "database",
+    "migration",
+    "postgresql",
+    "sql",
+    "code-generation"
+  ],
+  "author": "Ananke Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
