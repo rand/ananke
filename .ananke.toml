@@ -1,7 +1,7 @@
 # Ananke Configuration File
 
 [modal]
-# endpoint = "https://your-app.modal.run"
+endpoint = "https://rand--ananke-inference-generate-api.modal.run"
 # API key should be stored in environment variable ANANKE_MODAL_API_KEY
 # or set here (not recommended for security)
 
