@@ -166,7 +166,12 @@ fn callModalInference(
     const writer = json_body.writer(allocator);
 
     try writer.writeAll("{");
-    try writer.print("\"prompt\":\"{s}\",", .{escapeJsonString(prompt)});
+
+    // Escape the prompt for JSON
+    const escaped_prompt = try escapeJsonString(allocator, prompt);
+    defer if (escaped_prompt.ptr != prompt.ptr) allocator.free(escaped_prompt);
+
+    try writer.print("\"prompt\":\"{s}\",", .{escaped_prompt});
 
     if (constraint_ir) |ir| {
         try writer.print("\"constraint_ir\":{s},", .{ir});
@@ -333,15 +338,203 @@ fn handleConnectionError(err: anyerror, endpoint_url: []const u8) InferenceError
     }
 }
 
-/// Escape a string for JSON encoding (simple implementation)
-fn escapeJsonString(s: []const u8) []const u8 {
-    // TODO: Implement proper JSON escaping
-    // For now, just return the string as-is if it doesn't contain quotes
+/// Escape a string for JSON encoding
+/// Returns an allocated string if escaping was needed, otherwise returns the original
+/// Caller must free the returned slice if it differs from the input
+fn escapeJsonString(allocator: std.mem.Allocator, s: []const u8) ![]const u8 {
+    // First pass: check if we need to escape anything
+    var needs_escape = false;
+    var extra_bytes: usize = 0;
+
     for (s) |c| {
-        if (c == '"' or c == '\\' or c == '\n' or c == '\r' or c == '\t') {
-            // Would need to allocate and escape properly
-            return s; // Simplified for now
+        switch (c) {
+            '"', '\\' => {
+                needs_escape = true;
+                extra_bytes += 1; // Each becomes 2 chars (\", \\)
+            },
+            '\n', '\r', '\t' => {
+                needs_escape = true;
+                extra_bytes += 1; // Each becomes 2 chars (\n, \r, \t)
+            },
+            0x00...0x08, 0x0B...0x0C, 0x0E...0x1F => {
+                // Other control characters (excluding \t, \n, \r which are handled above)
+                needs_escape = true;
+                extra_bytes += 5; // Becomes \uXXXX (6 chars total)
+            },
+            else => {},
         }
     }
-    return s;
+
+    // Fast path: no escaping needed
+    if (!needs_escape) {
+        return s;
+    }
+
+    // Allocate buffer for escaped string
+    const escaped = try allocator.alloc(u8, s.len + extra_bytes);
+    var i: usize = 0;
+
+    for (s) |c| {
+        switch (c) {
+            '"' => {
+                escaped[i] = '\\';
+                escaped[i + 1] = '"';
+                i += 2;
+            },
+            '\\' => {
+                escaped[i] = '\\';
+                escaped[i + 1] = '\\';
+                i += 2;
+            },
+            '\n' => {
+                escaped[i] = '\\';
+                escaped[i + 1] = 'n';
+                i += 2;
+            },
+            '\r' => {
+                escaped[i] = '\\';
+                escaped[i + 1] = 'r';
+                i += 2;
+            },
+            '\t' => {
+                escaped[i] = '\\';
+                escaped[i + 1] = 't';
+                i += 2;
+            },
+            0x00...0x08, 0x0B...0x0C, 0x0E...0x1F => {
+                // Escape other control characters as \uXXXX
+                const hex_digits = "0123456789abcdef";
+                escaped[i] = '\\';
+                escaped[i + 1] = 'u';
+                escaped[i + 2] = '0';
+                escaped[i + 3] = '0';
+                escaped[i + 4] = hex_digits[(c >> 4) & 0x0F];
+                escaped[i + 5] = hex_digits[c & 0x0F];
+                i += 6;
+            },
+            else => {
+                escaped[i] = c;
+                i += 1;
+            },
+        }
+    }
+
+    return escaped;
+}
+
+// Tests for JSON escaping
+const testing = std.testing;
+
+test "escapeJsonString: no special characters" {
+    const allocator = testing.allocator;
+    const input = "hello world";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    // Should return the same string (no allocation)
+    try testing.expectEqual(input.ptr, result.ptr);
+    try testing.expectEqualStrings(input, result);
+}
+
+test "escapeJsonString: empty string" {
+    const allocator = testing.allocator;
+    const input = "";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqual(input.ptr, result.ptr);
+    try testing.expectEqualStrings("", result);
+}
+
+test "escapeJsonString: double quotes" {
+    const allocator = testing.allocator;
+    const input = "hello \"world\"";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("hello \\\"world\\\"", result);
+}
+
+test "escapeJsonString: backslashes" {
+    const allocator = testing.allocator;
+    const input = "path\\to\\file";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("path\\\\to\\\\file", result);
+}
+
+test "escapeJsonString: newlines" {
+    const allocator = testing.allocator;
+    const input = "line1\nline2\nline3";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("line1\\nline2\\nline3", result);
+}
+
+test "escapeJsonString: carriage returns" {
+    const allocator = testing.allocator;
+    const input = "line1\rline2";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("line1\\rline2", result);
+}
+
+test "escapeJsonString: tabs" {
+    const allocator = testing.allocator;
+    const input = "col1\tcol2\tcol3";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("col1\\tcol2\\tcol3", result);
+}
+
+test "escapeJsonString: mixed special characters" {
+    const allocator = testing.allocator;
+    const input = "She said: \"It's in C:\\temp\"\nNext line\ttabbed";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("She said: \\\"It's in C:\\\\temp\\\"\\nNext line\\ttabbed", result);
+}
+
+test "escapeJsonString: control characters" {
+    const allocator = testing.allocator;
+    // Test a control character (0x01)
+    const input = "hello\x01world";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("hello\\u0001world", result);
+}
+
+test "escapeJsonString: null byte" {
+    const allocator = testing.allocator;
+    const input = "hello\x00world";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("hello\\u0000world", result);
+}
+
+test "escapeJsonString: multiple control characters" {
+    const allocator = testing.allocator;
+    const input = "\x00\x01\x02\x1F";
+
+    const result = try escapeJsonString(allocator, input);
+    defer if (result.ptr != input.ptr) allocator.free(result);
+
+    try testing.expectEqualStrings("\\u0000\\u0001\\u0002\\u001f", result);
 }
