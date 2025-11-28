@@ -1,0 +1,113 @@
+{
+  "version": "1.0",
+  "type": "cli_command_generation",
+  "patterns": [
+    {
+      "type": "import_pattern",
+      "imports": [
+        "import click",
+        "import json",
+        "import sys",
+        "from pathlib import Path",
+        "from typing import Optional"
+      ]
+    },
+    {
+      "type": "error_handling_pattern",
+      "pattern": "click.echo with style",
+      "example": "click.echo(click.style('Error:', fg='red', bold=True) + message, err=True)"
+    },
+    {
+      "type": "exit_code_pattern",
+      "codes": {
+        "success": 0,
+        "validation_failure": 1,
+        "runtime_error": 2
+      }
+    },
+    {
+      "type": "file_validation_pattern",
+      "uses_pathlib": true,
+      "checks_exists": true,
+      "checks_is_file": true
+    },
+    {
+      "type": "help_text_pattern",
+      "includes_examples": true,
+      "includes_exit_codes": true,
+      "docstring_format": "google"
+    },
+    {
+      "type": "output_pattern",
+      "uses_click_echo": true,
+      "colors_enabled": true,
+      "stderr_for_errors": true
+    }
+  ],
+  "command": {
+    "version": "1.0",
+    "type": "cli_command",
+    "metadata": {
+      "command_name": "validate",
+      "function_name": "validate_json",
+      "description": "Validate JSON files against a JSON Schema",
+      "help_text": "Validate JSON files against a JSON Schema.",
+      "dependencies": [
+        "click",
+        "jsonschema"
+      ]
+    },
+    "constraints": [
+      {
+        "type": "click_command",
+        "name": "validate",
+        "function_name": "validate_json",
+        "description": "Validate JSON files against a JSON Schema"
+      },
+      {
+        "type": "click_argument",
+        "name": "json_file",
+        "click_type": "click.Path",
+        "required": true,
+        "help": "Path to JSON file to validate",
+        "path_exists": true
+      },
+      {
+        "type": "click_option",
+        "name": "schema",
+        "short": "s",
+        "click_type": "click.Path",
+        "required": true,
+        "help": "Path to JSON Schema file",
+        "path_exists": true
+      },
+      {
+        "type": "click_option",
+        "name": "strict",
+        "click_type": "bool",
+        "required": false,
+        "default": false,
+        "is_flag": true,
+        "help": "Enable strict validation mode (shows detailed error paths)"
+      },
+      {
+        "type": "click_option",
+        "name": "verbose",
+        "short": "v",
+        "click_type": "bool",
+        "required": false,
+        "default": false,
+        "is_flag": true,
+        "help": "Enable verbose output"
+      },
+      {
+        "type": "click_option",
+        "name": "output",
+        "short": "o",
+        "click_type": "click.Path",
+        "required": false,
+        "help": "Output validation report to file (optional)"
+      }
+    ]
+  }
+}

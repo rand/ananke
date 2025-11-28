@@ -1,0 +1,118 @@
+# CLI Command Specification for 'validate' command
+# This specification defines a new Click command that will be generated
+# using patterns extracted from existing_cli.py
+
+command:
+  name: validate
+  function_name: validate_json
+  description: Validate JSON files against a JSON Schema
+
+  # Long description shown in help text
+  help: |
+    Validate JSON files against a JSON Schema.
+
+    This command reads a JSON file and validates it against a provided
+    JSON Schema file. Returns exit code 0 for valid files, 1 for validation
+    failures, and 2 for runtime errors.
+
+    Examples:
+
+        # Basic validation
+        validate data.json --schema schema.json
+
+        # Strict mode with detailed error paths
+        validate data.json --schema schema.json --strict
+
+        # Short option syntax
+        validate data.json -s schema.json -v
+
+    Exit Codes:
+        0 - JSON is valid according to schema
+        1 - Validation failed
+        2 - Runtime error (file not found, invalid JSON, etc.)
+
+  # Required positional arguments
+  arguments:
+    - name: json_file
+      type: path
+      help: Path to JSON file to validate
+      exists: true  # File must exist
+
+  # Optional named parameters
+  options:
+    - name: schema
+      short: s
+      type: path
+      required: true
+      help: Path to JSON Schema file
+      exists: true  # File must exist
+
+    - name: strict
+      type: boolean
+      default: false
+      help: Enable strict validation mode (shows detailed error paths)
+
+    - name: verbose
+      short: v
+      type: boolean
+      default: false
+      help: Enable verbose output
+
+    - name: output
+      short: o
+      type: path
+      required: false
+      help: Output validation report to file (optional)
+
+  # Validation rules
+  validation:
+    - type: file_exists
+      fields: [json_file, schema]
+      error_message: "File not found: {field}"
+
+    - type: json_format
+      field: json_file
+      error_message: "Invalid JSON in {field}: {details}"
+
+    - type: json_format
+      field: schema
+      error_message: "Invalid JSON Schema in {field}: {details}"
+
+  # Error handling patterns
+  error_handling:
+    file_not_found:
+      exit_code: 2
+      message_template: "Error: File not found: {path}"
+
+    invalid_json:
+      exit_code: 2
+      message_template: "Error: Invalid JSON in {file}: {details}"
+
+    validation_failure:
+      exit_code: 1
+      message_template: "Validation failed: {message}"
+
+    runtime_error:
+      exit_code: 2
+      message_template: "Error: {message}"
+
+  # Success output
+  output:
+    success:
+      message: "✓ {file} is valid"
+      color: green
+
+    failure:
+      message: "✗ Validation failed: {error}"
+      color: red
+      stream: stderr
+
+  # Dependencies required
+  dependencies:
+    - click
+    - jsonschema
+
+  # Type hints
+  type_hints:
+    enabled: true
+    strict: true

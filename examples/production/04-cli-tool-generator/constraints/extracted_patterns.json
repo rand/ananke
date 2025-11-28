@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "type": "cli_patterns",
+  "metadata": {
+    "source": "existing_cli.py",
+    "extracted_at": "2024-01-01T00:00:00Z"
+  },
+  "patterns": [
+    {
+      "type": "import_pattern",
+      "imports": [
+        "import click",
+        "import json",
+        "import sys",
+        "from pathlib import Path",
+        "from typing import Optional"
+      ]
+    },
+    {
+      "type": "error_handling_pattern",
+      "pattern": "click.echo with style",
+      "example": "click.echo(click.style('Error:', fg='red', bold=True) + message, err=True)"
+    },
+    {
+      "type": "exit_code_pattern",
+      "codes": {
+        "success": 0,
+        "validation_failure": 1,
+        "runtime_error": 2
+      }
+    },
+    {
+      "type": "file_validation_pattern",
+      "uses_pathlib": true,
+      "checks_exists": true,
+      "checks_is_file": true
+    },
+    {
+      "type": "help_text_pattern",
+      "includes_examples": true,
+      "includes_exit_codes": true,
+      "docstring_format": "google"
+    },
+    {
+      "type": "output_pattern",
+      "uses_click_echo": true,
+      "colors_enabled": true,
+      "stderr_for_errors": true
+    }
+  ]
+}
