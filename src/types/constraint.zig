@@ -530,7 +530,11 @@ pub const ConstraintSet = struct {
     /// Clone this ConstraintSet, creating a deep copy with independent ownership.
     /// Caller owns the returned ConstraintSet and must call deinit() on it.
     pub fn clone(self: *const ConstraintSet, allocator: std.mem.Allocator) !ConstraintSet {
-        var cloned = ConstraintSet.init(allocator, self.name);
+        // Deep copy the name to avoid dangling pointer
+        const owned_name = try allocator.dupe(u8, self.name);
+        errdefer allocator.free(owned_name);
+
+        var cloned = ConstraintSet.init(allocator, owned_name);
 
         // Deep copy all constraints
         for (self.constraints.items) |constraint| {
