@@ -22,6 +22,23 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // Link tree-sitter and language parsers from the ananke dependency
+    // This is required because the c_api.zig declares external functions for language parsers
+    exe.linkSystemLibrary("tree-sitter");
+    exe.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/include" });
+    exe.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/lib" });
+
+    // Link the language parser libraries built by ananke
+    exe.linkLibrary(ananke.artifact("tree-sitter-typescript"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-python"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-javascript"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-rust"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-go"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-zig"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-c"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-cpp"));
+    exe.linkLibrary(ananke.artifact("tree-sitter-java"));
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

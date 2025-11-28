@@ -61,13 +61,26 @@ pub fn build(b: *std.Build) void {
     // Note: Requires tree-sitter libraries to be installed via:
     // macOS: brew install tree-sitter
     // Linux: apt-get install libtree-sitter-dev or similar
+    //
+    // The tree-sitter C library provides the core API for parsing and AST traversal.
+    // We use the system-installed version at /opt/homebrew on macOS (Apple Silicon)
+    // or /usr/local on Linux. For portability across systems, you may need to adjust
+    // these paths or use pkg-config to detect the correct location.
 
     // Tree-sitter module for direct C FFI bindings
+    // CRITICAL: This module must be configured with C include paths and system library linkage
+    // so that @cImport in c_api.zig can find tree_sitter/api.h
     const tree_sitter_mod = b.addModule("tree_sitter", .{
         .root_source_file = b.path("src/clew/tree_sitter.zig"),
         .target = target,
         .link_libc = true,
     });
+
+    // Configure tree-sitter system library and include paths
+    // This ensures tree_sitter/api.h can be found by @cImport in c_api.zig
+    tree_sitter_mod.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/include" });
+    tree_sitter_mod.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/Cellar/tree-sitter/0.25.10/lib" });
+    tree_sitter_mod.linkSystemLibrary("tree-sitter", .{});
 
     // Tree-sitter language parsers as static libraries
     // TypeScript parser
@@ -81,7 +94,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
     ts_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
-    ts_parser_lib.addIncludePath(.{ .cwd_relative = "vendor/tree-sitter-typescript/typescript/src" });
+    ts_parser_lib.addIncludePath(b.path("vendor/tree-sitter-typescript/typescript/src"));
+    // The common scanner needs to find tree_sitter/parser.h from the tsx source dir
+    ts_parser_lib.addIncludePath(b.path("vendor/tree-sitter-typescript/tsx/src"));
     ts_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-typescript/typescript/src"),
         .files = &.{ "parser.c", "scanner.c" },
@@ -99,6 +114,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     py_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    py_parser_lib.addIncludePath(b.path("vendor/tree-sitter-python/src"));
     py_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-python/src"),
         .files = &.{ "parser.c", "scanner.c" },
@@ -116,6 +132,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     js_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    js_parser_lib.addIncludePath(b.path("vendor/tree-sitter-javascript/src"));
     js_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-javascript/src"),
         .files = &.{ "parser.c", "scanner.c" },
@@ -133,6 +150,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     rust_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    rust_parser_lib.addIncludePath(b.path("vendor/tree-sitter-rust/src"));
     rust_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-rust/src"),
         .files = &.{ "parser.c", "scanner.c" },
@@ -150,6 +168,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     go_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    go_parser_lib.addIncludePath(b.path("vendor/tree-sitter-go/src"));
     go_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-go/src"),
         .files = &.{"parser.c"},
@@ -167,6 +186,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     zig_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    zig_parser_lib.addIncludePath(b.path("vendor/tree-sitter-zig/src"));
     zig_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-zig/src"),
         .files = &.{"parser.c"},
@@ -184,6 +204,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     c_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    c_parser_lib.addIncludePath(b.path("vendor/tree-sitter-c/src"));
     c_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-c/src"),
         .files = &.{"parser.c"},
@@ -201,6 +222,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     cpp_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    cpp_parser_lib.addIncludePath(b.path("vendor/tree-sitter-cpp/src"));
     cpp_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-cpp/src"),
         .files = &.{ "parser.c", "scanner.c" },
@@ -218,11 +240,23 @@ pub fn build(b: *std.Build) void {
         }),
     });
     java_parser_lib.addIncludePath(.{ .cwd_relative = "/opt/homebrew/opt/tree-sitter/include" });
+    java_parser_lib.addIncludePath(b.path("vendor/tree-sitter-java/src"));
     java_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-java/src"),
         .files = &.{"parser.c"},
         .flags = getCFlags(optimize, enable_lto, cpu_native),
     });
+
+    // Install all tree-sitter parser libraries so they can be used by examples and other dependents
+    b.installArtifact(ts_parser_lib);
+    b.installArtifact(py_parser_lib);
+    b.installArtifact(js_parser_lib);
+    b.installArtifact(rust_parser_lib);
+    b.installArtifact(go_parser_lib);
+    b.installArtifact(zig_parser_lib);
+    b.installArtifact(c_parser_lib);
+    b.installArtifact(cpp_parser_lib);
+    b.installArtifact(java_parser_lib);
 
     // Core Ananke modules
     // Note: We need to create modules first, then add imports after
@@ -1039,24 +1073,9 @@ pub fn build(b: *std.Build) void {
     });
 
     // Add CLI module imports to CLI tests
-    cli_tests.root_module.addImport("args", b.addModule("cli_args", .{
-        .root_source_file = b.path("src/cli/args.zig"),
-        .target = target,
-    }));
-    cli_tests.root_module.addImport("output", b.addModule("cli_output", .{
-        .root_source_file = b.path("src/cli/output.zig"),
-        .target = target,
-        .imports = &.{
-            .{ .name = "types/constraint", .module = b.addModule("constraint_types", .{
-                .root_source_file = b.path("src/types/constraint.zig"),
-                .target = target,
-            }) },
-        },
-    }));
-    cli_tests.root_module.addImport("config", b.addModule("cli_config", .{
-        .root_source_file = b.path("src/cli/config.zig"),
-        .target = target,
-    }));
+    cli_tests.root_module.addImport("args", cli_args_mod);
+    cli_tests.root_module.addImport("output", cli_output_mod);
+    cli_tests.root_module.addImport("config", cli_config_mod);
 
     const run_cli_tests = b.addRunArtifact(cli_tests);
 
@@ -1071,14 +1090,8 @@ pub fn build(b: *std.Build) void {
     });
 
     // Add only the supporting module imports (not command modules)
-    cli_integration_tests.root_module.addImport("cli_args", b.addModule("cli_args_test", .{
-        .root_source_file = b.path("src/cli/args.zig"),
-        .target = target,
-    }));
-    cli_integration_tests.root_module.addImport("cli_config", b.addModule("cli_config_test", .{
-        .root_source_file = b.path("src/cli/config.zig"),
-        .target = target,
-    }));
+    cli_integration_tests.root_module.addImport("args", cli_args_mod);
+    cli_integration_tests.root_module.addImport("config", cli_config_mod);
 
     const run_cli_integration_tests = b.addRunArtifact(cli_integration_tests);
 
