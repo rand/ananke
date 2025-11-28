@@ -512,6 +512,224 @@ See Example 04 (examples/04-full-pipeline) for the complete working implementati
 
 ---
 
+## Troubleshooting
+
+### Common Issues
+
+#### Build Errors
+
+**Problem**: `error: tree-sitter library not found`
+
+**Solution**:
+```bash
+# macOS
+brew install tree-sitter
+
+# Ubuntu/Debian
+sudo apt-get install libtree-sitter-dev
+
+# Arch Linux
+sudo pacman -S tree-sitter
+
+# Verify
+tree-sitter --version
+```
+
+**Problem**: `error: Zig version 0.15.0 or later required`
+
+**Solution**:
+```bash
+# Download latest Zig from https://ziglang.org/download/
+# Or use version manager:
+zigup 0.15.2
+```
+
+**Problem**: `error: no field named 'root_source_file'`
+
+**Solution**: You're using old Zig syntax. Update to Zig 0.15.0+ which uses:
+```zig
+// Old (Zig 0.13)
+.root_source_file = .{ .path = "src/main.zig" }
+
+// New (Zig 0.15+)
+.root_source_file = b.path("src/main.zig")
+```
+
+#### Memory Errors
+
+**Problem**: Memory leak warnings when running CLI commands
+
+**Solution**: This has been fixed in recent versions. Update to latest main branch:
+```bash
+cd ananke
+git pull origin main
+zig build
+```
+
+If you still see leaks, they might be from:
+- Using outdated binaries (rebuild with `zig build`)
+- Custom code not calling `deinit()` properly
+- Report as bug if persistent after rebuild
+
+**Problem**: Out of memory when processing large files
+
+**Solution**:
+```bash
+# Increase file size limit (default: 10MB)
+# Not currently configurable - split large files into smaller chunks
+
+# Or process files individually:
+for file in src/**/*.ts; do
+    ananke extract "$file" -o "constraints_$(basename $file .ts).json"
+done
+```
+
+#### Runtime Errors
+
+**Problem**: `error: UnsupportedLanguage`
+
+**Solution**: Check supported languages:
+- **Fully supported**: TypeScript, Python, Rust, Go, Zig
+- **Fallback (pattern-based)**: Kotlin, Java, C++
+
+For unsupported languages, Ananke uses pattern matching which may have reduced accuracy.
+
+**Problem**: `error: FileNotFound` or `error: AccessDenied`
+
+**Solution**:
+```bash
+# Check file exists
+ls -la path/to/file
+
+# Check permissions
+chmod +r path/to/file
+
+# Use absolute paths if relative paths fail
+ananke extract /absolute/path/to/file.ts
+```
+
+**Problem**: No constraints extracted from valid code
+
+**Solution**:
+```bash
+# Verify language detection
+ananke extract file.ts --verbose
+
+# Try explicit language flag (coming soon)
+# ananke extract file --language typescript
+
+# Check if file contains actual code patterns
+# Empty files or comments-only files yield no constraints
+```
+
+#### API / Integration Issues
+
+**Problem**: Claude API errors (`ANTHROPIC_API_KEY` invalid)
+
+**Solution**:
+```bash
+# Verify key is set
+echo $ANTHROPIC_API_KEY
+
+# Re-export if needed
+export ANTHROPIC_API_KEY='sk-ant-...'
+
+# Test API access
+curl https://api.anthropic.com/v1/messages \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"claude-3-5-sonnet-20241022","max_tokens":10,"messages":[{"role":"user","content":"test"}]}'
+```
+
+**Problem**: Rate limit errors from Claude API
+
+**Solution**:
+- Ananke caches extraction results automatically (30x faster on repeated runs)
+- Process files in smaller batches
+- Consider upgrading your Anthropic API tier
+
+#### Example Build Issues
+
+**Problem**: Examples fail to build with `zig build run`
+
+**Solution**:
+```bash
+# Clean and rebuild from project root first
+cd /path/to/ananke
+zig build
+
+# Then try example
+cd examples/01-simple-extraction
+zig build run
+
+# If still fails, check example-specific build.zig
+cat build.zig  # Look for hard-coded paths
+```
+
+**Problem**: Example shows hard-coded paths like `/opt/homebrew/...`
+
+**Solution**: This is being fixed. For now, edit the example's `build.zig`:
+```zig
+// Remove hard-coded paths:
+// exe.addSystemIncludePath(.{ .cwd_relative = "/opt/homebrew/..." });
+
+// Replace with:
+exe.linkSystemLibrary("tree-sitter");
+```
+
+### Performance Tips
+
+#### Slow Extraction
+
+**Problem**: Constraint extraction takes >5 seconds per file
+
+**Possible causes**:
+- First run (no cache) - expected
+- Very large files (>100KB) - consider splitting
+- Network issues with Claude API - check connectivity
+
+**Solutions**:
+```bash
+# Use cache (automatic on repeated runs)
+# First run: ~10ms, cached: ~0.3ms (30x faster)
+
+# Disable Claude for faster syntactic-only extraction
+unset ANTHROPIC_API_KEY
+ananke extract file.ts  # Pure AST extraction, no API calls
+
+# Process in parallel
+find src -name "*.ts" | xargs -P 4 -I {} ananke extract {}
+```
+
+#### High Memory Usage
+
+**Problem**: Process uses >500MB RAM
+
+**Solutions**:
+- Process files one at a time instead of batch
+- Clear cache periodically (automatic, but can be manual)
+- Use smaller constraint sets
+
+### Getting More Help
+
+If you're still stuck:
+
+1. **Check examples**: `examples/` directory has working code for common patterns
+2. **Read docs**:
+   - [LIBRARY_INTEGRATION.md](docs/LIBRARY_INTEGRATION.md) - Library usage
+   - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System design
+   - [USER_GUIDE.md](docs/USER_GUIDE.md) - Comprehensive guide
+3. **Search issues**: [GitHub Issues](https://github.com/ananke-ai/ananke/issues)
+4. **Ask community**: [GitHub Discussions](https://github.com/ananke-ai/ananke/discussions)
+5. **Report bugs**: Include:
+   - Zig version (`zig version`)
+   - OS and version
+   - Full error message
+   - Minimal reproduction steps
+
+---
+
 ## Resources
 
 - **Main README**: [README.md](README.md)

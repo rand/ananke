@@ -19,6 +19,55 @@ Ananke enforces constraints at the **token level** during code generation, ensur
 
 ---
 
+## Prerequisites
+
+Before using Ananke, ensure you have the following installed:
+
+### Required
+
+- **Zig 0.15.0 or later** - [Download from ziglang.org](https://ziglang.org/download/)
+  ```bash
+  zig version  # Should show 0.15.0 or later
+  ```
+
+- **tree-sitter** - Required for AST-based constraint extraction
+  ```bash
+  # macOS (Homebrew)
+  brew install tree-sitter
+
+  # Ubuntu/Debian
+  sudo apt-get install libtree-sitter-dev
+
+  # Arch Linux
+  sudo pacman -S tree-sitter
+
+  # Verify installation
+  tree-sitter --version
+  ```
+
+### Optional
+
+- **Anthropic API Key** - For semantic constraint analysis (Claude integration)
+  ```bash
+  export ANTHROPIC_API_KEY='your-key-here'
+  ```
+  Get your key at [console.anthropic.com](https://console.anthropic.com/)
+
+- **OpenAI API Key** - Alternative LLM provider
+  ```bash
+  export OPENAI_API_KEY='your-key-here'
+  ```
+
+- **Git** - For cloning the repository
+
+### System Requirements
+
+- **OS**: macOS, Linux (Ubuntu 20.04+, Debian 11+, Arch), Windows WSL2
+- **Memory**: 2GB RAM minimum, 4GB recommended
+- **Disk**: 500MB for installation + dependencies
+
+---
+
 ## Quickstart (10 minutes)
 
 Get started with constraint extraction and analysis in 10 minutes:
