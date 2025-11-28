@@ -43,6 +43,7 @@ fn rhsContains(rhs: []const []const u8, symbol: []const u8) bool {
 }
 
 // Helper to free grammar rules
+// NOTE: buildGrammarFromConstraints returns owned strings, so we must free everything
 fn freeGrammar(allocator: std.mem.Allocator, grammar: Grammar) void {
     allocator.free(grammar.start_symbol);
     for (grammar.rules) |rule| {
