@@ -1,0 +1,11 @@
+# Virtual environment
+venv/
+*.pyc
+__pycache__/
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
