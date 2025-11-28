@@ -1619,7 +1619,11 @@ pub const ConstraintGraph = struct {
             // Find all edges from this node
             for (self.edges.items) |edge| {
                 if (edge.from == node_id) {
-                    const to_degree = in_degree.get(edge.to) orelse 0;
+                    const to_degree = in_degree.get(edge.to) orelse {
+                        // Edge points to non-existent node - this indicates a corrupted graph
+                        std.log.warn("Edge from {} points to non-existent node {}", .{ node_id, edge.to });
+                        continue;
+                    };
                     if (to_degree > 0) {
                         try in_degree.put(edge.to, to_degree - 1);
                         if (to_degree - 1 == 0) {
