@@ -30,8 +30,11 @@ test "topological sort: simple linear dependency A -> B -> C" {
     try graph.addEdge(1, 2);
 
     // Perform topological sort
-    const sorted = try graph.topologicalSort();
-    defer allocator.free(sorted);
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
+
+    // Should succeed without cycles
+    const sorted = sort_result.getOrder() orelse return error.UnexpectedCycle;
 
     // Expected order: A (0), B (1), C (2)
     try testing.expectEqual(@as(usize, 3), sorted.len);
@@ -60,8 +63,10 @@ test "topological sort: diamond dependency A -> (B,C) -> D" {
     try graph.addEdge(1, 3);
     try graph.addEdge(2, 3);
 
-    const sorted = try graph.topologicalSort();
-    defer allocator.free(sorted);
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
+
+    const sorted = sort_result.getOrder() orelse return error.UnexpectedCycle;
 
     // Expected: A first, D last, B and C in middle
     try testing.expectEqual(@as(usize, 4), sorted.len);
@@ -93,8 +98,10 @@ test "topological sort: no dependencies (all independent)" {
 
     // No edges added - all are independent
 
-    const sorted = try graph.topologicalSort();
-    defer allocator.free(sorted);
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
+
+    const sorted = sort_result.getOrder() orelse return error.UnexpectedCycle;
 
     // All nodes should be in result
     try testing.expectEqual(@as(usize, 5), sorted.len);
@@ -129,12 +136,26 @@ test "topological sort: cyclic dependency A -> B -> C -> A (detects cycle)" {
     try graph.addEdge(1, 2);
     try graph.addEdge(2, 0);
 
-    // Topological sort should detect cycle but return partial ordering
-    const sorted = try graph.topologicalSort();
-    defer allocator.free(sorted);
+    // Topological sort should detect cycle
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
 
-    // Should still return all nodes (with partial ordering)
-    try testing.expectEqual(@as(usize, 3), sorted.len);
+    // Should detect cycle
+    switch (sort_result) {
+        .success => return error.ExpectedCycleDetection,
+        .cycle_detected => |info| {
+            // Should have unordered nodes (all 3 are in cycle)
+            try testing.expectEqual(@as(usize, 3), info.unordered_nodes.len);
+
+            // Should have an example cycle
+            try testing.expect(info.example_cycle.len > 0);
+
+            // Test error formatting
+            const error_msg = try info.formatError(&graph, allocator);
+            defer allocator.free(error_msg);
+            try testing.expect(error_msg.len > 0);
+        },
+    }
 
     // Verify detectCycle also identifies the cycle
     const has_cycle = try graph.detectCycle();
@@ -165,8 +186,10 @@ test "topological sort: large graph (100 nodes)" {
         try graph.addEdge(i, i + 1);
     }
 
-    const sorted = try graph.topologicalSort();
-    defer allocator.free(sorted);
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
+
+    const sorted = sort_result.getOrder() orelse return error.UnexpectedCycle;
 
     // All nodes should be present
     try testing.expectEqual(@as(usize, node_count), sorted.len);
@@ -239,4 +262,84 @@ test "graph operations: add node and edge" {
     const edge = graph.edges.items[0];
     try testing.expectEqual(@as(usize, 0), edge.from);
     try testing.expectEqual(@as(usize, 1), edge.to);
+}
+
+test "topological sort: partial ordering with some nodes in cycle" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var graph = braid.ConstraintGraph.init(allocator);
+    defer graph.deinit();
+
+    // Add 5 nodes: A, B, C form a cycle, D and E are independent
+    _ = try graph.addNode(Constraint.init(0, "constraint_a", "In cycle"));
+    _ = try graph.addNode(Constraint.init(1, "constraint_b", "In cycle"));
+    _ = try graph.addNode(Constraint.init(2, "constraint_c", "In cycle"));
+    _ = try graph.addNode(Constraint.init(3, "constraint_d", "Independent"));
+    _ = try graph.addNode(Constraint.init(4, "constraint_e", "Depends on D"));
+
+    // Create cycle: A -> B -> C -> A
+    try graph.addEdge(0, 1);
+    try graph.addEdge(1, 2);
+    try graph.addEdge(2, 0);
+
+    // Add independent chain: D -> E
+    try graph.addEdge(3, 4);
+
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
+
+    switch (sort_result) {
+        .success => return error.ExpectedCycleDetection,
+        .cycle_detected => |info| {
+            // Partial order should contain D and E (2 nodes)
+            try testing.expectEqual(@as(usize, 2), info.partial_order.len);
+
+            // Unordered nodes should be A, B, C (3 nodes in cycle)
+            try testing.expectEqual(@as(usize, 3), info.unordered_nodes.len);
+
+            // Example cycle should exist
+            try testing.expect(info.example_cycle.len > 0);
+        },
+    }
+}
+
+test "cycle info: error message formatting" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var graph = braid.ConstraintGraph.init(allocator);
+    defer graph.deinit();
+
+    // Create simple cycle with descriptive names
+    _ = try graph.addNode(Constraint.init(0, "auth_check", "Authentication"));
+    _ = try graph.addNode(Constraint.init(1, "user_load", "User loading"));
+    _ = try graph.addNode(Constraint.init(2, "permission_verify", "Permissions"));
+
+    // Create cycle: auth -> user -> permission -> auth
+    try graph.addEdge(0, 1);
+    try graph.addEdge(1, 2);
+    try graph.addEdge(2, 0);
+
+    var sort_result = try graph.topologicalSort();
+    defer sort_result.deinit(allocator);
+
+    switch (sort_result) {
+        .success => return error.ExpectedCycleDetection,
+        .cycle_detected => |info| {
+            const error_msg = try info.formatError(&graph, allocator);
+            defer allocator.free(error_msg);
+
+            // Should mention number of constraints
+            try testing.expect(std.mem.indexOf(u8, error_msg, "3 constraint(s)") != null);
+
+            // Should contain "Example cycle"
+            try testing.expect(std.mem.indexOf(u8, error_msg, "Example cycle") != null);
+
+            // Should contain constraint names
+            try testing.expect(std.mem.indexOf(u8, error_msg, "auth_check") != null);
+        },
+    }
 }
