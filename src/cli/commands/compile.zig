@@ -74,8 +74,13 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     };
     defer allocator.free(constraints_json);
 
-    // Parse JSON constraints
-    const constraint_set = parseConstraintsJson(allocator, constraints_json) catch |err| {
+    // Use an arena allocator for JSON-parsed constraints to avoid manual memory management
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
+
+    // Parse JSON constraints using arena allocator - all strings will be freed when arena is freed
+    const constraint_set = parseConstraintsJson(arena_allocator, constraints_json) catch |err| {
         cli_error.printError("Failed to parse constraints file: {s}", .{@errorName(err)});
         cli_error.printInfo("Expected JSON format with 'name' and 'constraints' fields", .{});
         return err;

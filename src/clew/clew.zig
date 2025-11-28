@@ -510,14 +510,17 @@ pub const Clew = struct {
 /// - get() returns a cloned copy (caller owns it and must call deinit())
 /// - put() clones the input before storing (caller still owns original)
 /// - Cache's deinit() frees all owned ConstraintSets
+/// - Arena allocator owns all cloned constraint data (names, descriptions, etc.)
 const ConstraintCache = struct {
     allocator: std.mem.Allocator,
     cache: std.StringHashMap(ConstraintSet),
+    arena: std.heap.ArenaAllocator,
 
     pub fn init(allocator: std.mem.Allocator) !ConstraintCache {
         return .{
             .allocator = allocator,
             .cache = std.StringHashMap(ConstraintSet).init(allocator),
+            .arena = std.heap.ArenaAllocator.init(allocator),
         };
     }
 
@@ -529,6 +532,8 @@ const ConstraintCache = struct {
             self.allocator.free(entry.key_ptr.*);
         }
         self.cache.deinit();
+        // Free all arena allocations (cloned constraint data)
+        self.arena.deinit();
     }
 
     /// Get a cached ConstraintSet by key.
@@ -536,8 +541,8 @@ const ConstraintCache = struct {
     /// Returns null if not found.
     pub fn get(self: *ConstraintCache, key: []const u8) !?ConstraintSet {
         if (self.cache.get(key)) |cached_set| {
-            // Return a clone so caller owns independent copy
-            return try cached_set.clone(self.allocator);
+            // Return a clone using arena allocator (arena owns the cloned data)
+            return try cached_set.clone(self.arena.allocator());
         }
         return null;
     }
@@ -554,11 +559,11 @@ const ConstraintCache = struct {
             self.allocator.free(existing_key);
         }
 
-        // Clone the value so cache owns independent copy
-        var cloned_value = try value.clone(self.allocator);
+        // Clone the value using arena allocator (arena owns the cloned data)
+        var cloned_value = try value.clone(self.arena.allocator());
         errdefer cloned_value.deinit();
 
-        // Duplicate the key for cache ownership
+        // Duplicate the key for cache ownership (use regular allocator for HashMap keys)
         const owned_key = try self.allocator.dupe(u8, key);
         errdefer self.allocator.free(owned_key);
 
