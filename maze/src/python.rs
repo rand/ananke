@@ -326,16 +326,16 @@ impl Ananke {
     /// Raises:
     ///     RuntimeError: If initialization fails (e.g., invalid endpoint URL).
     ///
-    /// Example:
-    ///     ```python
-    ///     from ananke import Ananke
-    ///
-    ///     ananke = Ananke(
-    ///         modal_endpoint="https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run",
-    ///         model="meta-llama/Llama-3.1-8B-Instruct",
-    ///         enable_cache=True,
-    ///         cache_size=1000
-    ///     )
+    /// Example (Python):
+    ///     ```
+    ///     # from ananke import Ananke
+    ///     #
+    ///     # ananke = Ananke(
+    ///     #     modal_endpoint="https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run",
+    ///     #     model="meta-llama/Llama-3.1-8B-Instruct",
+    ///     #     enable_cache=True,
+    ///     #     cache_size=1000
+    ///     # )
     ///     ```
     #[new]
     #[pyo3(signature = (modal_endpoint, modal_api_key=None, model="meta-llama/Llama-3.1-8B-Instruct".to_string(), timeout_secs=300, enable_cache=true, cache_size=1000))]
@@ -387,15 +387,15 @@ impl Ananke {
     /// Raises:
     ///     RuntimeError: If MODAL_ENDPOINT is not set or configuration fails.
     ///
-    /// Example:
-    ///     ```python
-    ///     import os
-    ///     from ananke import Ananke
-    ///
-    ///     os.environ["MODAL_ENDPOINT"] = "https://your-app.modal.run"
-    ///     os.environ["MODAL_API_KEY"] = "your-api-key"
-    ///
-    ///     ananke = Ananke.from_env()
+    /// Example (Python):
+    ///     ```
+    ///     # import os
+    ///     # from ananke import Ananke
+    ///     #
+    ///     # os.environ["MODAL_ENDPOINT"] = "https://your-app.modal.run"
+    ///     # os.environ["MODAL_API_KEY"] = "your-api-key"
+    ///     #
+    ///     # ananke = Ananke.from_env()
     ///     ```
     #[staticmethod]
     fn from_env() -> PyResult<Self> {
@@ -446,23 +446,23 @@ impl Ananke {
     /// Raises:
     ///     RuntimeError: If generation fails (network error, timeout, inference error)
     ///
-    /// Example:
-    ///     ```python
-    ///     from ananke import Ananke, PyGenerationRequest, PyConstraintIR
-    ///
-    ///     ananke = Ananke.from_env()
-    ///
-    ///     request = PyGenerationRequest(
-    ///         prompt="Implement a secure user authentication handler",
-    ///         constraints_ir=[],  # No constraints for this example
-    ///         max_tokens=500,
-    ///         temperature=0.7
-    ///     )
-    ///
-    ///     result = await ananke.generate(request)
-    ///     print(f"Generated: {result.code}")
-    ///     print(f"Tokens: {result.metadata.tokens_generated}")
-    ///     print(f"Time: {result.metadata.generation_time_ms}ms")
+    /// Example (Python):
+    ///     ```
+    ///     # from ananke import Ananke, PyGenerationRequest, PyConstraintIR
+    ///     #
+    ///     # ananke = Ananke.from_env()
+    ///     #
+    ///     # request = PyGenerationRequest(
+    ///     #     prompt="Implement a secure user authentication handler",
+    ///     #     constraints_ir=[],  # No constraints for this example
+    ///     #     max_tokens=500,
+    ///     #     temperature=0.7
+    ///     # )
+    ///     #
+    ///     # result = await ananke.generate(request)
+    ///     # print(f"Generated: {result.code}")
+    ///     # print(f"Tokens: {result.metadata.tokens_generated}")
+    ///     # print(f"Time: {result.metadata.generation_time_ms}ms")
     ///     ```
     fn generate<'py>(
         &self,
