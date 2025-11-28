@@ -640,7 +640,7 @@ pub const Braid = struct {
         self: *Braid,
         constraints: []const Constraint,
     ) !JsonSchema {
-        var schema_type: []const u8 = "object";
+        var schema_type_literal: []const u8 = "object";
         var properties = std.json.ObjectMap.init(self.allocator);
         var required = std.ArrayList([]const u8){};
 
@@ -652,15 +652,15 @@ pub const Braid = struct {
             if (std.mem.indexOf(u8, desc, "array") != null or
                 std.mem.indexOf(u8, desc, "list") != null)
             {
-                schema_type = "array";
+                schema_type_literal = "array";
             } else if (std.mem.indexOf(u8, desc, "string") != null) {
-                schema_type = "string";
+                schema_type_literal = "string";
             } else if (std.mem.indexOf(u8, desc, "number") != null or
                 std.mem.indexOf(u8, desc, "integer") != null)
             {
-                schema_type = "number";
+                schema_type_literal = "number";
             } else if (std.mem.indexOf(u8, desc, "boolean") != null) {
-                schema_type = "boolean";
+                schema_type_literal = "boolean";
             }
 
             // Extract property names and types from description patterns
@@ -724,6 +724,9 @@ pub const Braid = struct {
             try required.toOwnedSlice(self.allocator)
         else
             &.{};
+
+        // Allocate schema_type so it can be freed consistently
+        const schema_type = try self.allocator.dupe(u8, schema_type_literal);
 
         return JsonSchema{
             .type = schema_type,
@@ -1177,7 +1180,7 @@ pub const Braid = struct {
 
         return Grammar{
             .rules = owned_rules,
-            .start_symbol = "program",
+            .start_symbol = try self.allocator.dupe(u8, "program"),
         };
     }
 

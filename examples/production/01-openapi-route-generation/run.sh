@@ -28,6 +28,7 @@ mkdir -p output
 echo "1/4 Extracting constraints from existing code..."
 ananke extract input/existing_routes.ts \
   --language typescript \
+  --format json \
   -o constraints/extracted.json
 
 if [ ! -f constraints/extracted.json ]; then

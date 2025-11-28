@@ -61,6 +61,7 @@ fi
 
 ananke extract input/Button.tsx \
   --language typescript \
+  --format json \
   -o constraints/extracted.json
 
 echo -e "${GREEN}✓ Extracted component patterns${NC}"

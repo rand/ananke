@@ -173,8 +173,34 @@ pub const ConstraintIR = struct {
 
     /// Free all allocated memory in this ConstraintIR
     pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
+        // Free json_schema if present
+        if (self.json_schema) |*schema| {
+            // Free the type string
+            allocator.free(schema.type);
+
+            // Free the properties ObjectMap
+            if (schema.properties) |*props| {
+                var iter = props.iterator();
+                while (iter.next()) |entry| {
+                    allocator.free(entry.key_ptr.*);
+                    freeJsonValue(allocator, entry.value_ptr.*);
+                }
+                // Free the HashMap's backing storage
+                props.deinit();
+            }
+
+            // Free the required array and its strings
+            for (schema.required) |req| {
+                allocator.free(req);
+            }
+            if (schema.required.len > 0) {
+                allocator.free(schema.required);
+            }
+        }
+
         // Free grammar rules if present
         if (self.grammar) |grammar| {
+            allocator.free(grammar.start_symbol);
             for (grammar.rules) |rule| {
                 allocator.free(rule.lhs);
                 for (rule.rhs) |rhs_item| {
@@ -188,6 +214,9 @@ pub const ConstraintIR = struct {
         // Free regex patterns if present
         for (self.regex_patterns) |pattern| {
             allocator.free(pattern.pattern);
+            if (pattern.flags.len > 0) {
+                allocator.free(pattern.flags);
+            }
         }
         if (self.regex_patterns.len > 0) {
             allocator.free(self.regex_patterns);
@@ -202,8 +231,6 @@ pub const ConstraintIR = struct {
                 allocator.free(tokens);
             }
         }
-
-        // Note: json_schema cleanup not implemented yet as structure is incomplete
     }
 
     /// Serialize to format compatible with llguidance
@@ -310,6 +337,31 @@ fn cloneJsonValue(allocator: std.mem.Allocator, value: std.json.Value) !std.json
             return .{ .object = cloned_obj };
         },
     };
+}
+
+/// Helper function to free a JSON value recursively
+fn freeJsonValue(allocator: std.mem.Allocator, value: std.json.Value) void {
+    switch (value) {
+        .null, .bool, .integer, .float => {}, // No allocation
+        .number_string => |s| allocator.free(s),
+        .string => |s| allocator.free(s),
+        .array => |arr| {
+            for (arr.items) |item| {
+                freeJsonValue(allocator, item);
+            }
+            // Note: arr.deinit() would free the ArrayList backing storage,
+            // but we're managing memory manually here
+        },
+        .object => |obj| {
+            var iter = obj.iterator();
+            while (iter.next()) |entry| {
+                allocator.free(entry.key_ptr.*);
+                freeJsonValue(allocator, entry.value_ptr.*);
+            }
+            // Note: obj.deinit() would free the HashMap backing storage,
+            // but we're managing memory manually here
+        },
+    }
 }
 
 /// Helper function to clone Grammar
