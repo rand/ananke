@@ -286,7 +286,7 @@ pub const HybridExtractor = struct {
             );
             defer self.allocator.free(description);
             const interned_desc = try self.interner.intern(description);
-            
+
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
@@ -319,7 +319,7 @@ pub const HybridExtractor = struct {
             );
             defer self.allocator.free(description);
             const interned_desc = try self.interner.intern(description);
-            
+
             const constraint = Constraint{
                 .kind = .type_safety,
                 .severity = .info,
@@ -346,7 +346,7 @@ pub const HybridExtractor = struct {
             );
             defer self.allocator.free(description);
             const interned_desc = try self.interner.intern(description);
-            
+
             const constraint = Constraint{
                 .kind = .syntactic,
                 .severity = .info,
@@ -440,7 +440,7 @@ pub const HybridExtractor = struct {
 
         return try constraints.toOwnedSlice(self.allocator);
     }
-    
+
     /// Print string interning statistics for performance analysis
     pub fn printInternerStats(self: *const HybridExtractor) void {
         self.interner.printStats();

@@ -372,8 +372,7 @@ fn convertIRToFFI(
                 const formatted = try std.fmt.allocPrint(allocator, "{s}|FLAGS:{s}", .{ regex.pattern, regex.flags });
                 defer allocator.free(formatted);
                 break :blk try allocator.dupeZ(u8, formatted);
-            } else
-                try allocator.dupeZ(u8, regex.pattern);
+            } else try allocator.dupeZ(u8, regex.pattern);
             patterns[i] = pattern_with_flags.ptr;
         }
         regex_ptrs = patterns.ptr;

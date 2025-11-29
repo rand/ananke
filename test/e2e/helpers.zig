@@ -203,7 +203,6 @@ pub const E2ETestContext = struct {
 
         return std.time.milliTimestamp() - start;
     }
-
 };
 
 // Helper functions

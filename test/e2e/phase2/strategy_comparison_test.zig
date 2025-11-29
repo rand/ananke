@@ -46,7 +46,7 @@ const comprehensive_typescript =
 // Strategy Comparison Tests
 test "Strategy: tree_sitter_only extracts AST constraints" {
     const allocator = testing.allocator;
-    
+
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer extractor.deinit();
     var result = try extractor.extract(comprehensive_typescript, "typescript");
@@ -57,14 +57,14 @@ test "Strategy: tree_sitter_only extracts AST constraints" {
     if (result.tree_sitter_available) {
         // Should have only AST-based constraints (confidence = 0.95)
         for (result.constraints) |c| {
-            std.debug.print("  - {s} (conf: {d:.2})\n", .{c.name, c.confidence});
-            
+            std.debug.print("  - {s} (conf: {d:.2})\n", .{ c.name, c.confidence });
+
             // All should be high confidence from AST
             if (c.confidence < 0.90) {
                 std.debug.print("    WARNING: Unexpected low confidence in tree_sitter_only mode\n", .{});
             }
         }
-        
+
         std.debug.print("✓ AST-only extraction successful\n", .{});
     } else {
         std.debug.print("⊘ Tree-sitter not available, returned empty results\n", .{});
@@ -89,7 +89,7 @@ test "Strategy: pattern_only extracts pattern constraints" {
     if (result.constraints.len > 0) {
         // Should have only pattern-based constraints (confidence = 0.75)
         for (result.constraints) |c| {
-            std.debug.print("  - {s} (conf: {d:.2})\n", .{c.name, c.confidence});
+            std.debug.print("  - {s} (conf: {d:.2})\n", .{ c.name, c.confidence });
             // All should be pattern-based confidence
             if (c.confidence >= 0.90) {
                 std.debug.print("    WARNING: Unexpected high confidence in pattern_only mode\n", .{});
@@ -221,8 +221,7 @@ test "Strategy Comparison: Confidence score distribution" {
         }
         const avg_conf = total_conf / @as(f32, @floatFromInt(result.constraints.len));
         std.debug.print("\n{s}:\n", .{strat.name});
-        std.debug.print("  Min: {d:.2}, Max: {d:.2}, Avg: {d:.2}\n",
-            .{min_conf, max_conf, avg_conf});
+        std.debug.print("  Min: {d:.2}, Max: {d:.2}, Avg: {d:.2}\n", .{ min_conf, max_conf, avg_conf });
     }
     std.debug.print("\n✓ Confidence analysis complete\n", .{});
 }
@@ -236,16 +235,14 @@ test "Strategy: Fallback for unsupported language" {
     defer ts_only.deinit();
     var ts_result = try ts_only.extract(kotlin_code, "kotlin");
     defer ts_result.deinitFull(allocator);
-    std.debug.print("tree_sitter_only - Available: {}, Count: {}\n",
-        .{ts_result.tree_sitter_available, ts_result.constraints.len});
+    std.debug.print("tree_sitter_only - Available: {}, Count: {}\n", .{ ts_result.tree_sitter_available, ts_result.constraints.len });
     try testing.expect(!ts_result.tree_sitter_available);
     // tree_sitter_with_fallback should fall back to patterns
     var with_fallback = try HybridExtractor.init(allocator, .tree_sitter_with_fallback);
     defer with_fallback.deinit();
     var fallback_result = try with_fallback.extract(kotlin_code, "kotlin");
     defer fallback_result.deinitFull(allocator);
-    std.debug.print("tree_sitter_with_fallback - Available: {}, Count: {}\n",
-        .{fallback_result.tree_sitter_available, fallback_result.constraints.len});
+    std.debug.print("tree_sitter_with_fallback - Available: {}, Count: {}\n", .{ fallback_result.tree_sitter_available, fallback_result.constraints.len });
     try testing.expect(!fallback_result.tree_sitter_available);
     std.debug.print("✓ Fallback behavior verified\n", .{});
 }
@@ -269,8 +266,7 @@ test "Strategy: Combined deduplicates constraints" {
     }
     var duplicate_count: usize = 0;
     for (result.constraints) |c| {
-        const key = try std.fmt.allocPrint(allocator, "{s}_{s}",
-            .{c.name, @tagName(c.kind)});
+        const key = try std.fmt.allocPrint(allocator, "{s}_{s}", .{ c.name, @tagName(c.kind) });
         if (seen.contains(key)) {
             duplicate_count += 1;
             std.debug.print("  Duplicate: {s}\n", .{key});

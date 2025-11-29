@@ -317,7 +317,6 @@ fn escapeJson(s: []const u8) []const u8 {
 pub fn printTable(
     constraint_set: constraint.ConstraintSet,
 ) !void {
-
     const stdout = std.io.getStdOut().writer();
 
     // Header

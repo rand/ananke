@@ -50,7 +50,7 @@ test "parse simple TypeScript code" {
 
         // Should be a function declaration
         try testing.expect(std.mem.indexOf(u8, node_type, "function") != null or
-                          std.mem.eql(u8, node_type, "function_declaration"));
+            std.mem.eql(u8, node_type, "function_declaration"));
 
         // Check position information
         const start_byte = function_node.startByte();
@@ -113,11 +113,7 @@ test "traverse AST tree" {
     while (i < child_count) : (i += 1) {
         if (root.child(i)) |child| {
             const node_type = child.nodeType();
-            std.debug.print("\nChild {}: type={s}, named={}\n", .{
-                i,
-                node_type,
-                child.isNamed()
-            });
+            std.debug.print("\nChild {}: type={s}, named={}\n", .{ i, node_type, child.isNamed() });
 
             // Check for errors
             try testing.expect(!child.hasError());

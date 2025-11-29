@@ -131,7 +131,7 @@ fn generateJSONReport(
 
     // Results section
     try writer.writeAll("  \"results\": {\n");
-    
+
     // Extraction results
     try writer.writeAll("    \"extraction\": {\n");
     for (extraction_results, 0..) |result, i| {
@@ -214,7 +214,7 @@ fn generateJSONReport(
     const baseline_path = "bench/results/baseline_v0.1.0.json";
 
     try std.fs.cwd().writeFile(.{ .sub_path = latest_path, .data = report.items });
-    
+
     // Only write baseline if it doesn't exist
     std.fs.cwd().access(baseline_path, .{}) catch {
         try std.fs.cwd().writeFile(.{ .sub_path = baseline_path, .data = report.items });
@@ -232,7 +232,7 @@ const EnvironmentInfo = struct {
 
 fn getEnvironmentInfo(allocator: Allocator) !EnvironmentInfo {
     const builtin = @import("builtin");
-    
+
     const os = try std.fmt.allocPrint(allocator, "{s}", .{@tagName(builtin.os.tag)});
     const cpu = try std.fmt.allocPrint(allocator, "{s}", .{@tagName(builtin.cpu.arch)});
     const zig_version = try std.fmt.allocPrint(allocator, "{s}", .{builtin.zig_version_string});

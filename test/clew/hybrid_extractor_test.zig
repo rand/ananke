@@ -95,7 +95,7 @@ test "HybridExtractor: tree_sitter_only extracts functions from TypeScript" {
         // Look for function identifiers like "getUser" or "fetchUser"
         if (constraint.kind == .syntactic and
             (std.mem.eql(u8, constraint.name, "getUser") or
-            std.mem.eql(u8, constraint.name, "fetchUser")))
+                std.mem.eql(u8, constraint.name, "fetchUser")))
         {
             found_function_identifier = true;
             // Verify it's from AST (use approximate equality for floating point)
@@ -118,7 +118,7 @@ test "HybridExtractor: tree_sitter_only extracts types from TypeScript" {
         // Look for type identifiers like "User" or "UserService"
         if (constraint.kind == .type_safety and
             (std.mem.eql(u8, constraint.name, "User") or
-            std.mem.eql(u8, constraint.name, "UserService")))
+                std.mem.eql(u8, constraint.name, "UserService")))
         {
             found_type_identifier = true;
         }

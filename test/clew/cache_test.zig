@@ -112,7 +112,7 @@ test "ConstraintCache: performance improvement verification" {
     defer clew.deinit();
 
     // Create a moderately complex source
-    const source = 
+    const source =
         \\function complexFunction(a: string, b: number): boolean {
         \\    if (a === null) return false;
         \\    const result = a.length > b;
@@ -126,7 +126,7 @@ test "ConstraintCache: performance improvement verification" {
     ;
 
     const iterations = 10;
-    
+
     // Measure time for first extraction (cache miss)
     const start_uncached = std.time.milliTimestamp();
     var first = try clew.extractFromCode(source, "typescript");
@@ -145,7 +145,7 @@ test "ConstraintCache: performance improvement verification" {
 
     std.debug.print("\nPerformance comparison:\n", .{});
     std.debug.print("  Uncached (first): {}ms\n", .{uncached_time});
-    std.debug.print("  Cached (avg of {}): {d:.2}ms\n", .{iterations, avg_cached_time});
+    std.debug.print("  Cached (avg of {}): {d:.2}ms\n", .{ iterations, avg_cached_time });
     std.debug.print("  Speedup: {d:.1}x faster\n", .{@as(f64, @floatFromInt(uncached_time)) / avg_cached_time});
 
     // Cache should be faster (or at worst, same speed)

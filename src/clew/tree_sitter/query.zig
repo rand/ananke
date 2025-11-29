@@ -176,7 +176,6 @@ pub const QueryCapture = struct {
 };
 
 /// Common query patterns for constraint extraction
-
 /// TypeScript/JavaScript function query
 pub const TS_FUNCTION_QUERY =
     \\(function_declaration

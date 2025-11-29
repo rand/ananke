@@ -49,7 +49,7 @@ test "e2e: typescript full pipeline - functions, types, async patterns" {
     const extract_time = std.time.milliTimestamp() - extract_start;
     defer constraint_set.deinit();
 
-    std.debug.print("Extracted {d} constraints in {d}ms\n", .{constraint_set.constraints.items.len, extract_time});
+    std.debug.print("Extracted {d} constraints in {d}ms\n", .{ constraint_set.constraints.items.len, extract_time });
 
     // Verify constraints were extracted
     try testing.expect(constraint_set.constraints.items.len > 0);
@@ -143,7 +143,7 @@ test "e2e: python full pipeline - type hints, decorators, async" {
     const extract_time = std.time.milliTimestamp() - extract_start;
     defer constraint_set.deinit();
 
-    std.debug.print("Extracted {d} constraints in {d}ms\n", .{constraint_set.constraints.items.len, extract_time});
+    std.debug.print("Extracted {d} constraints in {d}ms\n", .{ constraint_set.constraints.items.len, extract_time });
 
     // Verify constraints were extracted
     try testing.expect(constraint_set.constraints.items.len > 0);
@@ -159,7 +159,8 @@ test "e2e: python full pipeline - type hints, decorators, async" {
 
         // Check for type hints
         if (std.mem.indexOf(u8, desc, "type") != null or
-            std.mem.indexOf(u8, desc, "hint") != null) {
+            std.mem.indexOf(u8, desc, "hint") != null)
+        {
             type_hint_count += 1;
         }
 
@@ -170,7 +171,8 @@ test "e2e: python full pipeline - type hints, decorators, async" {
 
         // Check for decorators
         if (std.mem.indexOf(u8, desc, "decorator") != null or
-            std.mem.indexOf(u8, desc, "@") != null) {
+            std.mem.indexOf(u8, desc, "@") != null)
+        {
             decorator_count += 1;
         }
 
@@ -241,19 +243,19 @@ test "e2e: multi-language constraint extraction and unified compilation" {
     var ts_set = try clew.extractFromCode(SAMPLE_TS, "typescript");
     const ts_time = std.time.milliTimestamp() - ts_start;
     defer ts_set.deinit();
-    std.debug.print("TypeScript: extracted {d} constraints in {d}ms\n", .{ts_set.constraints.items.len, ts_time});
+    std.debug.print("TypeScript: extracted {d} constraints in {d}ms\n", .{ ts_set.constraints.items.len, ts_time });
 
     const py_start = std.time.milliTimestamp();
     var py_set = try clew.extractFromCode(SAMPLE_PY, "python");
     const py_time = std.time.milliTimestamp() - py_start;
     defer py_set.deinit();
-    std.debug.print("Python: extracted {d} constraints in {d}ms\n", .{py_set.constraints.items.len, py_time});
+    std.debug.print("Python: extracted {d} constraints in {d}ms\n", .{ py_set.constraints.items.len, py_time });
 
     const rs_start = std.time.milliTimestamp();
     var rs_set = try clew.extractFromCode(SAMPLE_RS, "rust");
     const rs_time = std.time.milliTimestamp() - rs_start;
     defer rs_set.deinit();
-    std.debug.print("Rust: extracted {d} constraints in {d}ms\n", .{rs_set.constraints.items.len, rs_time});
+    std.debug.print("Rust: extracted {d} constraints in {d}ms\n", .{ rs_set.constraints.items.len, rs_time });
 
     // Step 2: Merge all constraints from different languages
     var combined = std.ArrayList(Constraint){};
@@ -315,7 +317,7 @@ test "e2e: multi-language constraint extraction and unified compilation" {
     std.debug.print("  Constraint kind distribution:\n", .{});
     var kind_iter = kind_counts.iterator();
     while (kind_iter.next()) |entry| {
-        std.debug.print("    {s}: {d}\n", .{@tagName(entry.key_ptr.*), entry.value_ptr.*});
+        std.debug.print("    {s}: {d}\n", .{ @tagName(entry.key_ptr.*), entry.value_ptr.* });
     }
 
     // Multi-language should have diverse constraint kinds
@@ -336,7 +338,7 @@ test "e2e: constraint priority propagates through full pipeline" {
     defer braid.deinit();
 
     // Extract security-relevant Python code
-    const security_code = 
+    const security_code =
         \\import hashlib
         \\
         \\def hash_password(password: str) -> str:
@@ -349,8 +351,9 @@ test "e2e: constraint priority propagates through full pipeline" {
     // Check for security constraints
     var has_security = false;
     for (constraint_set.constraints.items) |constraint| {
-        if (constraint.kind == .security or 
-            std.mem.indexOf(u8, constraint.description, "security") != null) {
+        if (constraint.kind == .security or
+            std.mem.indexOf(u8, constraint.description, "security") != null)
+        {
             has_security = true;
             break;
         }
@@ -383,7 +386,7 @@ test "e2e: constraint metadata preserved through pipeline" {
         // Confidence should be in valid range
         try testing.expect(constraint.confidence >= 0.0);
         try testing.expect(constraint.confidence <= 1.0);
-        
+
         // Frequency should be positive
         try testing.expect(constraint.frequency > 0);
     }
@@ -391,7 +394,7 @@ test "e2e: constraint metadata preserved through pipeline" {
     // Compile and verify IR maintains priority
     var ir = try braid.compile(constraint_set.constraints.items);
     defer ir.deinit(testing.allocator);
-    
+
     try testing.expect(ir.priority >= 0);
 }
 
@@ -517,13 +520,13 @@ test "e2e: performance baseline - extract and compile under 10ms target" {
 
     std.debug.print("Performance metrics ({d} iterations):\n", .{iterations});
     std.debug.print("  Extraction:\n", .{});
-    std.debug.print("    Average: {d}µs ({d:.2}ms)\n", .{avg_extract_us, @as(f64, @floatFromInt(avg_extract_us)) / 1000.0});
+    std.debug.print("    Average: {d}µs ({d:.2}ms)\n", .{ avg_extract_us, @as(f64, @floatFromInt(avg_extract_us)) / 1000.0 });
     std.debug.print("  Compilation:\n", .{});
-    std.debug.print("    Average: {d}µs ({d:.2}ms)\n", .{avg_compile_us, @as(f64, @floatFromInt(avg_compile_us)) / 1000.0});
+    std.debug.print("    Average: {d}µs ({d:.2}ms)\n", .{ avg_compile_us, @as(f64, @floatFromInt(avg_compile_us)) / 1000.0 });
     std.debug.print("  Combined (Extract + Compile):\n", .{});
-    std.debug.print("    Average: {d}µs ({d:.2}ms)\n", .{avg_total_us, @as(f64, @floatFromInt(avg_total_us)) / 1000.0});
-    std.debug.print("    Min: {d}µs ({d:.2}ms)\n", .{min_total, @as(f64, @floatFromInt(min_total)) / 1000.0});
-    std.debug.print("    Max: {d}µs ({d:.2}ms)\n", .{max_total, @as(f64, @floatFromInt(max_total)) / 1000.0});
+    std.debug.print("    Average: {d}µs ({d:.2}ms)\n", .{ avg_total_us, @as(f64, @floatFromInt(avg_total_us)) / 1000.0 });
+    std.debug.print("    Min: {d}µs ({d:.2}ms)\n", .{ min_total, @as(f64, @floatFromInt(min_total)) / 1000.0 });
+    std.debug.print("    Max: {d}µs ({d:.2}ms)\n", .{ max_total, @as(f64, @floatFromInt(max_total)) / 1000.0 });
 
     // Target: Extract + Compile under 10ms for small samples
     // This is generous for debug builds, production builds should be faster
@@ -557,9 +560,9 @@ test "e2e: performance baseline - extract and compile under 10ms target" {
 
     const full_total = full_extract_time + full_compile_time;
 
-    std.debug.print("  Extraction: {d}µs ({d:.2}ms)\n", .{full_extract_time, @as(f64, @floatFromInt(full_extract_time)) / 1000.0});
-    std.debug.print("  Compilation: {d}µs ({d:.2}ms)\n", .{full_compile_time, @as(f64, @floatFromInt(full_compile_time)) / 1000.0});
-    std.debug.print("  Total: {d}µs ({d:.2}ms)\n", .{full_total, @as(f64, @floatFromInt(full_total)) / 1000.0});
+    std.debug.print("  Extraction: {d}µs ({d:.2}ms)\n", .{ full_extract_time, @as(f64, @floatFromInt(full_extract_time)) / 1000.0 });
+    std.debug.print("  Compilation: {d}µs ({d:.2}ms)\n", .{ full_compile_time, @as(f64, @floatFromInt(full_compile_time)) / 1000.0 });
+    std.debug.print("  Total: {d}µs ({d:.2}ms)\n", .{ full_total, @as(f64, @floatFromInt(full_total)) / 1000.0 });
     std.debug.print("  Constraints extracted: {d}\n", .{full_constraint_set.constraints.items.len});
 
     // Identify bottlenecks

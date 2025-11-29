@@ -75,10 +75,10 @@ fn handleRequest(
         const error_response = try std.fmt.allocPrint(
             allocator,
             "HTTP/1.1 {d} Internal Server Error\r\n" ++
-            "Content-Type: application/json\r\n" ++
-            "Content-Length: {d}\r\n" ++
-            "\r\n" ++
-            "{{\"error\": \"Mock server configured to fail\"}}",
+                "Content-Type: application/json\r\n" ++
+                "Content-Length: {d}\r\n" ++
+                "\r\n" ++
+                "{{\"error\": \"Mock server configured to fail\"}}",
             .{ config.error_code, 39 },
         );
         defer allocator.free(error_response);
@@ -118,11 +118,11 @@ fn handleValidateConstraints(
     const response = try std.fmt.allocPrint(
         allocator,
         "HTTP/1.1 200 OK\r\n" ++
-        "Content-Type: application/json\r\n" ++
-        "Content-Length: {d}\r\n" ++
-        "X-Request-ID: mock-{d}\r\n" ++
-        "\r\n" ++
-        "{s}",
+            "Content-Type: application/json\r\n" ++
+            "Content-Length: {d}\r\n" ++
+            "X-Request-ID: mock-{d}\r\n" ++
+            "\r\n" ++
+            "{s}",
         .{
             response_body.len,
             std.crypto.random.int(u32),
@@ -153,11 +153,11 @@ fn handleGenerate(
     const response = try std.fmt.allocPrint(
         allocator,
         "HTTP/1.1 200 OK\r\n" ++
-        "Content-Type: application/json\r\n" ++
-        "Content-Length: {d}\r\n" ++
-        "X-Request-ID: mock-{d}\r\n" ++
-        "\r\n" ++
-        "{s}",
+            "Content-Type: application/json\r\n" ++
+            "Content-Length: {d}\r\n" ++
+            "X-Request-ID: mock-{d}\r\n" ++
+            "\r\n" ++
+            "{s}",
         .{
             response_body.len,
             std.crypto.random.int(u32),
@@ -184,10 +184,10 @@ fn handleStatus(
     const response = try std.fmt.allocPrint(
         allocator,
         "HTTP/1.1 200 OK\r\n" ++
-        "Content-Type: application/json\r\n" ++
-        "Content-Length: {d}\r\n" ++
-        "\r\n" ++
-        "{s}",
+            "Content-Type: application/json\r\n" ++
+            "Content-Length: {d}\r\n" ++
+            "\r\n" ++
+            "{s}",
         .{ response_body.len, response_body },
     );
     defer allocator.free(response);
@@ -206,10 +206,10 @@ fn handleNotFound(
     const response = try std.fmt.allocPrint(
         allocator,
         "HTTP/1.1 404 Not Found\r\n" ++
-        "Content-Type: application/json\r\n" ++
-        "Content-Length: {d}\r\n" ++
-        "\r\n" ++
-        "{s}",
+            "Content-Type: application/json\r\n" ++
+            "Content-Length: {d}\r\n" ++
+            "\r\n" ++
+            "{s}",
         .{ response_body.len, response_body },
     );
     defer allocator.free(response);
@@ -264,9 +264,9 @@ pub fn sendTestRequest(
     const request = try std.fmt.allocPrint(
         allocator,
         "GET {s} HTTP/1.1\r\n" ++
-        "Host: localhost:{d}\r\n" ++
-        "Connection: close\r\n" ++
-        "\r\n",
+            "Host: localhost:{d}\r\n" ++
+            "Connection: close\r\n" ++
+            "\r\n",
         .{ endpoint, port },
     );
     defer allocator.free(request);
