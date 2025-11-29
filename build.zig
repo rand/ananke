@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Build options for mechanical sympathy optimizations
-    const enable_lto = b.option(bool, "lto", "Enable Link-Time Optimization for release builds") orelse (optimize != .Debug);
+    // Note: LTO is disabled for tree-sitter parser libraries to prevent symbol stripping
     const cpu_native = b.option(bool, "cpu-native", "Enable native CPU features (-march=native)") orelse false;
     // TODO: Apply strip_symbols to executables (requires updating exe configuration)
     // const strip_symbols = b.option(bool, "strip", "Strip debug symbols from release builds") orelse (optimize == .ReleaseSmall);
@@ -80,6 +80,7 @@ pub fn build(b: *std.Build) void {
     tree_sitter_mod.linkSystemLibrary("tree-sitter", .{});
 
     // Tree-sitter language parsers as static libraries
+    // IMPORTANT: Disable LTO for parser libraries to prevent symbol stripping
     // TypeScript parser
     const ts_parser_lib = b.addLibrary(.{
         .name = "tree-sitter-typescript",
@@ -96,7 +97,7 @@ pub fn build(b: *std.Build) void {
     ts_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-typescript/typescript/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // Python parser
@@ -113,7 +114,7 @@ pub fn build(b: *std.Build) void {
     py_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-python/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // JavaScript parser
@@ -130,7 +131,7 @@ pub fn build(b: *std.Build) void {
     js_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-javascript/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // Rust parser
@@ -147,7 +148,7 @@ pub fn build(b: *std.Build) void {
     rust_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-rust/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // Go parser
@@ -164,7 +165,7 @@ pub fn build(b: *std.Build) void {
     go_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-go/src"),
         .files = &.{"parser.c"},
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // Zig parser
@@ -181,7 +182,7 @@ pub fn build(b: *std.Build) void {
     zig_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-zig/src"),
         .files = &.{"parser.c"},
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // C parser
@@ -198,7 +199,7 @@ pub fn build(b: *std.Build) void {
     c_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-c/src"),
         .files = &.{"parser.c"},
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // C++ parser
@@ -215,7 +216,7 @@ pub fn build(b: *std.Build) void {
     cpp_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-cpp/src"),
         .files = &.{ "parser.c", "scanner.c" },
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // Java parser
@@ -232,7 +233,7 @@ pub fn build(b: *std.Build) void {
     java_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-java/src"),
         .files = &.{"parser.c"},
-        .flags = getCFlags(optimize, enable_lto, cpu_native),
+        .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
     // Install all tree-sitter parser libraries so they can be used by examples and other dependents
