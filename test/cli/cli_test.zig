@@ -215,7 +215,7 @@ test "config: parse Claude section" {
 
     try config.parseToml(toml);
 
-    try testing.expectEqualStrings("sk-ant-test-key", config.claude_api_key.?);
+    try testing.expectEqualStrings("sk-ant-test-key", config.claude_api_key.slice().?);
     try testing.expectEqualStrings("https://custom.anthropic.com/v1/messages", config.claude_endpoint.?);
     try testing.expectEqualStrings("claude-opus-4-1-20250805", config.claude_model);
     try testing.expectEqual(true, config.use_claude);

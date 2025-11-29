@@ -1,11 +1,13 @@
 // HTTP client utilities for Ananke
-// Provides simple HTTP POST wrapper for API calls
+// Provides HTTP POST wrapper with retry logic and exponential backoff
 const std = @import("std");
+const retry_mod = @import("retry.zig");
 
 /// HTTP client configuration
 pub const HttpClient = struct {
     allocator: std.mem.Allocator,
     timeout_ms: u32 = 30000,
+    retry_config: retry_mod.RetryConfig = .{},
 
     pub fn init(allocator: std.mem.Allocator) HttpClient {
         return .{
@@ -58,6 +60,8 @@ pub const HttpError = error{
     RequestFailed,
     InvalidResponse,
     TooManyRedirects,
+    RateLimited,
+    ServerError,
 };
 
 /// Send an HTTP POST request with JSON body
@@ -142,6 +146,70 @@ pub fn post(
         .allocator = allocator,
         .body = body,
     };
+}
+
+/// Send an HTTP POST request with retry logic and exponential backoff
+/// This wrapper adds resilience for transient failures
+pub fn postWithRetry(
+    allocator: std.mem.Allocator,
+    url: []const u8,
+    headers: []const HttpRequest.Header,
+    json_body: []const u8,
+    retry_config: retry_mod.RetryConfig,
+    stats: ?*retry_mod.RetryStats,
+) !HttpResponse {
+    // Wrap the post function with retry logic
+    const Context = struct {
+        alloc: std.mem.Allocator,
+        url_str: []const u8,
+        hdrs: []const HttpRequest.Header,
+        body: []const u8,
+    };
+
+    const ctx = Context{
+        .alloc = allocator,
+        .url_str = url,
+        .hdrs = headers,
+        .body = json_body,
+    };
+
+    const postFn = struct {
+        fn call(context: Context) !HttpResponse {
+            const response = post(
+                context.alloc,
+                context.url_str,
+                context.hdrs,
+                context.body,
+            ) catch |err| {
+                return err;
+            };
+
+            // Check for retryable status codes
+            if (retry_mod.isRetryableStatus(response.status_code)) {
+                // Log the status code for observability
+                std.log.warn("HTTP request returned retryable status {d}", .{response.status_code});
+
+                // Clean up response before retrying
+                var mut_response = response;
+                mut_response.deinit();
+
+                // Return appropriate error
+                return switch (response.status_code) {
+                    429 => HttpError.RateLimited,
+                    500...599 => HttpError.ServerError,
+                    else => HttpError.RequestFailed,
+                };
+            }
+
+            return response;
+        }
+    }.call;
+
+    return retry_mod.withRetry(@TypeOf(postFn), retry_config, struct {
+        fn call() !HttpResponse {
+            return postFn(ctx);
+        }
+    }.call, stats);
 }
 
 /// Parse JSON response body
