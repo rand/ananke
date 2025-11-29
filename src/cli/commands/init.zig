@@ -1,8 +1,8 @@
 // Init command - Initialize .ananke.toml configuration
 const std = @import("std");
-const args_mod = @import("../args.zig");
-const config_mod = @import("../config.zig");
-const cli_error = @import("../error.zig");
+const args_mod = @import("cli_args");
+const config_mod = @import("cli_config");
+const cli_error = @import("cli_error");
 
 pub const usage =
     \\Usage: ananke init [options]

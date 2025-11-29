@@ -313,16 +313,39 @@ pub fn build(b: *std.Build) void {
     });
     cli_output_mod.addImport("ananke", ananke_mod);
 
+    const security_mod = b.addModule("security", .{
+        .root_source_file = b.path("src/security/secure_string.zig"),
+        .target = target,
+    });
+
+    const path_validator_mod = b.addModule("path_validator", .{
+        .root_source_file = b.path("src/cli/path_validator.zig"),
+        .target = target,
+    });
+
+    const sanitizer_mod = b.addModule("sanitizer", .{
+        .root_source_file = b.path("src/braid/sanitizer.zig"),
+        .target = target,
+    });
+
     const cli_config_mod = b.addModule("cli_config", .{
         .root_source_file = b.path("src/cli/config.zig"),
         .target = target,
     });
+    cli_config_mod.addImport("security", security_mod);
 
     const cli_error_mod = b.addModule("cli_error", .{
         .root_source_file = b.path("src/cli/error.zig"),
         .target = target,
     });
     cli_error_mod.addImport("cli_output", cli_output_mod);
+
+    const cli_error_help_mod = b.addModule("cli_error_help", .{
+        .root_source_file = b.path("src/cli/error_help.zig"),
+        .target = target,
+    });
+    cli_error_help_mod.addImport("cli_output", cli_output_mod);
+    cli_error_help_mod.addImport("cli_error", cli_error_mod);
 
     // CLI command modules
     const cli_extract_mod = b.addModule("cli_extract", .{
@@ -334,6 +357,8 @@ pub fn build(b: *std.Build) void {
     cli_extract_mod.addImport("cli_output", cli_output_mod);
     cli_extract_mod.addImport("cli_config", cli_config_mod);
     cli_extract_mod.addImport("cli_error", cli_error_mod);
+    cli_extract_mod.addImport("cli_error_help", cli_error_help_mod);
+    cli_extract_mod.addImport("path_validator", path_validator_mod);
 
     const cli_compile_mod = b.addModule("cli_compile", .{
         .root_source_file = b.path("src/cli/commands/compile.zig"),
@@ -344,6 +369,8 @@ pub fn build(b: *std.Build) void {
     cli_compile_mod.addImport("cli_output", cli_output_mod);
     cli_compile_mod.addImport("cli_config", cli_config_mod);
     cli_compile_mod.addImport("cli_error", cli_error_mod);
+    cli_compile_mod.addImport("cli_error_help", cli_error_help_mod);
+    cli_compile_mod.addImport("path_validator", path_validator_mod);
 
     const cli_generate_mod = b.addModule("cli_generate", .{
         .root_source_file = b.path("src/cli/commands/generate.zig"),
@@ -362,6 +389,8 @@ pub fn build(b: *std.Build) void {
     cli_validate_mod.addImport("cli_output", cli_output_mod);
     cli_validate_mod.addImport("cli_config", cli_config_mod);
     cli_validate_mod.addImport("cli_error", cli_error_mod);
+    cli_validate_mod.addImport("cli_error_help", cli_error_help_mod);
+    cli_validate_mod.addImport("path_validator", path_validator_mod);
 
     const cli_init_mod = b.addModule("cli_init", .{
         .root_source_file = b.path("src/cli/commands/init.zig"),
@@ -386,6 +415,12 @@ pub fn build(b: *std.Build) void {
     cli_help_mod.addImport("cli_args", cli_args_mod);
     cli_help_mod.addImport("cli_config", cli_config_mod);
     cli_help_mod.addImport("cli_output", cli_output_mod);
+    cli_help_mod.addImport("cli/commands/extract", cli_extract_mod);
+    cli_help_mod.addImport("cli/commands/compile", cli_compile_mod);
+    cli_help_mod.addImport("cli/commands/generate", cli_generate_mod);
+    cli_help_mod.addImport("cli/commands/validate", cli_validate_mod);
+    cli_help_mod.addImport("cli/commands/init", cli_init_mod);
+    cli_help_mod.addImport("cli/commands/version", cli_version_mod);
 
     // Build static library for FFI integration with Rust Maze
     const lib = b.addLibrary(.{
@@ -463,6 +498,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "cli/output", .module = cli_output_mod },
                 .{ .name = "cli/config", .module = cli_config_mod },
                 .{ .name = "cli/error", .module = cli_error_mod },
+                .{ .name = "cli/error_help", .module = cli_error_help_mod },
                 .{ .name = "cli/commands/extract", .module = cli_extract_mod },
                 .{ .name = "cli/commands/compile", .module = cli_compile_mod },
                 .{ .name = "cli/commands/generate", .module = cli_generate_mod },
@@ -1051,6 +1087,23 @@ pub fn build(b: *std.Build) void {
 
     const run_cli_integration_tests = b.addRunArtifact(cli_integration_tests);
 
+    // Security edge case tests
+    const security_edge_case_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/security/edge_cases_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{},
+        }),
+    });
+
+    // Add necessary module imports for security tests
+    security_edge_case_tests.root_module.addImport("security", security_mod);
+    security_edge_case_tests.root_module.addImport("path_validator", path_validator_mod);
+    security_edge_case_tests.root_module.addImport("sanitizer", sanitizer_mod);
+
+    const run_security_edge_case_tests = b.addRunArtifact(security_edge_case_tests);
+
     // Ariadne DSL tests
     const ariadne_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1094,6 +1147,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_phase2_constraint_quality_tests.step);
     test_step.dependOn(&run_cli_tests.step);
     test_step.dependOn(&run_cli_integration_tests.step);
+    test_step.dependOn(&run_security_edge_case_tests.step);
     test_step.dependOn(&run_ariadne_tests.step);
 
     // Phase 8a: TypeScript E2E pipeline tests

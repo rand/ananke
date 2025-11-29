@@ -80,7 +80,8 @@ pub fn formatJson(
         try writer.print("      \"confidence\": {d:.2},\n", .{c.confidence});
         try writer.print("      \"frequency\": {d}\n", .{c.frequency});
         try writer.writeAll("    }");
-        if (i < constraint_set.constraints.items.len - 1) {
+        // Safe check: use addition instead of subtraction to avoid underflow
+        if (i + 1 < constraint_set.constraints.items.len) {
             try writer.writeAll(",");
         }
         try writer.writeAll("\n");
@@ -165,7 +166,8 @@ pub fn formatPretty(
             c.confidence * 100,
         });
 
-        if (i < constraint_set.constraints.items.len - 1) {
+        // Safe check: use addition instead of subtraction to avoid underflow
+        if (i + 1 < constraint_set.constraints.items.len) {
             try writer.writeAll("\n");
         }
     }

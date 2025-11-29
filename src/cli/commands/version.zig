@@ -1,8 +1,8 @@
 // Version command - Show version information
 const std = @import("std");
-const args_mod = @import("../args.zig");
-const config_mod = @import("../config.zig");
-const output = @import("../output.zig");
+const args_mod = @import("cli_args");
+const config_mod = @import("cli_config");
+const output = @import("cli_output");
 
 pub const VERSION = "0.1.0";
 pub const BUILD_DATE = "November 24, 2025";

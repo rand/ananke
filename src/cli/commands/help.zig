@@ -1,15 +1,15 @@
 // Help command - Show help for commands
 const std = @import("std");
-const args_mod = @import("../args.zig");
-const config_mod = @import("../config.zig");
-const output = @import("../output.zig");
+const args_mod = @import("cli_args");
+const config_mod = @import("cli_config");
+const output = @import("cli_output");
 
-const extract = @import("extract.zig");
-const compile = @import("compile.zig");
-const generate = @import("generate.zig");
-const validate = @import("validate.zig");
-const init = @import("init.zig");
-const version = @import("version.zig");
+const extract = @import("cli/commands/extract");
+const compile = @import("cli/commands/compile");
+const generate = @import("cli/commands/generate");
+const validate = @import("cli/commands/validate");
+const init = @import("cli/commands/init");
+const version = @import("cli/commands/version");
 
 pub const usage =
     \\Usage: ananke help [command]

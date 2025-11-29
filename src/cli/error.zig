@@ -1,6 +1,6 @@
 // Error handling and formatting for Ananke CLI
 const std = @import("std");
-const output = @import("output.zig");
+const output = @import("cli_output");
 
 /// Standard exit codes
 pub const ExitCode = enum(u8) {

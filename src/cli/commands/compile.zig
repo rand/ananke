@@ -1,10 +1,12 @@
 // Compile command - Compile constraints to IR
 const std = @import("std");
 const ananke = @import("ananke");
-const args_mod = @import("../args.zig");
-const output = @import("../output.zig");
-const config_mod = @import("../config.zig");
-const cli_error = @import("../error.zig");
+const args_mod = @import("cli_args");
+const output = @import("cli_output");
+const config_mod = @import("cli_config");
+const cli_error = @import("cli_error");
+const error_help = @import("cli_error_help");
+const path_validator = @import("path_validator");
 
 pub const usage =
     \\Usage: ananke compile <constraints-file> [options]
@@ -50,8 +52,8 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
 
     // Validate format
     if (!std.mem.eql(u8, format_str, "json") and !std.mem.eql(u8, format_str, "yaml")) {
-        cli_error.printError("Invalid format '{s}'", .{format_str});
-        cli_error.printInfo("Valid formats: json, yaml", .{});
+        const valid_formats = &[_][]const u8{ "json", "yaml" };
+        error_help.printInvalidFormatError(format_str, valid_formats);
         return error.InvalidArgument;
     }
 
@@ -67,9 +69,33 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         cli_error.printInfo("Priority: {s}", .{@tagName(priority)});
     }
 
+    // Validate and resolve constraints file path (security: prevent path traversal)
+    const validated_path = path_validator.validatePath(
+        allocator,
+        constraints_file,
+        false,
+    ) catch |err| {
+        if (err == path_validator.PathValidationError.PathTraversalAttempt) {
+            cli_error.printError("Path traversal attempt detected: {s}", .{constraints_file});
+            cli_error.printInfo("Only relative paths within the current directory are allowed.", .{});
+            return error.InvalidPath;
+        }
+        if (err == error.FileNotFound) {
+            error_help.printFileNotFoundError(constraints_file, allocator);
+        } else {
+            cli_error.printFileError(err, constraints_file);
+        }
+        return err;
+    };
+    defer allocator.free(validated_path);
+
     // Read constraints file
-    const constraints_json = std.fs.cwd().readFileAlloc(allocator, constraints_file, 10 * 1024 * 1024) catch |err| {
-        cli_error.printFileError(err, constraints_file);
+    const constraints_json = std.fs.cwd().readFileAlloc(allocator, validated_path, 10 * 1024 * 1024) catch |err| {
+        if (err == error.FileNotFound) {
+            error_help.printFileNotFoundError(validated_path, allocator);
+        } else {
+            cli_error.printFileError(err, validated_path);
+        }
         return err;
     };
     defer allocator.free(constraints_json);
@@ -81,8 +107,7 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
 
     // Parse JSON constraints using arena allocator - all strings will be freed when arena is freed
     const constraint_set = parseConstraintsJson(arena_allocator, constraints_json) catch |err| {
-        cli_error.printError("Failed to parse constraints file: {s}", .{@errorName(err)});
-        cli_error.printInfo("Expected JSON format with 'name' and 'constraints' fields", .{});
+        error_help.printCompilationError("parsing", @errorName(err));
         return err;
     };
     defer {
@@ -94,6 +119,13 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         cli_error.printInfo("Loaded {d} constraints", .{constraint_set.constraints.items.len});
     }
 
+    // Validate constraint set is not empty
+    if (constraint_set.constraints.items.len == 0) {
+        cli_error.printError("Cannot compile empty constraint set", .{});
+        cli_error.printInfo("The constraints file contains no valid constraints", .{});
+        return error.EmptyConstraintSet;
+    }
+
     // Initialize Ananke
     var ananke_instance = try ananke.Ananke.init(allocator);
     defer ananke_instance.deinit();
@@ -101,7 +133,7 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     // Compile constraints to IR
     var spinner = output.Spinner.init("Compiling constraints to IR...");
     const ir = ananke_instance.compile(constraint_set.constraints.items) catch |err| {
-        cli_error.printError("Compilation failed: {s}", .{@errorName(err)});
+        error_help.printCompilationError("IR generation", @errorName(err));
         return err;
     };
     spinner.finish("Compilation complete");

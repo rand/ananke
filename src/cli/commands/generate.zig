@@ -1,8 +1,8 @@
 // Generate command - Generate code with constraints
 const std = @import("std");
-const args_mod = @import("../args.zig");
-const config_mod = @import("../config.zig");
-const cli_error = @import("../error.zig");
+const args_mod = @import("cli_args");
+const config_mod = @import("cli_config");
+const cli_error = @import("cli_error");
 
 /// Error types for Modal inference
 const InferenceError = error{

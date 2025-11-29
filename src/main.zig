@@ -2,19 +2,19 @@
 const std = @import("std");
 
 // Import CLI modules
-const args_mod = @import("cli/args.zig");
-const output = @import("cli/output.zig");
-const config_mod = @import("cli/config.zig");
-const cli_error = @import("cli/error.zig");
+const args_mod = @import("cli/args");
+const output = @import("cli/output");
+const config_mod = @import("cli/config");
+const cli_error = @import("cli/error");
 
 // Import command modules
-const extract = @import("cli/commands/extract.zig");
-const compile = @import("cli/commands/compile.zig");
-const generate = @import("cli/commands/generate.zig");
-const validate = @import("cli/commands/validate.zig");
-const init = @import("cli/commands/init.zig");
-const version = @import("cli/commands/version.zig");
-const help = @import("cli/commands/help.zig");
+const extract = @import("cli/commands/extract");
+const compile = @import("cli/commands/compile");
+const generate = @import("cli/commands/generate");
+const validate = @import("cli/commands/validate");
+const init = @import("cli/commands/init");
+const version = @import("cli/commands/version");
+const help = @import("cli/commands/help");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
