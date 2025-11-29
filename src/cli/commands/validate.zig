@@ -1,10 +1,12 @@
 // Validate command - Validate code against constraints
 const std = @import("std");
 const ananke = @import("ananke");
-const args_mod = @import("../args.zig");
-const output = @import("../output.zig");
-const config_mod = @import("../config.zig");
-const cli_error = @import("../error.zig");
+const args_mod = @import("cli_args");
+const output = @import("cli_output");
+const config_mod = @import("cli_config");
+const cli_error = @import("cli_error");
+const error_help = @import("cli_error_help");
+const path_validator = @import("path_validator");
 
 pub const usage =
     \\Usage: ananke validate <code-file> [options]
@@ -52,9 +54,33 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         }
     }
 
+    // Validate and resolve file path (security: prevent path traversal)
+    const validated_path = path_validator.validatePath(
+        allocator,
+        file_path,
+        false,
+    ) catch |err| {
+        if (err == path_validator.PathValidationError.PathTraversalAttempt) {
+            cli_error.printError("Path traversal attempt detected: {s}", .{file_path});
+            cli_error.printInfo("Only relative paths within the current directory are allowed.", .{});
+            return error.InvalidPath;
+        }
+        if (err == error.FileNotFound) {
+            error_help.printFileNotFoundError(file_path, allocator);
+        } else {
+            cli_error.printFileError(err, file_path);
+        }
+        return err;
+    };
+    defer allocator.free(validated_path);
+
     // Read source file
-    const source = std.fs.cwd().readFileAlloc(allocator, file_path, 10 * 1024 * 1024) catch |err| {
-        cli_error.printFileError(err, file_path);
+    const source = std.fs.cwd().readFileAlloc(allocator, validated_path, 10 * 1024 * 1024) catch |err| {
+        if (err == error.FileNotFound) {
+            error_help.printFileNotFoundError(validated_path, allocator);
+        } else {
+            cli_error.printFileError(err, validated_path);
+        }
         return err;
     };
     defer allocator.free(source);
@@ -77,8 +103,24 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
             cli_error.printInfo("Loading constraints from: {s}", .{path});
         }
 
-        const constraints_json = std.fs.cwd().readFileAlloc(allocator, path, 10 * 1024 * 1024) catch |err| {
+        // Validate constraints file path (security: prevent path traversal)
+        const validated_constraints_path = path_validator.validatePath(
+            allocator,
+            path,
+            false,
+        ) catch |err| {
+            if (err == path_validator.PathValidationError.PathTraversalAttempt) {
+                cli_error.printError("Path traversal attempt detected: {s}", .{path});
+                cli_error.printInfo("Only relative paths within the current directory are allowed.", .{});
+                return error.InvalidPath;
+            }
             cli_error.printFileError(err, path);
+            return err;
+        };
+        defer allocator.free(validated_constraints_path);
+
+        const constraints_json = std.fs.cwd().readFileAlloc(allocator, validated_constraints_path, 10 * 1024 * 1024) catch |err| {
+            cli_error.printFileError(err, validated_constraints_path);
             return err;
         };
         defer allocator.free(constraints_json);
@@ -104,6 +146,13 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     const cs = constraint_set.?;
     if (verbose) {
         cli_error.printInfo("Validating against {d} constraints", .{cs.constraints.items.len});
+    }
+
+    // Check for empty constraint set
+    if (cs.constraints.items.len == 0) {
+        cli_error.printWarning("No constraints to validate against", .{});
+        cli_error.printInfo("Consider extracting constraints from the code or providing a constraints file", .{});
+        return;
     }
 
     // Perform validation

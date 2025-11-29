@@ -1,10 +1,12 @@
 // Extract command - Extract constraints from source code
 const std = @import("std");
 const ananke = @import("ananke");
-const args_mod = @import("../args.zig");
-const output = @import("../output.zig");
-const config_mod = @import("../config.zig");
-const cli_error = @import("../error.zig");
+const args_mod = @import("cli_args");
+const output = @import("cli_output");
+const config_mod = @import("cli_config");
+const cli_error = @import("cli_error");
+const error_help = @import("cli_error_help");
+const path_validator = @import("path_validator");
 
 pub const usage =
     \\Usage: ananke extract <file> [options]
@@ -53,8 +55,8 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
 
     // Validate format
     const format = output.OutputFormat.fromString(format_str) orelse {
-        cli_error.printError("Invalid format '{s}'", .{format_str});
-        cli_error.printInfo("Valid formats: json, yaml, pretty, ariadne", .{});
+        const valid_formats = &[_][]const u8{ "json", "yaml", "pretty", "ariadne" };
+        error_help.printInvalidFormatError(format_str, valid_formats);
         return error.InvalidArgument;
     };
 
@@ -72,9 +74,33 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         cli_error.printInfo("Confidence threshold: {d:.1}%", .{confidence_threshold * 100});
     }
 
+    // Validate and resolve file path (security: prevent path traversal)
+    const validated_path = path_validator.validatePath(
+        allocator,
+        file_path,
+        false, // Don't allow absolute paths by default
+    ) catch |err| {
+        if (err == path_validator.PathValidationError.PathTraversalAttempt) {
+            cli_error.printError("Path traversal attempt detected: {s}", .{file_path});
+            cli_error.printInfo("Only relative paths within the current directory are allowed.", .{});
+            return error.InvalidPath;
+        }
+        if (err == error.FileNotFound) {
+            error_help.printFileNotFoundError(file_path, allocator);
+        } else {
+            cli_error.printFileError(err, file_path);
+        }
+        return err;
+    };
+    defer allocator.free(validated_path);
+
     // Read source file
-    const source = std.fs.cwd().readFileAlloc(allocator, file_path, 10 * 1024 * 1024) catch |err| {
-        cli_error.printFileError(err, file_path);
+    const source = std.fs.cwd().readFileAlloc(allocator, validated_path, 10 * 1024 * 1024) catch |err| {
+        if (err == error.FileNotFound) {
+            error_help.printFileNotFoundError(validated_path, allocator);
+        } else {
+            cli_error.printFileError(err, validated_path);
+        }
         return err;
     };
     defer allocator.free(source);
@@ -95,7 +121,7 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     defer if (claude_client_opt) |*client| client.deinit();
 
     if (use_claude) {
-        if (config.claude_api_key) |api_key| {
+        if (config.claude_api_key.slice()) |api_key| {
             const claude_config = ananke.api.claude.ClaudeConfig{
                 .api_key = api_key,
                 .endpoint = config.claude_endpoint orelse "https://api.anthropic.com/v1/messages",
@@ -114,8 +140,11 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
                 cli_error.printInfo("Claude client initialized with model: {s}", .{config.claude_model});
             }
         } else {
-            if (verbose) {
-                cli_error.printWarning("Claude requested but ANTHROPIC_API_KEY not set - proceeding without semantic analysis", .{});
+            // API key missing - provide detailed setup instructions
+            error_help.printApiKeyMissingError("Claude");
+            if (!verbose) {
+                std.debug.print("\n", .{});
+                cli_error.printWarning("Proceeding without semantic analysis", .{});
             }
         }
     }
@@ -143,6 +172,19 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     }
 
     std.debug.print("Extracted {d} constraints\n", .{constraint_set.constraints.items.len});
+
+    // Check for empty constraint set
+    if (constraint_set.constraints.items.len == 0) {
+        cli_error.printWarning("No constraints extracted from source file", .{});
+        cli_error.printInfo("This could mean:", .{});
+        cli_error.printInfo("  - The source file is empty or minimal", .{});
+        cli_error.printInfo("  - The language is not fully supported", .{});
+        cli_error.printInfo("  - The confidence threshold is too high", .{});
+        if (!use_claude) {
+            cli_error.printInfo("  - Try using --use-claude for semantic analysis", .{});
+        }
+        return;
+    }
 
     // Format output
     const output_text = switch (format) {

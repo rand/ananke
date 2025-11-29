@@ -24,6 +24,9 @@ const string_interner = @import("string_interner.zig");
 const GrammarInterner = string_interner.GrammarInterner;
 const RegexPatternPool = string_interner.RegexPatternPool;
 
+// Import sanitizer for security
+const sanitizer = @import("sanitizer.zig");
+
 /// Main Braid compilation engine
 pub const Braid = struct {
     allocator: std.mem.Allocator,
@@ -297,20 +300,30 @@ pub const Braid = struct {
         const node_a = graph.nodes.items[idx_a];
         const node_b = graph.nodes.items[idx_b];
 
+        // Sanitize constraint names and descriptions to prevent injection attacks
+        const sanitized_name_a = try sanitizer.sanitizeName(self.allocator, node_a.constraint.name);
+        defer self.allocator.free(sanitized_name_a);
+        const sanitized_name_b = try sanitizer.sanitizeName(self.allocator, node_b.constraint.name);
+        defer self.allocator.free(sanitized_name_b);
+        const sanitized_desc_a = try sanitizer.sanitizeDescription(self.allocator, node_a.constraint.description);
+        defer self.allocator.free(sanitized_desc_a);
+        const sanitized_desc_b = try sanitizer.sanitizeDescription(self.allocator, node_b.constraint.description);
+        defer self.allocator.free(sanitized_desc_b);
+
         // Create merged constraint combining properties from both
         var merged_desc = std.ArrayList(u8){};
         defer merged_desc.deinit(self.allocator);
 
-        try merged_desc.appendSlice(self.allocator, node_a.constraint.description);
+        try merged_desc.appendSlice(self.allocator, sanitized_desc_a);
         try merged_desc.appendSlice(self.allocator, " AND ");
-        try merged_desc.appendSlice(self.allocator, node_b.constraint.description);
+        try merged_desc.appendSlice(self.allocator, sanitized_desc_b);
 
         var merged_name = std.ArrayList(u8){};
         defer merged_name.deinit(self.allocator);
 
-        try merged_name.appendSlice(self.allocator, node_a.constraint.name);
+        try merged_name.appendSlice(self.allocator, sanitized_name_a);
         try merged_name.appendSlice(self.allocator, "_merged_");
-        try merged_name.appendSlice(self.allocator, node_b.constraint.name);
+        try merged_name.appendSlice(self.allocator, sanitized_name_b);
 
         const merged_constraint = Constraint{
             .id = node_a.constraint.id, // Use first constraint's ID
@@ -338,9 +351,10 @@ pub const Braid = struct {
         graph.nodes.items[idx_a].constraint = merged_constraint;
         graph.nodes.items[idx_b].enabled = false;
 
+        // Log with sanitized names (already computed above)
         std.log.info("Merged constraints: {s} + {s} -> {s}", .{
-            node_a.constraint.name,
-            node_b.constraint.name,
+            sanitized_name_a,
+            sanitized_name_b,
             merged_constraint.name,
         });
     }
@@ -379,12 +393,19 @@ pub const Braid = struct {
             const node_a = graph.nodes.items[conflict.constraint_a];
             const node_b = graph.nodes.items[conflict.constraint_b];
 
+            // Sanitize constraint data before sending to Claude API to prevent injection
+            const sanitized_name_a = try sanitizer.sanitizeName(self.allocator, node_a.constraint.name);
+            const sanitized_desc_a = try sanitizer.sanitizeDescription(self.allocator, node_a.constraint.description);
+            const sanitized_name_b = try sanitizer.sanitizeName(self.allocator, node_b.constraint.name);
+            const sanitized_desc_b = try sanitizer.sanitizeDescription(self.allocator, node_b.constraint.description);
+            const sanitized_issue = try sanitizer.sanitizeDescription(self.allocator, conflict.description);
+
             const desc = claude_api.ConflictDescription{
-                .constraint_a_name = try self.allocator.dupe(u8, node_a.constraint.name),
-                .constraint_a_desc = try self.allocator.dupe(u8, node_a.constraint.description),
-                .constraint_b_name = try self.allocator.dupe(u8, node_b.constraint.name),
-                .constraint_b_desc = try self.allocator.dupe(u8, node_b.constraint.description),
-                .issue = try self.allocator.dupe(u8, conflict.description),
+                .constraint_a_name = sanitized_name_a,
+                .constraint_a_desc = sanitized_desc_a,
+                .constraint_b_name = sanitized_name_b,
+                .constraint_b_desc = sanitized_desc_b,
+                .issue = sanitized_issue,
             };
 
             try descriptions.append(self.allocator, desc);
@@ -1518,7 +1539,10 @@ pub const ConstraintGraph = struct {
                 for (self.example_cycle, 0..) |node_idx, i| {
                     if (node_idx < graph.nodes.items.len) {
                         const node = graph.nodes.items[node_idx];
-                        try writer.print("{s}", .{node.constraint.name});
+                        // Sanitize name to prevent log injection
+                        const safe_name = try sanitizer.sanitizeName(allocator, node.constraint.name);
+                        defer allocator.free(safe_name);
+                        try writer.print("{s}", .{safe_name});
                         if (i < self.example_cycle.len - 1) {
                             try writer.writeAll(" -> ");
                         }
@@ -1527,7 +1551,9 @@ pub const ConstraintGraph = struct {
                 // Close the cycle by showing it returns to first node
                 if (self.example_cycle.len > 0 and self.example_cycle[0] < graph.nodes.items.len) {
                     const first_node = graph.nodes.items[self.example_cycle[0]];
-                    try writer.print(" -> {s}", .{first_node.constraint.name});
+                    const safe_name = try sanitizer.sanitizeName(allocator, first_node.constraint.name);
+                    defer allocator.free(safe_name);
+                    try writer.print(" -> {s}", .{safe_name});
                 }
             }
 
