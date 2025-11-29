@@ -25,7 +25,7 @@ pub const UpdateDto = struct {
 
 pub const EntityService = struct {
     const Self = @This();
-    
+
     db: *Database,
     logger: *Logger,
     cache: *Cache(u64, Entity),
@@ -45,7 +45,6 @@ pub const EntityService = struct {
     pub fn deinit(self: *Self) void {
         self.allocator.destroy(self);
     }
-
 
     pub fn operation0(self: *Self, id: u64, data: []const u8) !?Entity {
         const result = self.db.query("SELECT * FROM entities WHERE id = ?", .{id}) catch |err| {

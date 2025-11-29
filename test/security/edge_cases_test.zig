@@ -63,9 +63,9 @@ test "constraint injection - SQL-style" {
     try testing.expect(result.len > 0);
     for (result) |char| {
         const allowed = (char >= 'a' and char <= 'z') or
-                       (char >= 'A' and char <= 'Z') or
-                       (char >= '0' and char <= '9') or
-                       char == '_' or char == '-';
+            (char >= 'A' and char <= 'Z') or
+            (char >= '0' and char <= '9') or
+            char == '_' or char == '-';
         try testing.expect(allowed);
     }
 }
@@ -120,9 +120,9 @@ test "constraint injection - special characters" {
     // Should only contain alphanumeric, underscore, and hyphen
     for (result) |char| {
         const allowed = (char >= 'a' and char <= 'z') or
-                       (char >= 'A' and char <= 'Z') or
-                       (char >= '0' and char <= '9') or
-                       char == '_' or char == '-';
+            (char >= 'A' and char <= 'Z') or
+            (char >= '0' and char <= '9') or
+            char == '_' or char == '-';
         try testing.expect(allowed);
     }
 }

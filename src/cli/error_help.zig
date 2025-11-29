@@ -12,10 +12,7 @@ pub fn printApiKeyMissingError(api_name: []const u8) void {
     std.debug.print("\n", .{});
 
     if (output.use_colors) {
-        std.debug.print("{s}Setup Instructions:{s}\n", .{
-            output.Color.cyan.code(),
-            output.Color.reset.code()
-        });
+        std.debug.print("{s}Setup Instructions:{s}\n", .{ output.Color.cyan.code(), output.Color.reset.code() });
     } else {
         std.debug.print("Setup Instructions:\n", .{});
     }
@@ -66,10 +63,7 @@ pub fn printNetworkError(err: anyerror, endpoint: []const u8) void {
     std.debug.print("  Endpoint: {s}\n\n", .{endpoint});
 
     if (output.use_colors) {
-        std.debug.print("{s}Troubleshooting:{s}\n", .{
-            output.Color.cyan.code(),
-            output.Color.reset.code()
-        });
+        std.debug.print("{s}Troubleshooting:{s}\n", .{ output.Color.cyan.code(), output.Color.reset.code() });
     } else {
         std.debug.print("Troubleshooting:\n", .{});
     }
@@ -125,10 +119,7 @@ pub fn printHttpStatusError(status_code: u16, response_body: []const u8) void {
     std.debug.print("\n", .{});
 
     if (output.use_colors) {
-        std.debug.print("{s}What this means:{s}\n", .{
-            output.Color.cyan.code(),
-            output.Color.reset.code()
-        });
+        std.debug.print("{s}What this means:{s}\n", .{ output.Color.cyan.code(), output.Color.reset.code() });
     } else {
         std.debug.print("What this means:\n", .{});
     }
@@ -243,10 +234,7 @@ pub fn printFileNotFoundError(path: []const u8, allocator: std.mem.Allocator) vo
     std.debug.print("  Current directory: {s}\n\n", .{cwd});
 
     if (output.use_colors) {
-        std.debug.print("{s}Suggestions:{s}\n", .{
-            output.Color.cyan.code(),
-            output.Color.reset.code()
-        });
+        std.debug.print("{s}Suggestions:{s}\n", .{ output.Color.cyan.code(), output.Color.reset.code() });
     } else {
         std.debug.print("Suggestions:\n", .{});
     }
@@ -278,10 +266,7 @@ pub fn printInvalidFormatError(format: []const u8, valid_formats: []const []cons
     std.debug.print("\n", .{});
 
     if (output.use_colors) {
-        std.debug.print("{s}Valid formats:{s}\n", .{
-            output.Color.cyan.code(),
-            output.Color.reset.code()
-        });
+        std.debug.print("{s}Valid formats:{s}\n", .{ output.Color.cyan.code(), output.Color.reset.code() });
     } else {
         std.debug.print("Valid formats:\n", .{});
     }
@@ -311,10 +296,7 @@ pub fn printCompilationError(phase: []const u8, details: []const u8) void {
     std.debug.print("  {s}\n\n", .{details});
 
     if (output.use_colors) {
-        std.debug.print("{s}What went wrong:{s}\n", .{
-            output.Color.cyan.code(),
-            output.Color.reset.code()
-        });
+        std.debug.print("{s}What went wrong:{s}\n", .{ output.Color.cyan.code(), output.Color.reset.code() });
     } else {
         std.debug.print("What went wrong:\n", .{});
     }

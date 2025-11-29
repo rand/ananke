@@ -29,6 +29,18 @@ jobs:
         with:
           version: ${{ matrix.zig-version }}
 
+      - name: Install tree-sitter
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y libtree-sitter-dev
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install tree-sitter
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            echo "tree-sitter not available on Windows, will use vendored parsers"
+          fi
+
       - name: Cache Zig dependencies
         uses: actions/cache@v4
         with:
