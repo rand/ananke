@@ -14,7 +14,7 @@ pub const FunctionDecl = struct {
     return_type: ?[]const u8 = null,
     params: []Parameter = &.{},
     has_error_handling: bool = false,
-    
+
     pub const Parameter = struct {
         name: []const u8,
         type_annotation: ?[]const u8 = null,
@@ -28,7 +28,7 @@ pub const TypeDecl = struct {
     kind: TypeKind,
     fields: []Field = &.{},
     methods: []FunctionDecl = &.{},
-    
+
     pub const TypeKind = enum {
         struct_type,
         class_type,
@@ -36,7 +36,7 @@ pub const TypeDecl = struct {
         enum_type,
         union_type,
     };
-    
+
     pub const Field = struct {
         name: []const u8,
         type_annotation: ?[]const u8 = null,
@@ -58,7 +58,7 @@ pub const SyntaxStructure = struct {
     functions: std.ArrayList(FunctionDecl),
     types: std.ArrayList(TypeDecl),
     imports: std.ArrayList(ImportDecl),
-    
+
     pub fn init(allocator: std.mem.Allocator) SyntaxStructure {
         return .{
             .allocator = allocator,
@@ -123,24 +123,24 @@ pub const SyntaxStructure = struct {
         self.types.deinit(self.allocator);
         self.imports.deinit(self.allocator);
     }
-    
+
     /// Convert syntax structure to constraints
     pub fn toConstraints(self: *const SyntaxStructure, constraint_allocator: std.mem.Allocator) ![]Constraint {
         var constraints = std.ArrayList(Constraint){};
         errdefer constraints.deinit(constraint_allocator);
-        
+
         // Function-related constraints
         if (self.functions.items.len > 0) {
             var async_count: u32 = 0;
             var typed_count: u32 = 0;
             var error_handling_count: u32 = 0;
-            
+
             for (self.functions.items) |func| {
                 if (func.is_async) async_count += 1;
                 if (func.return_type != null) typed_count += 1;
                 if (func.has_error_handling) error_handling_count += 1;
             }
-            
+
             // Summary constraint for functions
             const func_desc = try std.fmt.allocPrint(
                 constraint_allocator,
@@ -155,7 +155,7 @@ pub const SyntaxStructure = struct {
                 .source = .AST_Pattern,
                 .frequency = @intCast(self.functions.items.len),
             });
-            
+
             // Type safety constraint
             if (typed_count > 0) {
                 const typed_ratio = @as(f32, @floatFromInt(typed_count)) / @as(f32, @floatFromInt(self.functions.items.len));
@@ -253,11 +253,11 @@ pub const SyntaxStructure = struct {
 /// Base extractor interface
 pub const Extractor = struct {
     allocator: std.mem.Allocator,
-    
+
     pub fn init(allocator: std.mem.Allocator) Extractor {
         return .{ .allocator = allocator };
     }
-    
+
     /// Parse source code into syntax structure
     pub fn parse(self: *Extractor, source: []const u8, language: []const u8) !SyntaxStructure {
         _ = self;

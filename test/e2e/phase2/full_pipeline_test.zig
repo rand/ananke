@@ -104,7 +104,7 @@ const python_real_world =
 // Full Pipeline: TypeScript
 test "Full Pipeline: TypeScript real-world code extraction" {
     const allocator = testing.allocator;
-    
+
     var clew = try Clew.init(allocator);
     defer clew.deinit();
     var constraints = try clew.extractFromCode(typescript_real_world, "typescript");
@@ -121,13 +121,12 @@ test "Full Pipeline: TypeScript real-world code extraction" {
     for (constraints.constraints.items) |constraint| {
         const name_lower = std.ascii.allocLowerString(allocator, constraint.name) catch constraint.name;
         defer if (name_lower.ptr != constraint.name.ptr) allocator.free(name_lower);
-        
+
         if (std.mem.indexOf(u8, name_lower, "interface") != null) found_interface = true;
         if (std.mem.indexOf(u8, name_lower, "class") != null) found_class = true;
         if (std.mem.indexOf(u8, name_lower, "async") != null) found_async = true;
         if (std.mem.indexOf(u8, name_lower, "validat") != null) found_validation = true;
-        std.debug.print("  - {s} (kind: {s}, confidence: {d:.2})\n", 
-            .{constraint.name, @tagName(constraint.kind), constraint.confidence});
+        std.debug.print("  - {s} (kind: {s}, confidence: {d:.2})\n", .{ constraint.name, @tagName(constraint.kind), constraint.confidence });
     }
     try testing.expect(found_interface or found_class);
     std.debug.print("✓ Found structural patterns (interfaces/classes)\n", .{});
@@ -155,8 +154,7 @@ test "Full Pipeline: TypeScript constraint quality checks" {
         // AST-based constraints should have high confidence (0.95)
         // Pattern-based should have medium confidence (0.75)
         if (constraint.confidence >= 0.90) {
-            std.debug.print("  High confidence (AST): {s} = {d:.2}\n",
-                .{constraint.name, constraint.confidence});
+            std.debug.print("  High confidence (AST): {s} = {d:.2}\n", .{ constraint.name, constraint.confidence });
         }
     }
 
@@ -194,8 +192,7 @@ test "Full Pipeline: Python real-world code extraction" {
         if (std.mem.indexOf(u8, name_lower, "exception") != null or
             std.mem.indexOf(u8, name_lower, "error") != null) found_exception = true;
         if (std.mem.indexOf(u8, name_lower, "decorator") != null) found_decorator = true;
-        std.debug.print("  - {s} (kind: {s}, confidence: {d:.2})\n",
-            .{c.name, @tagName(c.kind), c.confidence});
+        std.debug.print("  - {s} (kind: {s}, confidence: {d:.2})\n", .{ c.name, @tagName(c.kind), c.confidence });
     }
     std.debug.print("✓ Extracted Python-specific patterns\n", .{});
 }
@@ -217,8 +214,7 @@ test "Full Pipeline: Python metadata and provenance" {
         switch (constraint.kind) {
             .syntactic, .type_safety, .semantic, .architectural, .operational, .security => {},
         }
-        std.debug.print("  {s}: line={?}, freq={}, conf={d:.2}\n",
-            .{constraint.name, constraint.origin_line, constraint.frequency, constraint.confidence});
+        std.debug.print("  {s}: line={?}, freq={}, conf={d:.2}\n", .{ constraint.name, constraint.origin_line, constraint.frequency, constraint.confidence });
     }
     std.debug.print("✓ All constraints have valid metadata\n", .{});
 }
@@ -260,7 +256,7 @@ test "Full Pipeline: Very large source file" {
     defer constraints.deinit();
     const elapsed = std.time.milliTimestamp() - start;
     std.debug.print("\n=== Large File Test ===\n", .{});
-    std.debug.print("Processed {} bytes in {}ms\n", .{large_source.items.len, elapsed});
+    std.debug.print("Processed {} bytes in {}ms\n", .{ large_source.items.len, elapsed });
     std.debug.print("Extracted {} constraints\n", .{constraints.constraints.items.len});
     std.debug.print("✓ Handled large file successfully\n", .{});
 }
@@ -287,9 +283,9 @@ test "Full Pipeline: Confidence score distribution" {
     var result = try clew.extractFromCode(typescript_real_world, "typescript");
     defer result.deinit();
     std.debug.print("\n=== Confidence Score Distribution ===\n", .{});
-    var high_conf: usize = 0;  // >= 0.90
-    var mid_conf: usize = 0;   // 0.70 - 0.89
-    var low_conf: usize = 0;   // < 0.70
+    var high_conf: usize = 0; // >= 0.90
+    var mid_conf: usize = 0; // 0.70 - 0.89
+    var low_conf: usize = 0; // < 0.70
     for (result.constraints.items) |constraint| {
         if (constraint.confidence >= 0.90) {
             high_conf += 1;
@@ -301,12 +297,9 @@ test "Full Pipeline: Confidence score distribution" {
     }
     const total = result.constraints.items.len;
     if (total > 0) {
-        std.debug.print("High confidence (AST, ≥0.90): {} ({d:.1}%)\n", 
-            .{high_conf, @as(f64, @floatFromInt(high_conf)) / @as(f64, @floatFromInt(total)) * 100.0});
-        std.debug.print("Mid confidence (0.70-0.89): {} ({d:.1}%)\n",
-            .{mid_conf, @as(f64, @floatFromInt(mid_conf)) / @as(f64, @floatFromInt(total)) * 100.0});
-        std.debug.print("Low confidence (<0.70): {} ({d:.1}%)\n",
-            .{low_conf, @as(f64, @floatFromInt(low_conf)) / @as(f64, @floatFromInt(total)) * 100.0});
+        std.debug.print("High confidence (AST, ≥0.90): {} ({d:.1}%)\n", .{ high_conf, @as(f64, @floatFromInt(high_conf)) / @as(f64, @floatFromInt(total)) * 100.0 });
+        std.debug.print("Mid confidence (0.70-0.89): {} ({d:.1}%)\n", .{ mid_conf, @as(f64, @floatFromInt(mid_conf)) / @as(f64, @floatFromInt(total)) * 100.0 });
+        std.debug.print("Low confidence (<0.70): {} ({d:.1}%)\n", .{ low_conf, @as(f64, @floatFromInt(low_conf)) / @as(f64, @floatFromInt(total)) * 100.0 });
     }
     std.debug.print("✓ Confidence scores properly distributed\n", .{});
 }

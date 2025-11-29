@@ -103,7 +103,7 @@ test "FFI roundtrip: Grammar rules" {
     };
     rules[1] = GrammarRule{
         .lhs = "term",
-        .rhs = &[_][]const u8{ "NUMBER" },
+        .rhs = &[_][]const u8{"NUMBER"},
     };
 
     const grammar = Grammar{
@@ -442,7 +442,7 @@ fn convertFFIToIR(alloc: std.mem.Allocator, ir_ffi: *const ffi.ConstraintIRFFI) 
         const rules = try alloc.alloc(GrammarRule, if (has_expression) 2 else 1);
         rules[0] = GrammarRule{
             .lhs = if (has_expression) "expression" else "start",
-            .rhs = &[_][]const u8{ if (has_expression) "term" else "TOKEN" },
+            .rhs = &[_][]const u8{if (has_expression) "term" else "TOKEN"},
         };
         if (has_expression) {
             rules[1] = GrammarRule{
@@ -467,7 +467,7 @@ fn convertFFIToIR(alloc: std.mem.Allocator, ir_ffi: *const ffi.ConstraintIRFFI) 
             if (std.mem.indexOf(u8, pattern_str, "|FLAGS:")) |flags_pos| {
                 regex_patterns[i] = Regex{
                     .pattern = pattern_str[0..flags_pos],
-                    .flags = pattern_str[flags_pos + 7..],
+                    .flags = pattern_str[flags_pos + 7 ..],
                 };
             } else {
                 regex_patterns[i] = Regex{

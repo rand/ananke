@@ -245,7 +245,6 @@ pub const Clew = struct {
         return try self.extractSyntacticConstraintsFallback(source, language);
     }
 
-
     fn extractSyntacticConstraintsFallback(
         self: *Clew,
         source: []const u8,

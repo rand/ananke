@@ -17,13 +17,13 @@ pub fn extract(
 ) ![]@import("ananke").types.constraint.Constraint {
     // Use tree-sitter with fallback for all supported languages
     const use_hybrid = std.mem.eql(u8, language, "typescript") or
-                       std.mem.eql(u8, language, "ts") or
-                       std.mem.eql(u8, language, "python") or
-                       std.mem.eql(u8, language, "py") or
-                       std.mem.eql(u8, language, "rust") or
-                       std.mem.eql(u8, language, "rs") or
-                       std.mem.eql(u8, language, "go") or
-                       std.mem.eql(u8, language, "zig");
+        std.mem.eql(u8, language, "ts") or
+        std.mem.eql(u8, language, "python") or
+        std.mem.eql(u8, language, "py") or
+        std.mem.eql(u8, language, "rust") or
+        std.mem.eql(u8, language, "rs") or
+        std.mem.eql(u8, language, "go") or
+        std.mem.eql(u8, language, "zig");
 
     if (use_hybrid) {
         return try extractHybrid(allocator, constraint_allocator, source, language);

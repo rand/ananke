@@ -83,7 +83,7 @@ fn benchmarkE2E(
     defer braid.deinit();
 
     // Run the pipeline with timing
-    
+
     // Stage 1: Extraction
     const extraction_start = std.time.nanoTimestamp();
     var constraints = try clew.extractFromCode(source, language);

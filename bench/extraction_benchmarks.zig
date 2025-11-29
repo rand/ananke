@@ -62,7 +62,7 @@ pub fn runExtractionBenchmarks(allocator: Allocator) ![]BenchmarkResult {
         std.debug.print("  max: {d:.2}ms\n", .{result.max_ms});
         std.debug.print("  min: {d:.2}ms\n", .{result.min_ms});
         std.debug.print("  mean: {d:.2}ms\n", .{result.mean_ms});
-        
+
         if (result.pass) {
             std.debug.print("  Status: PASS ✓\n\n", .{});
         } else {
@@ -143,7 +143,7 @@ const Stats = struct {
 fn calculateStats(latencies: []const u64) Stats {
     const sorted = std.heap.page_allocator.alloc(u64, latencies.len) catch unreachable;
     defer std.heap.page_allocator.free(sorted);
-    
+
     @memcpy(sorted, latencies);
     std.mem.sort(u64, sorted, {}, comptime std.sort.asc(u64));
 

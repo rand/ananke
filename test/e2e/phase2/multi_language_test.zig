@@ -67,7 +67,7 @@ const user_service_zig =
 // Language Detection and Routing
 test "Multi-Language: TypeScript detection and extraction" {
     const allocator = testing.allocator;
-    
+
     var clew = try Clew.init(allocator);
     defer clew.deinit();
     var constraints = try clew.extractFromCode(user_service_typescript, "typescript");
@@ -106,9 +106,8 @@ test "Multi-Language: All supported languages" {
         defer extractor.deinit();
         var result = try extractor.extract(lang.code, lang.name);
         defer result.deinitFull(allocator);
-        
-        std.debug.print("{s:12} - TS: {}, Constraints: {}\n",
-            .{lang.name, result.tree_sitter_available, result.constraints.len});
+
+        std.debug.print("{s:12} - TS: {}, Constraints: {}\n", .{ lang.name, result.tree_sitter_available, result.constraints.len });
         // Verify tree-sitter availability matches expectations
         if (lang.has_ts_support) {
             // TypeScript and Python should have tree-sitter support
@@ -153,8 +152,8 @@ test "Multi-Language: Compare TypeScript vs Python patterns" {
         if (std.mem.indexOf(u8, name_lower2, "async") != null) py_has_async = true;
     }
     std.debug.print("Common patterns found:\n", .{});
-    std.debug.print("  Classes: TS={}, Py={}\n", .{ts_has_class, py_has_class});
-    std.debug.print("  Async:   TS={}, Py={}\n", .{ts_has_async, py_has_async});
+    std.debug.print("  Classes: TS={}, Py={}\n", .{ ts_has_class, py_has_class });
+    std.debug.print("  Async:   TS={}, Py={}\n", .{ ts_has_async, py_has_async });
     std.debug.print("✓ Cross-language patterns detected\n", .{});
 }
 // Constraint Aggregation
@@ -178,8 +177,7 @@ test "Multi-Language: Aggregate constraints from multiple files" {
     for (files) |file| {
         var file_constraints = try clew.extractFromCode(file.code, file.language);
         defer file_constraints.deinit();
-        std.debug.print("{s:15} -> {} constraints\n", 
-            .{file.name, file_constraints.constraints.items.len});
+        std.debug.print("{s:15} -> {} constraints\n", .{ file.name, file_constraints.constraints.items.len });
         // Add to aggregate set
         for (file_constraints.constraints.items) |constraint| {
             try all_constraints.add(constraint);
@@ -263,8 +261,7 @@ test "Multi-Language: Extraction performance comparison" {
         var constraints = try clew.extractFromCode(lang.code, lang.name);
         defer constraints.deinit();
         const elapsed = std.time.milliTimestamp() - start;
-        std.debug.print("{s:12} - {}ms, {} constraints\n",
-            .{lang.name, elapsed, constraints.constraints.items.len});
+        std.debug.print("{s:12} - {}ms, {} constraints\n", .{ lang.name, elapsed, constraints.constraints.items.len });
     }
     std.debug.print("✓ Performance comparison complete\n", .{});
 }

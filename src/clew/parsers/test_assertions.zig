@@ -8,15 +8,15 @@ const Severity = root.types.constraint.Severity;
 
 /// Type of test assertion
 pub const AssertionType = enum {
-    equality,        // toBe, toEqual, ==
-    type_check,      // isinstance, typeof
-    error_expected,  // toThrow, raises
-    property_check,  // toHaveProperty
-    regex_match,     // toMatch
-    membership,      // in, includes
-    truthiness,      // toBeTruthy, toBeFalsy
-    nullity,         // toBeNull, toBeUndefined
-    comparison,      // toBeGreaterThan, toBeLessThan
+    equality, // toBe, toEqual, ==
+    type_check, // isinstance, typeof
+    error_expected, // toThrow, raises
+    property_check, // toHaveProperty
+    regex_match, // toMatch
+    membership, // in, includes
+    truthiness, // toBeTruthy, toBeFalsy
+    nullity, // toBeNull, toBeUndefined
+    comparison, // toBeGreaterThan, toBeLessThan
 };
 
 /// Represents a single test assertion
@@ -91,12 +91,11 @@ pub const TestAssertionParser = struct {
         var depth: i32 = 1;
         var end = start;
         while (end < line.len and depth > 0) : (end += 1) {
-            if (line[end] == '(') depth += 1
-            else if (line[end] == ')') depth -= 1;
+            if (line[end] == '(') depth += 1 else if (line[end] == ')') depth -= 1;
         }
         if (depth != 0) return null;
 
-        const expect_content = line[start..end - 1];
+        const expect_content = line[start .. end - 1];
 
         // Extract function name if it's a function call
         const func_name = try self.extractFunctionName(expect_content);
@@ -104,7 +103,8 @@ pub const TestAssertionParser = struct {
         // Parse the assertion matcher (toBe, toEqual, etc.)
         const matcher_start = end + 1;
         if (matcher_start >= line.len or line[matcher_start - 1] != ')' or
-            (matcher_start < line.len and line[matcher_start] != '.')) {
+            (matcher_start < line.len and line[matcher_start] != '.'))
+        {
             if (func_name) |name| self.allocator.free(name);
             return null;
         }
@@ -323,9 +323,10 @@ pub const TestAssertionParser = struct {
         } else if (std.mem.containsAtLeast(u8, trimmed, 1, " in ")) {
             return try self.parsePytestMembership(trimmed, line_num);
         } else if (std.mem.containsAtLeast(u8, trimmed, 1, " > ") or
-                   std.mem.containsAtLeast(u8, trimmed, 1, " < ") or
-                   std.mem.containsAtLeast(u8, trimmed, 1, " >= ") or
-                   std.mem.containsAtLeast(u8, trimmed, 1, " <= ")) {
+            std.mem.containsAtLeast(u8, trimmed, 1, " < ") or
+            std.mem.containsAtLeast(u8, trimmed, 1, " >= ") or
+            std.mem.containsAtLeast(u8, trimmed, 1, " <= "))
+        {
             return try self.parsePytestComparison(trimmed, line_num);
         }
 
@@ -356,7 +357,7 @@ pub const TestAssertionParser = struct {
         const eq_pos = std.mem.indexOf(u8, expr, " == ") orelse return null;
 
         const left = std.mem.trim(u8, expr[0..eq_pos], " ");
-        const right = std.mem.trim(u8, expr[eq_pos + 4..], " ");
+        const right = std.mem.trim(u8, expr[eq_pos + 4 ..], " ");
 
         const func_name = try self.extractPythonFunctionName(left);
         if (func_name) |name| {
@@ -384,7 +385,7 @@ pub const TestAssertionParser = struct {
         const neq_pos = std.mem.indexOf(u8, expr, " != ") orelse return null;
 
         const left = std.mem.trim(u8, expr[0..neq_pos], " ");
-        const right = std.mem.trim(u8, expr[neq_pos + 4..], " ");
+        const right = std.mem.trim(u8, expr[neq_pos + 4 ..], " ");
 
         const func_name = try self.extractPythonFunctionName(left);
         if (func_name) |name| {
@@ -414,11 +415,11 @@ pub const TestAssertionParser = struct {
 
         // Find the comma separating object and type
         const comma_pos = std.mem.indexOf(u8, expr[start..], ",") orelse return null;
-        const obj_expr = std.mem.trim(u8, expr[start..start + comma_pos], " ");
+        const obj_expr = std.mem.trim(u8, expr[start .. start + comma_pos], " ");
 
         // Find the closing parenthesis
-        const close_pos = std.mem.indexOf(u8, expr[start + comma_pos..], ")") orelse return null;
-        const type_expr = std.mem.trim(u8, expr[start + comma_pos + 1..start + comma_pos + close_pos], " ");
+        const close_pos = std.mem.indexOf(u8, expr[start + comma_pos ..], ")") orelse return null;
+        const type_expr = std.mem.trim(u8, expr[start + comma_pos + 1 .. start + comma_pos + close_pos], " ");
 
         const func_name = try self.extractPythonFunctionName(obj_expr);
         if (func_name) |name| {
@@ -446,7 +447,7 @@ pub const TestAssertionParser = struct {
         const in_pos = std.mem.indexOf(u8, expr, " in ") orelse return null;
 
         const left = std.mem.trim(u8, expr[0..in_pos], " ");
-        const right = std.mem.trim(u8, expr[in_pos + 4..], " ");
+        const right = std.mem.trim(u8, expr[in_pos + 4 ..], " ");
 
         // Check if left side is a function call result
         const func_name = try self.extractPythonFunctionName(right);
@@ -477,7 +478,7 @@ pub const TestAssertionParser = struct {
         for (operators) |op| {
             if (std.mem.indexOf(u8, expr, op)) |op_pos| {
                 const left = std.mem.trim(u8, expr[0..op_pos], " ");
-                const right = std.mem.trim(u8, expr[op_pos + op.len..], " ");
+                const right = std.mem.trim(u8, expr[op_pos + op.len ..], " ");
 
                 const func_name = try self.extractPythonFunctionName(left);
                 if (func_name) |name| {
@@ -510,7 +511,7 @@ pub const TestAssertionParser = struct {
 
         // Find the exception type
         const close_pos = std.mem.indexOf(u8, line[start..], ")") orelse return null;
-        const exception_type = std.mem.trim(u8, line[start..start + close_pos], " ");
+        const exception_type = std.mem.trim(u8, line[start .. start + close_pos], " ");
 
         // Try to find function name in the with block (this is approximate)
         const constraint_text = try std.fmt.allocPrint(
@@ -553,7 +554,7 @@ pub const TestAssertionParser = struct {
                 // Handle module.function pattern
                 const dot_pos = std.mem.lastIndexOf(u8, name, ".");
                 if (dot_pos) |d_pos| {
-                    return try self.allocator.dupe(u8, name[d_pos + 1..]);
+                    return try self.allocator.dupe(u8, name[d_pos + 1 ..]);
                 }
 
                 return try self.allocator.dupe(u8, name);
@@ -761,10 +762,12 @@ pub fn detectTestFileType(path: []const u8) ?Language {
         std.mem.endsWith(u8, path, "_test.ts") or
         std.mem.endsWith(u8, path, ".test.js") or
         std.mem.endsWith(u8, path, ".spec.js") or
-        std.mem.endsWith(u8, path, "_test.js")) {
+        std.mem.endsWith(u8, path, "_test.js"))
+    {
         return .typescript;
     } else if (std.mem.startsWith(u8, std.fs.path.basename(path), "test_") or
-               std.mem.endsWith(u8, path, "_test.py")) {
+        std.mem.endsWith(u8, path, "_test.py"))
+    {
         return .python;
     }
     return null;

@@ -48,7 +48,7 @@ const duplicate_patterns =
 // Confidence Score Tests
 test "Quality: AST constraints have high confidence" {
     const allocator = testing.allocator;
-    
+
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer extractor.deinit();
     var result = try extractor.extract(high_quality_typescript, "typescript");
@@ -60,7 +60,7 @@ test "Quality: AST constraints have high confidence" {
     }
     // All AST-based constraints should have confidence >= 0.95
     for (result.constraints) |c| {
-        std.debug.print("  {s}: {d:.2}\n", .{c.name, c.confidence});
+        std.debug.print("  {s}: {d:.2}\n", .{ c.name, c.confidence });
 
         if (c.confidence < 0.90) {
             std.debug.print("    ERROR: AST constraint has low confidence!\n", .{});
@@ -150,7 +150,7 @@ test "Quality: Duplicate detection in combined mode" {
         if (count > 0) {
             // Found duplicate
             allocator.free(key);
-            std.debug.print("  Duplicate name: {s} (count: {})\n", .{c.name, count + 1});
+            std.debug.print("  Duplicate name: {s} (count: {})\n", .{ c.name, count + 1 });
         }
         try name_counts.put(key, count + 1);
     }
@@ -168,7 +168,7 @@ test "Quality: Frequency counting for repeated patterns" {
     var found_frequency_tracking = false;
     for (constraints.constraints.items) |c| {
         if (c.frequency > 1) {
-            std.debug.print("  {s}: frequency = {}\n", .{c.name, c.frequency});
+            std.debug.print("  {s}: frequency = {}\n", .{ c.name, c.frequency });
             found_frequency_tracking = true;
         }
     }
@@ -198,10 +198,8 @@ test "Quality: All constraints have names and descriptions" {
             std.debug.print("  ERROR: Constraint missing description\n", .{});
         }
     }
-    std.debug.print("Constraints with names: {}/{}\n",
-        .{constraints.constraints.items.len - missing_name, constraints.constraints.items.len});
-    std.debug.print("Constraints with descriptions: {}/{}\n",
-        .{constraints.constraints.items.len - missing_description, constraints.constraints.items.len});
+    std.debug.print("Constraints with names: {}/{}\n", .{ constraints.constraints.items.len - missing_name, constraints.constraints.items.len });
+    std.debug.print("Constraints with descriptions: {}/{}\n", .{ constraints.constraints.items.len - missing_description, constraints.constraints.items.len });
     try testing.expectEqual(@as(usize, 0), missing_name);
     try testing.expectEqual(@as(usize, 0), missing_description);
     std.debug.print("✓ All constraints have complete metadata\n", .{});
@@ -226,7 +224,7 @@ test "Quality: Line number tracking" {
     var has_line_numbers = false;
     for (constraints.constraints.items) |c| {
         if (c.origin_line) |line| {
-            std.debug.print("  {s}: line {}\n", .{c.name, line});
+            std.debug.print("  {s}: line {}\n", .{ c.name, line });
             has_line_numbers = true;
 
             // Line numbers should be reasonable (1-8 for this code)
@@ -256,13 +254,13 @@ test "Quality: Constraint kind appropriateness" {
     // Print distribution
     var iter = kind_counts.iterator();
     while (iter.next()) |entry| {
-        std.debug.print("  {s}: {}\n", .{@tagName(entry.key_ptr.*), entry.value_ptr.*});
+        std.debug.print("  {s}: {}\n", .{ @tagName(entry.key_ptr.*), entry.value_ptr.* });
     }
     // TypeScript should have syntactic and type_safety constraints
     const syntactic = kind_counts.get(.syntactic) orelse 0;
     const type_safety = kind_counts.get(.type_safety) orelse 0;
     std.debug.print("✓ Constraint kinds distributed across categories\n", .{});
-    std.debug.print("  Syntactic: {}, Type Safety: {}\n", .{syntactic, type_safety});
+    std.debug.print("  Syntactic: {}, Type Safety: {}\n", .{ syntactic, type_safety });
 }
 // Constraint Validation Tests
 test "Quality: All constraints pass validation" {
@@ -276,8 +274,7 @@ test "Quality: All constraints pass validation" {
     for (constraints.constraints.items) |c| {
         // Check confidence in valid range
         if (c.confidence < 0.0 or c.confidence > 1.0) {
-            std.debug.print("  ERROR: Invalid confidence {d:.2} for {s}\n",
-                .{c.confidence, c.name});
+            std.debug.print("  ERROR: Invalid confidence {d:.2} for {s}\n", .{ c.confidence, c.name });
             invalid_count += 1;
         }
         // Check name is not empty
@@ -321,8 +318,7 @@ test "Quality: Minimal code produces valid constraints" {
     std.debug.print("\n=== Minimal Code Quality Test ===\n", .{});
     std.debug.print("Constraints: {}\n", .{constraints.constraints.items.len});
     for (constraints.constraints.items) |c| {
-        std.debug.print("  {s} (conf: {d:.2}, kind: {s})\n",
-            .{c.name, c.confidence, @tagName(c.kind)});
+        std.debug.print("  {s} (conf: {d:.2}, kind: {s})\n", .{ c.name, c.confidence, @tagName(c.kind) });
         // Validate each constraint
         try testing.expect(c.name.len > 0);
         try testing.expect(c.confidence >= 0.0 and c.confidence <= 1.0);

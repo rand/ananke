@@ -2,7 +2,6 @@
 ///
 /// Utilities to simplify build configuration and improve developer experience.
 /// Provides automatic tree-sitter detection, parser linking, and helpful error messages.
-
 const std = @import("std");
 
 /// Helper to link tree-sitter system library with automatic path detection

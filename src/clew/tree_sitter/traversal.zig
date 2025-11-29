@@ -12,13 +12,13 @@ const Allocator = std.mem.Allocator;
 fn RingQueue(comptime T: type) type {
     return struct {
         const Self = @This();
-        
+
         items: []T,
         head: usize,
         tail: usize,
         count: usize,
         allocator: Allocator,
-        
+
         fn init(allocator: Allocator, initial_capacity: usize) !Self {
             const capacity = std.math.ceilPowerOfTwo(usize, @max(initial_capacity, 4)) catch return error.OutOfMemory;
             const items = try allocator.alloc(T, capacity);
@@ -30,11 +30,11 @@ fn RingQueue(comptime T: type) type {
                 .allocator = allocator,
             };
         }
-        
+
         fn deinit(self: *Self) void {
             self.allocator.free(self.items);
         }
-        
+
         fn enqueue(self: *Self, item: T) !void {
             if (self.count == self.items.len) {
                 try self.grow();
@@ -43,7 +43,7 @@ fn RingQueue(comptime T: type) type {
             self.tail = (self.tail + 1) & (self.items.len - 1);
             self.count += 1;
         }
-        
+
         fn dequeue(self: *Self) !T {
             if (self.count == 0) return error.EmptyQueue;
             const item = self.items[self.head];
@@ -51,23 +51,23 @@ fn RingQueue(comptime T: type) type {
             self.count -= 1;
             return item;
         }
-        
+
         fn isEmpty(self: *Self) bool {
             return self.count == 0;
         }
-        
+
         fn grow(self: *Self) !void {
             const old_capacity = self.items.len;
             const new_capacity = old_capacity * 2;
             var new_items = try self.allocator.alloc(T, new_capacity);
-            
+
             var i: usize = 0;
             var current = self.head;
             while (i < self.count) : (i += 1) {
                 new_items[i] = self.items[current];
                 current = (current + 1) & (old_capacity - 1);
             }
-            
+
             self.allocator.free(self.items);
             self.items = new_items;
             self.head = 0;
@@ -341,7 +341,6 @@ pub const Traversal = struct {
 };
 
 /// Helper functions for common constraint extraction patterns
-
 /// Extract function/method declarations
 pub fn extractFunctions(allocator: Allocator, root: Node) ![]Node {
     const t = Traversal.init(allocator);
@@ -449,19 +448,20 @@ fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !
     if (std.mem.indexOf(u8, node_type, "class") != null or
         std.mem.indexOf(u8, node_type, "interface") != null or
         std.mem.indexOf(u8, node_type, "type_alias") != null or
-        std.mem.eql(u8, node_type, "enum_declaration")) {
+        std.mem.eql(u8, node_type, "enum_declaration"))
+    {
         // Type declarations use type_identifier for their name
         identifier_types = &[_][]const u8{
-            "type_identifier",      // The actual name of the type
-            "identifier",           // Fallback for some languages
-            "name",                 // Generic fallback
+            "type_identifier", // The actual name of the type
+            "identifier", // Fallback for some languages
+            "name", // Generic fallback
         };
     } else {
         // Functions and other declarations use identifier for their name
         identifier_types = &[_][]const u8{
-            "identifier",           // The actual name of the function/variable
-            "type_identifier",      // Fallback for rare cases
-            "name",                 // Generic fallback
+            "identifier", // The actual name of the function/variable
+            "type_identifier", // Fallback for rare cases
+            "name", // Generic fallback
         };
     }
 

@@ -5,14 +5,14 @@ const base = @import("base.zig");
 pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStructure {
     var structure = base.SyntaxStructure.init(allocator);
     errdefer structure.deinit();
-    
+
     var line_num: u32 = 1;
     var lines = std.mem.splitScalar(u8, source, '\n');
-    
+
     while (lines.next()) |line| : (line_num += 1) {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0) continue;
-        
+
         // Parse imports
         if (std.mem.startsWith(u8, trimmed, "import ")) {
             if (try parseImport(allocator, trimmed, line_num)) |import_decl| {
@@ -39,14 +39,15 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
         }
         // Parse functions (async function, function, arrow functions in const/let)
         else if (std.mem.indexOf(u8, trimmed, "function ") != null or
-                 std.mem.indexOf(u8, trimmed, " => ") != null or
-                 std.mem.indexOf(u8, trimmed, "async ") != null) {
+            std.mem.indexOf(u8, trimmed, " => ") != null or
+            std.mem.indexOf(u8, trimmed, "async ") != null)
+        {
             if (try parseFunction(allocator, trimmed, line_num, source)) |func_decl| {
                 try structure.functions.append(allocator, func_decl);
             }
         }
     }
-    
+
     return structure;
 }
 
@@ -54,25 +55,25 @@ fn parseImport(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
     // Match patterns: import { ... } from '...', import * as ... from '...'
     const from_pos = std.mem.indexOf(u8, line, "from ");
     if (from_pos == null) return null;
-    
+
     const module_start = from_pos.? + 5;
     var module_end = module_start;
-    
+
     // Skip whitespace and quotes
     while (module_end < line.len and (line[module_end] == ' ' or line[module_end] == '\'' or line[module_end] == '"')) {
         module_end += 1;
     }
-    
+
     const quote_start = module_end;
     while (module_end < line.len and line[module_end] != '\'' and line[module_end] != '"' and line[module_end] != ';') {
         module_end += 1;
     }
-    
+
     if (module_end <= quote_start) return null;
-    
+
     const module_name = try allocator.dupe(u8, line[quote_start..module_end]);
     const is_wildcard = std.mem.indexOf(u8, line, "* as ") != null;
-    
+
     return base.ImportDecl{
         .module = module_name,
         .line = line_num,
@@ -84,16 +85,16 @@ fn parseImport(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
 fn parseInterface(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.TypeDecl {
     const interface_pos = std.mem.indexOf(u8, line, "interface ") orelse return null;
     const name_start = interface_pos + 10;
-    
+
     var name_end = name_start;
     while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
         name_end += 1;
     }
-    
+
     if (name_end <= name_start) return null;
-    
+
     const name = try allocator.dupe(u8, line[name_start..name_end]);
-    
+
     return base.TypeDecl{
         .name = name,
         .line = line_num,
@@ -104,16 +105,16 @@ fn parseInterface(allocator: std.mem.Allocator, line: []const u8, line_num: u32)
 fn parseClass(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.TypeDecl {
     const class_pos = std.mem.indexOf(u8, line, "class ") orelse return null;
     const name_start = class_pos + 6;
-    
+
     var name_end = name_start;
     while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
         name_end += 1;
     }
-    
+
     if (name_end <= name_start) return null;
-    
+
     const name = try allocator.dupe(u8, line[name_start..name_end]);
-    
+
     return base.TypeDecl{
         .name = name,
         .line = line_num,
@@ -123,18 +124,18 @@ fn parseClass(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?b
 
 fn parseTypeAlias(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.TypeDecl {
     if (!std.mem.startsWith(u8, line, "type ")) return null;
-    
+
     const name_start: usize = 5;
     var name_end = name_start;
-    
+
     while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
         name_end += 1;
     }
-    
+
     if (name_end <= name_start) return null;
-    
+
     const name = try allocator.dupe(u8, line[name_start..name_end]);
-    
+
     return base.TypeDecl{
         .name = name,
         .line = line_num,
@@ -144,23 +145,23 @@ fn parseTypeAlias(allocator: std.mem.Allocator, line: []const u8, line_num: u32)
 
 fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32, source: []const u8) !?base.FunctionDecl {
     _ = source; // May use for error handling detection in the future
-    
+
     const is_async = std.mem.indexOf(u8, line, "async ") != null;
-    
+
     // Try to extract function name
     var name: ?[]const u8 = null;
     var return_type: ?[]const u8 = null;
-    
+
     // Pattern: function name(...) or async function name(...)
     if (std.mem.indexOf(u8, line, "function ")) |func_pos| {
         var name_start = func_pos + 9;
         while (name_start < line.len and line[name_start] == ' ') name_start += 1;
-        
+
         var name_end = name_start;
         while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
             name_end += 1;
         }
-        
+
         if (name_end > name_start) {
             name = try allocator.dupe(u8, line[name_start..name_end]);
         }
@@ -173,13 +174,13 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32, 
         } else if (std.mem.indexOf(u8, line, "let ")) |let_pos| {
             name_start = let_pos + 4;
         }
-        
+
         if (name_start > 0) {
             var name_end = name_start;
             while (name_end < eq_pos and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
                 name_end += 1;
             }
-            
+
             if (name_end > name_start) {
                 name = try allocator.dupe(u8, line[name_start..name_end]);
             }
@@ -190,32 +191,32 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32, 
         // Try to find method pattern
         var name_start: usize = 0;
         while (name_start < line.len and line[name_start] == ' ') name_start += 1;
-        
+
         // Skip async keyword
         if (std.mem.startsWith(u8, line[name_start..], "async ")) {
             name_start += 6;
             while (name_start < line.len and line[name_start] == ' ') name_start += 1;
         }
-        
+
         var name_end = name_start;
         while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
             name_end += 1;
         }
-        
+
         if (name_end > name_start and name_end < line.len and line[name_end] == '(') {
             name = try allocator.dupe(u8, line[name_start..name_end]);
         }
     }
-    
+
     // Extract return type (look for :TYPE before { or =>)
     if (std.mem.indexOf(u8, line, "): ")) |colon_pos| {
         const type_start = colon_pos + 3;
         var type_end = type_start;
-        
+
         while (type_end < line.len and line[type_end] != '{' and line[type_end] != ';' and line[type_end] != '=' and line[type_end] != '\n') {
             type_end += 1;
         }
-        
+
         if (type_end > type_start) {
             const type_str = std.mem.trim(u8, line[type_start..type_end], " \t");
             if (type_str.len > 0) {
@@ -223,9 +224,9 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32, 
             }
         }
     }
-    
+
     const has_error_handling = std.mem.indexOf(u8, line, "try") != null or
-                                std.mem.indexOf(u8, line, "catch") != null;
+        std.mem.indexOf(u8, line, "catch") != null;
 
     if (name) |func_name| {
         return base.FunctionDecl{
