@@ -446,9 +446,9 @@ fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !
     if (std.mem.eql(u8, node_type, "class_definition")) {
         const class_text = t.getNodeText(node, source);
 
-        // Look for "class ClassName" pattern
-        if (std.mem.startsWith(u8, class_text, "class ")) {
-            var i: usize = 6; // Start after "class "
+        // Look for "class ClassName" pattern (may be preceded by decorators)
+        if (std.mem.indexOf(u8, class_text, "class ")) |class_pos| {
+            var i: usize = class_pos + 6; // Start after "class "
 
             // Skip whitespace
             while (i < class_text.len and class_text[i] == ' ') : (i += 1) {}
