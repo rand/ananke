@@ -441,7 +441,15 @@ fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !
     const t = Traversal.init(allocator);
     const node_type = node.nodeType();
 
-    // Determine which identifier types to search based on node type
+    // First, try to get name using field accessor (more reliable across tree-sitter versions)
+    if (node.childByFieldName("name")) |name_node| {
+        const name_text = t.getNodeText(name_node, source);
+        if (name_text.len > 0) {
+            return try allocator.dupe(u8, name_text);
+        }
+    }
+
+    // Fallback: Determine which identifier types to search based on node type
     // This is important because different declaration types use different identifier child types
     var identifier_types: []const []const u8 = undefined;
 
