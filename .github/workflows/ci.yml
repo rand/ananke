@@ -203,11 +203,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
           version: '0.15.2'
+
+      - name: Install tree-sitter
+        shell: bash
+        run: |
+          # Build latest tree-sitter from source for cross-compilation
+          cd /tmp
+          git clone --depth 1 https://github.com/tree-sitter/tree-sitter.git
+          cd tree-sitter
+          make
+          sudo make install
+          sudo ldconfig
 
       - name: Cross-compile for ${{ matrix.target }}
         run: |
@@ -228,11 +241,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
         with:
           version: '0.15.2'
+
+      - name: Install tree-sitter
+        shell: bash
+        run: |
+          # Build latest tree-sitter from source to ensure ABI compatibility
+          cd /tmp
+          git clone --depth 1 https://github.com/tree-sitter/tree-sitter.git
+          cd tree-sitter
+          make
+          sudo make install
+          sudo ldconfig
 
       - name: Build release binary
         run: zig build -Doptimize=ReleaseSafe
