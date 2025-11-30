@@ -79,6 +79,12 @@ pub fn build(b: *std.Build) void {
     // This ensures tree_sitter/api.h can be found by @cImport in c_api.zig
     tree_sitter_mod.linkSystemLibrary("tree-sitter", .{});
 
+    // On Linux, explicitly add /usr/local/include for tree-sitter headers
+    // This is where our source-built tree-sitter installs headers
+    if (target.result.os.tag == .linux) {
+        tree_sitter_mod.addSystemIncludePath(.{ .cwd_relative = "/usr/local/include" });
+    }
+
     // Tree-sitter language parsers as static libraries
     // IMPORTANT: Disable LTO for parser libraries to prevent symbol stripping
     // TypeScript parser
