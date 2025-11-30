@@ -155,6 +155,12 @@ test "E2E: Python auth extraction" {
     // Verify Python-specific constraint extraction
     try testing.expect(result.constraints.constraints.items.len >= 8);
 
+    // Debug: Print all constraint names
+    std.debug.print("DEBUG: Extracted {} constraints:\n", .{result.constraints.constraints.items.len});
+    for (result.constraints.constraints.items, 0..) |constraint, i| {
+        std.debug.print("  [{}] {s}\n", .{ i, constraint.name });
+    }
+
     // Check for dataclass constraints
     var found_user_dataclass = false;
     var found_session_manager = false;
@@ -169,6 +175,8 @@ test "E2E: Python auth extraction" {
             found_rate_limit = true;
         }
     }
+
+    std.debug.print("DEBUG: found_user_dataclass={}, found_session_manager={}, found_rate_limit={}\n", .{ found_user_dataclass, found_session_manager, found_rate_limit });
 
     try testing.expect(found_user_dataclass);
     try testing.expect(found_session_manager);
