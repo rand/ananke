@@ -441,23 +441,40 @@ fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !
     const t = Traversal.init(allocator);
     const node_type = node.nodeType();
 
-    // DEBUG: Log extraction attempts for class_definition nodes
-    const is_class = std.mem.indexOf(u8, node_type, "class_definition") != null;
-    if (is_class) {
-        std.debug.print("DEBUG extractIdentifierName: node_type={s}\n", .{node_type});
+    // Special handling for Python class_definition: extract name from source text
+    // This is more robust across different tree-sitter Python parser versions
+    if (std.mem.eql(u8, node_type, "class_definition")) {
+        const class_text = t.getNodeText(node, source);
+
+        // Look for "class ClassName" pattern
+        if (std.mem.startsWith(u8, class_text, "class ")) {
+            var i: usize = 6; // Start after "class "
+
+            // Skip whitespace
+            while (i < class_text.len and class_text[i] == ' ') : (i += 1) {}
+
+            // Extract identifier (stop at '(', ':', whitespace, or newline)
+            const start = i;
+            while (i < class_text.len) : (i += 1) {
+                const c = class_text[i];
+                if (c == '(' or c == ':' or c == ' ' or c == '\n' or c == '\r') {
+                    break;
+                }
+            }
+
+            if (i > start) {
+                const class_name = class_text[start..i];
+                return try allocator.dupe(u8, class_name);
+            }
+        }
     }
 
     // First, try to get name using field accessor (more reliable across tree-sitter versions)
     if (node.childByFieldName("name")) |name_node| {
         const name_text = t.getNodeText(name_node, source);
-        if (is_class) {
-            std.debug.print("DEBUG: Field accessor found name_node, text='{s}' (len={})\n", .{ name_text, name_text.len });
-        }
         if (name_text.len > 0) {
             return try allocator.dupe(u8, name_text);
         }
-    } else if (is_class) {
-        std.debug.print("DEBUG: Field accessor returned null, using fallback search\n", .{});
     }
 
     // Fallback: Determine which identifier types to search based on node type
@@ -492,18 +509,12 @@ fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !
         if (identifiers.len > 0) {
             const id_node = identifiers[0];
             const id_text = t.getNodeText(id_node, source);
-            if (is_class) {
-                std.debug.print("DEBUG: Fallback search for '{s}' found {} nodes, first text='{s}'\n", .{ id_type, identifiers.len, id_text });
-            }
             if (id_text.len > 0) {
                 return try allocator.dupe(u8, id_text);
             }
         }
     }
 
-    if (is_class) {
-        std.debug.print("DEBUG: No identifier found, returning null\n", .{});
-    }
     return null;
 }
 
