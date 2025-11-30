@@ -56,6 +56,7 @@ pub const ts_node_has_error = c.ts_node_has_error;
 pub const ts_node_parent = c.ts_node_parent;
 pub const ts_node_child = c.ts_node_child;
 pub const ts_node_named_child = c.ts_node_named_child;
+pub const ts_node_child_by_field_name = c.ts_node_child_by_field_name;
 pub const ts_node_child_count = c.ts_node_child_count;
 pub const ts_node_named_child_count = c.ts_node_named_child_count;
 pub const ts_node_next_sibling = c.ts_node_next_sibling;
