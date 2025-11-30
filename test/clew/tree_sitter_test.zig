@@ -156,28 +156,29 @@ test "parse with errors" {
     try testing.expect(root.hasError());
 }
 
-test "parser timeout" {
-    const allocator = testing.allocator;
-
-    var ts_parser = TreeSitterParser.init(allocator, .typescript) catch |err| {
-        std.debug.print("\nWarning: tree-sitter-typescript not available: {}\n", .{err});
-        return;
-    };
-    defer ts_parser.deinit();
-
-    // Set timeout to 1000 microseconds (1ms)
-    ts_parser.setTimeout(1000);
-    const timeout = ts_parser.getTimeout();
-    try testing.expectEqual(@as(u64, 1000), timeout);
-
-    // Parse normally (should complete within timeout)
-    const source = "const x = 1;";
-    const tree = try ts_parser.parse(source);
-    defer tree.deinit();
-
-    const root = tree.rootNode();
-    try testing.expect(!root.isNull());
-}
+// Note: Timeout functions removed in latest tree-sitter
+// test "parser timeout" {
+//     const allocator = testing.allocator;
+//
+//     var ts_parser = TreeSitterParser.init(allocator, .typescript) catch |err| {
+//         std.debug.print("\nWarning: tree-sitter-typescript not available: {}\n", .{err});
+//         return;
+//     };
+//     defer ts_parser.deinit();
+//
+//     // Set timeout to 1000 microseconds (1ms)
+//     ts_parser.setTimeout(1000);
+//     const timeout = ts_parser.getTimeout();
+//     try testing.expectEqual(@as(u64, 1000), timeout);
+//
+//     // Parse normally (should complete within timeout)
+//     const source = "const x = 1;";
+//     const tree = try ts_parser.parse(source);
+//     defer tree.deinit();
+//
+//     const root = tree.rootNode();
+//     try testing.expect(!root.isNull());
+// }
 
 test "memory leak check" {
     const allocator = testing.allocator;
