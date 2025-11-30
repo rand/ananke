@@ -53,9 +53,9 @@ jobs:
             ~/.cache/zig
             .zig-cache
             zig-out
-          key: ${{ runner.os }}-zig-${{ matrix.zig-version }}-${{ hashFiles('build.zig.zon', 'build.zig') }}
+          key: ${{ runner.os }}-zig-${{ matrix.zig-version }}-ts-0.24.6-${{ hashFiles('build.zig.zon', 'build.zig') }}
           restore-keys: |
-            ${{ runner.os }}-zig-${{ matrix.zig-version }}-
+            ${{ runner.os }}-zig-${{ matrix.zig-version }}-ts-0.24.6-
             ${{ runner.os }}-zig-
 
       - name: Build (Debug)
