@@ -155,12 +155,6 @@ test "E2E: Python auth extraction" {
     // Verify Python-specific constraint extraction
     try testing.expect(result.constraints.constraints.items.len >= 8);
 
-    // DEBUG: Print all extracted constraint names
-    std.debug.print("DEBUG Python auth: Extracted {} constraints:\n", .{result.constraints.constraints.items.len});
-    for (result.constraints.constraints.items, 0..) |constraint, i| {
-        std.debug.print("  [{}] {s}\n", .{ i, constraint.name });
-    }
-
     // Check for dataclass constraints
     var found_user_dataclass = false;
     var found_session_manager = false;
@@ -169,17 +163,12 @@ test "E2E: Python auth extraction" {
     for (result.constraints.constraints.items) |constraint| {
         if (try containsIgnoreCase(testing.allocator, constraint.name, "user")) {
             found_user_dataclass = true;
-            std.debug.print("DEBUG: Found user constraint: {s}\n", .{constraint.name});
         } else if (try containsIgnoreCase(testing.allocator, constraint.name, "sessionmanager")) {
             found_session_manager = true;
-            std.debug.print("DEBUG: Found sessionmanager constraint: {s}\n", .{constraint.name});
         } else if (try containsIgnoreCase(testing.allocator, constraint.name, "ratelimiterror")) {
             found_rate_limit = true;
-            std.debug.print("DEBUG: Found ratelimiterror constraint: {s}\n", .{constraint.name});
         }
     }
-
-    std.debug.print("DEBUG: found_user_dataclass={}, found_session_manager={}\n", .{ found_user_dataclass, found_session_manager });
 
     try testing.expect(found_user_dataclass);
     try testing.expect(found_session_manager);
