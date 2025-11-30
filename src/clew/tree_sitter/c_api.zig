@@ -31,8 +31,9 @@ pub const ts_parser_language = c.ts_parser_language;
 pub const ts_parser_parse_string = c.ts_parser_parse_string;
 pub const ts_parser_parse = c.ts_parser_parse;
 pub const ts_parser_reset = c.ts_parser_reset;
-pub const ts_parser_set_timeout_micros = c.ts_parser_set_timeout_micros;
-pub const ts_parser_timeout_micros = c.ts_parser_timeout_micros;
+// Note: timeout functions removed in latest tree-sitter
+// pub const ts_parser_set_timeout_micros = c.ts_parser_set_timeout_micros;
+// pub const ts_parser_timeout_micros = c.ts_parser_timeout_micros;
 
 // Tree functions
 pub const ts_tree_delete = c.ts_tree_delete;

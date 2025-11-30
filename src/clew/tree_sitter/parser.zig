@@ -103,13 +103,14 @@ pub const TreeSitterParser = struct {
         return result;
     }
 
-    pub fn setTimeout(self: *TreeSitterParser, timeout_micros: u64) void {
-        c_api.ts_parser_set_timeout_micros(self.parser, timeout_micros);
-    }
-
-    pub fn getTimeout(self: *TreeSitterParser) u64 {
-        return c_api.ts_parser_timeout_micros(self.parser);
-    }
+    // Note: Timeout functions removed in latest tree-sitter
+    // pub fn setTimeout(self: *TreeSitterParser, timeout_micros: u64) void {
+    //     c_api.ts_parser_set_timeout_micros(self.parser, timeout_micros);
+    // }
+    //
+    // pub fn getTimeout(self: *TreeSitterParser) u64 {
+    //     return c_api.ts_parser_timeout_micros(self.parser);
+    // }
 
     pub fn reset(self: *TreeSitterParser) void {
         c_api.ts_parser_reset(self.parser);
