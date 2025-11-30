@@ -261,6 +261,19 @@ pub const Node = struct {
         };
     }
 
+    pub fn childByFieldName(self: Node, field_name: []const u8) ?Node {
+        const child_node = c_api.ts_node_child_by_field_name(
+            self.node,
+            field_name.ptr,
+            @intCast(field_name.len),
+        );
+        if (c_api.ts_node_is_null(child_node)) return null;
+        return Node{
+            .node = child_node,
+            .allocator = self.allocator,
+        };
+    }
+
     pub fn toString(self: Node) ![]const u8 {
         const c_str = c_api.ts_node_string(self.node);
         if (c_api.isNull(c_str)) return c_api.Error.NullNode;
