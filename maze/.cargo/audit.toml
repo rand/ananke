@@ -3,7 +3,17 @@
 
 [advisories]
 # RUSTSEC-2025-0020: pyo3 PyString::from_object buffer overflow
-# Tracked for upgrade in future PR - requires significant API migration
-# The vulnerability requires specific conditions (malformed Python string input)
-# which are unlikely in our controlled use case
+# Risk Assessment:
+#   - ACTUAL RISK: LOW - maze code does NOT use PyString::from_object directly
+#   - The vulnerable function is not called in our Python bindings (maze/src/python.rs)
+#   - Vulnerability requires malformed Python string input through specific API
+#
+# Migration Requirements (when ready):
+#   - Upgrade pyo3: 0.20 → 0.27 (multiple breaking changes)
+#   - Replace pyo3-asyncio 0.20 → pyo3-async-runtimes 0.27
+#   - Migrate from GIL Refs API to Bound<T> smart pointers
+#   - Update async method signatures (return types change)
+#   - See: https://pyo3.rs/main/migration for full guide
+#
+# Decision: Ignore until dedicated migration PR
 ignore = ["RUSTSEC-2025-0020"]
