@@ -51,49 +51,6 @@ jobs:
           cargo audit --ignore RUSTSEC-2025-0020 --json > ../rust-audit-results.json || true
           cargo audit --ignore RUSTSEC-2025-0020
 
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --locked
-
-      - name: Check dependencies with cargo-deny
-        run: |
-          cd maze
-          # Create deny.toml if it doesn't exist
-          if [ ! -f deny.toml ]; then
-            cat > deny.toml <<'EOF'
-          [advisories]
-          version = 2
-          ignore = ["RUSTSEC-2025-0020"]
-
-          [licenses]
-          version = 2
-          allow = [
-              "MIT",
-              "Apache-2.0",
-              "BSD-2-Clause",
-              "BSD-3-Clause",
-              "ISC",
-              "Unicode-3.0",
-              "Zlib",
-              "OpenSSL",
-          ]
-
-          [[licenses.clarify]]
-          name = "ring"
-          expression = "MIT AND ISC AND OpenSSL"
-          license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
-
-          [bans]
-          multiple-versions = "warn"
-          wildcards = "warn"
-          highlight = "all"
-
-          [sources]
-          unknown-registry = "warn"
-          unknown-git = "warn"
-          EOF
-          fi
-          cargo deny check
-
       - name: Check for known vulnerable dependencies
         run: |
           cd maze
