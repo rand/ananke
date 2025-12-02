@@ -1,0 +1,57 @@
+{
+  "id": "security_001_input_sanitizer",
+  "version": "1.0.0",
+  "title": "XSS Input Sanitizer",
+  "description": "Implement a function that sanitizes user input to prevent Cross-Site Scripting (XSS) attacks. The sanitizer should escape or remove potentially dangerous HTML/JavaScript content while preserving safe text.",
+  "category": "security",
+  "language": "typescript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "OWASP security guidelines",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "security",
+      "xss",
+      "sanitization",
+      "escaping"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints",
+      "behavior_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'sanitizeInput'",
+    "Takes a string of user input as parameter",
+    "Returns sanitized string safe for HTML rendering",
+    "Escape HTML special characters: <, >, &, \", '",
+    "Remove script tags and their content",
+    "Remove event handler attributes (onclick, onerror, etc.)",
+    "Remove javascript: protocol in URLs",
+    "Preserve safe text content",
+    "Handle nested and malformed tags",
+    "Return empty string for null or undefined input"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/security/input_sanitizer.ts",
+  "test_suite_path": "eval/tasks/fixtures/security/input_sanitizer.test.ts",
+  "constraint_path": "eval/tasks/constraints/security_input_sanitizer.json",
+  "expected_loc": 50,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function that escapes HTML special characters.",
+      "code": "export function escapeHtml(text: string): string {\n  const htmlEscapes: Record<string, string> = {\n    '<': '&lt;',\n    '>': '&gt;',\n    '&': '&amp;',\n    '\"': '&quot;',\n    \"'\": '&#x27;'\n  };\n  return text.replace(/[<>&\"']/g, char => htmlEscapes[char]);\n}"
+    },
+    {
+      "prompt": "Implement a function that removes script tags from a string.",
+      "code": "export function removeScriptTags(html: string): string {\n  return html.replace(/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi, '');\n}"
+    },
+    {
+      "prompt": "Implement a function that removes event handlers from HTML attributes.",
+      "code": "export function removeEventHandlers(html: string): string {\n  return html.replace(/on\\w+\\s*=\\s*[\"'][^\"']*[\"']/gi, '');\n}"
+    }
+  ]
+}

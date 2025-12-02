@@ -1,0 +1,44 @@
+{
+  "id": "algo_001_binary_search",
+  "version": "1.0.0",
+  "title": "Binary Search Implementation",
+  "description": "Implement a binary search algorithm that finds the index of a target value in a sorted array. Return -1 if the target is not found.",
+  "category": "algorithms",
+  "language": "typescript",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval-style algorithmic task",
+    "complexity": {
+      "time": "O(log n)",
+      "space": "O(1)"
+    },
+    "tags": ["search", "divide-and-conquer", "array", "iterative"],
+    "constraint_types": ["regex_pattern", "type_constraints", "naming_constraints"]
+  },
+  "requirements": [
+    "Function must be named 'binarySearch'",
+    "Takes two parameters: sorted array of numbers and target number",
+    "Returns the index of the target if found, -1 otherwise",
+    "Must use iterative binary search (not recursive)",
+    "Handle edge cases: empty array, single element, target not found",
+    "Time complexity must be O(log n)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/algorithms/binary_search.ts",
+  "test_suite_path": "eval/tasks/fixtures/algorithms/binary_search.test.ts",
+  "constraint_path": "eval/tasks/constraints/algorithms_binary_search.json",
+  "expected_loc": 20,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a linear search function that finds an element in an array.",
+      "code": "export function linearSearch(arr: number[], target: number): number {\n  for (let i = 0; i < arr.length; i++) {\n    if (arr[i] === target) {\n      return i;\n    }\n  }\n  return -1;\n}"
+    },
+    {
+      "prompt": "Implement a function to find the maximum value in an array.",
+      "code": "export function findMax(arr: number[]): number {\n  if (arr.length === 0) {\n    throw new Error('Array is empty');\n  }\n  let max = arr[0];\n  for (let i = 1; i < arr.length; i++) {\n    if (arr[i] > max) {\n      max = arr[i];\n    }\n  }\n  return max;\n}"
+    },
+    {
+      "prompt": "Implement a function to check if an array is sorted in ascending order.",
+      "code": "export function isSorted(arr: number[]): boolean {\n  for (let i = 0; i < arr.length - 1; i++) {\n    if (arr[i] > arr[i + 1]) {\n      return false;\n    }\n  }\n  return true;\n}"
+    }
+  ]
+}

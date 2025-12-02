@@ -1,0 +1,77 @@
+{
+  "task_id": "system_001_config_parser",
+  "constraints": {
+    "grammar": "from typing import Any\n\ndef parse_config(content: str) -> dict[str, dict[str, Any]]:\n    \"\"\"Parse INI-style configuration file.\n    \n    Returns nested dict: {section: {key: value}}\n    Keys without sections go to 'default' section.\n    \"\"\"\n    pass",
+    "regex_pattern": "^from\\s+typing\\s+import\\s+Any\\s*\\ndef\\s+parse_config\\s*\\(",
+    "type_constraints": {
+      "parameters": [
+        {
+          "name": "content",
+          "type": "str",
+          "required": true
+        }
+      ],
+      "return_type": "dict[str, dict[str, Any]]"
+    },
+    "naming_constraints": {
+      "function_name": "parse_config",
+      "helper_function": "_convert_value (optional)",
+      "variable_patterns": [
+        "config",
+        "current_section",
+        "line",
+        "key",
+        "value"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "string.split('\\n') to process lines",
+        "string.strip() for whitespace handling",
+        "string.startswith() for comments and sections",
+        "nested dictionary structure",
+        "type conversion (int, float, bool)"
+      ],
+      "must_not_use": [
+        "configparser module (must implement from scratch)",
+        "external INI parsing libraries",
+        "eval() or exec() for type conversion"
+      ],
+      "recommended_patterns": [
+        "Track current section with variable",
+        "Helper function for type conversion",
+        "Check for section headers with [ and ]",
+        "Split key=value on first equals sign only"
+      ]
+    },
+    "behavior_constraints": {
+      "required_features": [
+        "Parse [section] headers",
+        "Parse key=value pairs",
+        "Skip # and ; comments",
+        "Auto-convert bool (true/false/yes/no/on/off)",
+        "Auto-convert int and float",
+        "Strip whitespace from keys and values",
+        "Default section for keys without section header",
+        "Return empty dict for empty input"
+      ],
+      "edge_cases": [
+        "Empty input",
+        "Only comments",
+        "Section without keys",
+        "Keys before first section (use 'default')",
+        "Values containing equals signs",
+        "Whitespace in section headers",
+        "Duplicate keys (last wins)",
+        "Empty values"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n) where n is number of lines",
+      "space_complexity": "O(n) for config dictionary"
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/system/config_parser.py",
+  "extraction_method": "manual",
+  "verified": true
+}

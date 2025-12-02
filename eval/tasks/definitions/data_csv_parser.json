@@ -1,0 +1,55 @@
+{
+  "id": "data_001_csv_parser",
+  "version": "1.0.0",
+  "title": "CSV Parser with Type Conversion",
+  "description": "Implement a function that parses CSV content into structured data with automatic type conversion. The parser should handle headers, convert numeric values, handle quoted fields, and return a list of dictionaries.",
+  "category": "data_processing",
+  "language": "python",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "parsing",
+      "csv",
+      "streaming",
+      "data-processing"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'parse_csv'",
+    "Takes CSV string content as input parameter",
+    "Returns list of dictionaries (one per row)",
+    "First row treated as headers (dictionary keys)",
+    "Automatically convert numeric strings to int or float",
+    "Handle quoted fields with commas inside",
+    "Strip whitespace from field values",
+    "Handle empty lines (skip them)",
+    "Return empty list for empty input or header-only CSV"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/data/csv_parser.py",
+  "test_suite_path": "eval/tasks/fixtures/data/test_csv_parser.py",
+  "constraint_path": "eval/tasks/constraints/data_csv_parser.json",
+  "expected_loc": 35,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function that splits a string by a delimiter and returns a list.",
+      "code": "def split_string(text: str, delimiter: str) -> list[str]:\n    return text.split(delimiter)"
+    },
+    {
+      "prompt": "Implement a function that converts a string to int or float if possible.",
+      "code": "def try_convert_number(value: str) -> int | float | str:\n    try:\n        if '.' in value:\n            return float(value)\n        return int(value)\n    except ValueError:\n        return value"
+    },
+    {
+      "prompt": "Implement a function that parses key-value pairs from a string.",
+      "code": "def parse_key_values(text: str) -> dict[str, str]:\n    result = {}\n    for line in text.strip().split('\\n'):\n        if '=' in line:\n            key, value = line.split('=', 1)\n            result[key.strip()] = value.strip()\n    return result"
+    }
+  ]
+}

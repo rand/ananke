@@ -1,0 +1,57 @@
+{
+  "id": "system_001_config_parser",
+  "version": "1.0.0",
+  "title": "INI Configuration File Parser",
+  "description": "Implement a function that parses INI-style configuration files into a nested dictionary structure. The parser should handle sections, key-value pairs, comments, and basic type conversion.",
+  "category": "system_utilities",
+  "language": "python",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "config",
+      "parsing",
+      "key-value",
+      "environment"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'parse_config'",
+    "Takes INI file content as string parameter",
+    "Returns nested dictionary: {section: {key: value}}",
+    "Support [section] headers",
+    "Support key=value pairs within sections",
+    "Skip lines starting with # or ; (comments)",
+    "Automatically convert boolean strings (true/false) to bool",
+    "Automatically convert numeric strings to int or float",
+    "Strip whitespace from keys and values",
+    "Handle keys without sections (assign to 'default' section)",
+    "Return empty dict for empty input"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/system/config_parser.py",
+  "test_suite_path": "eval/tasks/fixtures/system/test_config_parser.py",
+  "constraint_path": "eval/tasks/constraints/system_config_parser.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function that parses a simple key=value format.",
+      "code": "def parse_simple_config(text: str) -> dict[str, str]:\n    config = {}\n    for line in text.split('\\n'):\n        if '=' in line:\n            key, value = line.split('=', 1)\n            config[key.strip()] = value.strip()\n    return config"
+    },
+    {
+      "prompt": "Implement a function that converts string values to appropriate types.",
+      "code": "def convert_value(value: str) -> bool | int | float | str:\n    lower = value.lower()\n    if lower in ('true', 'yes'):\n        return True\n    if lower in ('false', 'no'):\n        return False\n    try:\n        if '.' in value:\n            return float(value)\n        return int(value)\n    except ValueError:\n        return value"
+    },
+    {
+      "prompt": "Implement a function that checks if a string is a comment line.",
+      "code": "def is_comment(line: str) -> bool:\n    stripped = line.strip()\n    return stripped.startswith('#') or stripped.startswith(';')"
+    }
+  ]
+}

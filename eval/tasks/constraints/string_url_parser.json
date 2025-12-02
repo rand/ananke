@@ -1,0 +1,50 @@
+{
+  "task_id": "string_001_url_parser",
+  "constraints": {
+    "grammar": "export interface URLComponents { protocol: string | null; host: string | null; port: number | null; path: string | null; query: Record<string, string>; fragment: string | null }\nexport function parseURL(url: string): URLComponents | null",
+    "regex_pattern": "^export\\s+interface\\s+URLComponents\\s*\\{",
+    "type_constraints": {
+      "function_name": "parseURL",
+      "parameters": [
+        {"name": "url", "type": "string"}
+      ],
+      "return_type": "URLComponents | null"
+    },
+    "naming_constraints": {
+      "function_name": "parseURL",
+      "variable_patterns": [
+        "Use 'protocol' for protocol portion",
+        "Use 'host' for hostname",
+        "Use 'port' for port number",
+        "Use 'path' for URL path",
+        "Use 'query' or 'queryParams' for query parameters",
+        "Use 'fragment' or 'hash' for fragment identifier"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "String parsing and regex for URL components",
+        "Query parameter parsing into object",
+        "URL decoding for special characters"
+      ],
+      "must_not_use": [
+        "Built-in URL or URLSearchParams classes (implement manually)"
+      ],
+      "patterns": [
+        "Extract protocol (http://, https://, etc.)",
+        "Extract host and optional port",
+        "Extract path component",
+        "Parse query string into key-value object",
+        "Extract fragment/hash component",
+        "Handle malformed URLs by returning null"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n) where n is length of URL string",
+      "space_complexity": "O(n) for storing parsed components"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/string_url_parser.json",
+  "extraction_method": "manual",
+  "verified": true
+}

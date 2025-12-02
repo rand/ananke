@@ -1,0 +1,47 @@
+{
+  "task_id": "math_001_prime_generator",
+  "constraints": {
+    "grammar": "export function generatePrimes(limit: number): number[]",
+    "regex_pattern": "^export\\s+function\\s+generatePrimes\\s*\\(\\s*limit\\s*:\\s*number\\s*\\)\\s*:\\s*number\\[\\]\\s*\\{",
+    "type_constraints": {
+      "function_name": "generatePrimes",
+      "parameters": [
+        {"name": "limit", "type": "number"}
+      ],
+      "return_type": "number[]"
+    },
+    "naming_constraints": {
+      "function_name": "generatePrimes",
+      "variable_patterns": [
+        "Use 'sieve' or 'isPrime' for boolean array",
+        "Use 'primes' or 'result' for output array",
+        "Use descriptive loop variables like 'i', 'j', 'p' for prime"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "Sieve of Eratosthenes algorithm",
+        "Boolean array to mark composites",
+        "Nested loop: outer for candidates, inner for multiples"
+      ],
+      "must_not_use": [
+        "Trial division for each number",
+        "isPrime helper function checking individual numbers"
+      ],
+      "patterns": [
+        "Create boolean array of size limit+1",
+        "Mark 0 and 1 as not prime",
+        "For each unmarked number p, mark all multiples of p",
+        "Optimize: start inner loop at p*p",
+        "Collect all unmarked numbers as primes"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n log log n)",
+      "space_complexity": "O(n)"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/math_prime_generator.json",
+  "extraction_method": "manual",
+  "verified": true
+}

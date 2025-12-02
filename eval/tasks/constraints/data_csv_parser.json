@@ -1,0 +1,74 @@
+{
+  "task_id": "data_001_csv_parser",
+  "constraints": {
+    "grammar": "from typing import Any\n\ndef parse_csv(content: str) -> list[dict[str, Any]]:\n    \"\"\"Parse CSV content into a list of dictionaries.\"\"\"\n    # Implementation must:\n    # - Split content into lines\n    # - Parse first line as headers\n    # - Parse subsequent lines as data rows\n    # - Handle quoted fields\n    # - Convert types automatically\n    pass",
+    "regex_pattern": "^from\\s+typing\\s+import\\s+Any\\s*\\ndef\\s+parse_csv\\s*\\(",
+    "type_constraints": {
+      "parameters": [
+        {
+          "name": "content",
+          "type": "str",
+          "required": true
+        }
+      ],
+      "return_type": "list[dict[str, Any]]"
+    },
+    "naming_constraints": {
+      "function_name": "parse_csv",
+      "helper_functions": [
+        "_parse_row (optional)",
+        "_convert_type (optional)"
+      ],
+      "variable_patterns": [
+        "headers",
+        "lines",
+        "result"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "string split operations (split or splitlines)",
+        "iteration over lines",
+        "type conversion (int/float)",
+        "list comprehension or filtering for empty lines"
+      ],
+      "must_not_use": [
+        "csv module (must implement from scratch)",
+        "pandas library",
+        "external parsing libraries"
+      ],
+      "recommended_patterns": [
+        "Helper function to parse individual rows",
+        "Helper function for type conversion",
+        "State machine or flag for tracking quoted fields"
+      ]
+    },
+    "behavior_constraints": {
+      "required_features": [
+        "Parse headers from first row",
+        "Return list of dictionaries",
+        "Automatic int/float conversion",
+        "Handle quoted fields with commas",
+        "Strip whitespace from values",
+        "Skip empty lines",
+        "Return empty list for empty input"
+      ],
+      "edge_cases": [
+        "Empty input",
+        "Header-only CSV",
+        "Missing values in rows",
+        "Quoted fields with commas",
+        "Whitespace in fields",
+        "Negative numbers",
+        "Mixed data types"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n*m) where n=rows, m=average row length",
+      "space_complexity": "O(n*k) where n=rows, k=columns"
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/data/csv_parser.py",
+  "extraction_method": "manual",
+  "verified": true
+}
