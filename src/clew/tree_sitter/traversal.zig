@@ -569,3 +569,262 @@ pub fn extractTypeIdentifiers(allocator: Allocator, root: Node, source: []const 
 
     return try results.toOwnedSlice(allocator);
 }
+
+// ============================================================================
+// Type Constraint Information (AST-based type analysis)
+// ============================================================================
+
+/// Structured information about type constraints extracted from AST nodes.
+/// Replaces brittle string matching with AST-aware analysis.
+pub const TypeConstraintInfo = struct {
+    /// True if optional types are present (TypeScript `?`, `| undefined`, Python `Optional[]`)
+    has_optional_types: bool = false,
+    /// True if `any` or `unknown` types are present (TypeScript-specific, considered weak typing)
+    has_any_types: bool = false,
+    /// True if union types are present (`|` in TypeScript, `Union[]` in Python)
+    has_union_types: bool = false,
+    /// True if null/None is explicitly referenced in type annotations
+    has_null_types: bool = false,
+    /// Number of type annotations found
+    type_annotation_count: u32 = 0,
+    /// Confidence level of the analysis (0.0-1.0)
+    confidence: f32 = 0.0,
+};
+
+/// Language-specific type annotation node types
+const TypeAnnotationNodeTypes = struct {
+    /// TypeScript/JavaScript type annotation nodes
+    const typescript = [_][]const u8{
+        "type_annotation",
+        "type_alias_declaration",
+        "interface_declaration",
+        "type_predicate",
+    };
+
+    /// Python type hint nodes
+    const python = [_][]const u8{
+        "type",
+        "type_parameter",
+        "subscript", // Used for Optional[T], Union[T, U], etc.
+    };
+
+    /// Generic identifier nodes that might contain type info
+    const generic = [_][]const u8{
+        "type_identifier",
+        "predefined_type",
+        "generic_type",
+    };
+};
+
+/// Extract type constraint information from AST nodes.
+/// This is language-aware and only examines actual type annotation nodes,
+/// avoiding false positives from comments, strings, and variable names.
+pub fn extractTypeConstraintInfo(
+    allocator: Allocator,
+    root: Node,
+    source: []const u8,
+    language: []const u8,
+) !TypeConstraintInfo {
+    const t = Traversal.init(allocator);
+    var info = TypeConstraintInfo{};
+
+    // Determine which node types to search based on language
+    const is_typescript = std.mem.eql(u8, language, "typescript") or
+        std.mem.eql(u8, language, "javascript") or
+        std.mem.eql(u8, language, "tsx") or
+        std.mem.eql(u8, language, "jsx");
+    const is_python = std.mem.eql(u8, language, "python");
+
+    if (is_typescript) {
+        info = try extractTypescriptConstraints(allocator, t, root, source);
+    } else if (is_python) {
+        info = try extractPythonConstraints(allocator, t, root, source);
+    } else {
+        // For other languages, do basic type annotation search
+        info = try extractGenericConstraints(allocator, t, root, source);
+    }
+
+    return info;
+}
+
+/// Extract TypeScript-specific type constraints from AST
+fn extractTypescriptConstraints(
+    allocator: Allocator,
+    t: Traversal,
+    root: Node,
+    source: []const u8,
+) !TypeConstraintInfo {
+    var info = TypeConstraintInfo{
+        .confidence = 0.95, // High confidence for AST-based extraction
+    };
+
+    // Find all type annotation nodes
+    for (TypeAnnotationNodeTypes.typescript) |node_type| {
+        const type_nodes = try t.findByType(root, node_type);
+        defer allocator.free(type_nodes);
+
+        info.type_annotation_count += @intCast(type_nodes.len);
+
+        for (type_nodes) |type_node| {
+            const type_text = t.getNodeText(type_node, source);
+
+            // Check for 'any' or 'unknown' (weak typing)
+            // Only match as standalone types, not as part of other words
+            if (containsTypeKeyword(type_text, "any") or
+                containsTypeKeyword(type_text, "unknown"))
+            {
+                info.has_any_types = true;
+            }
+
+            // Check for optional types
+            if (std.mem.indexOf(u8, type_text, "?") != null or
+                containsTypeKeyword(type_text, "undefined"))
+            {
+                info.has_optional_types = true;
+            }
+
+            // Check for null types
+            if (containsTypeKeyword(type_text, "null")) {
+                info.has_null_types = true;
+            }
+
+            // Check for union types
+            if (std.mem.indexOf(u8, type_text, "|") != null) {
+                info.has_union_types = true;
+            }
+        }
+    }
+
+    // Also check for predefined_type nodes which contain 'any', 'unknown', etc.
+    const predefined_types = try t.findByType(root, "predefined_type");
+    defer allocator.free(predefined_types);
+
+    for (predefined_types) |pred_node| {
+        const pred_text = t.getNodeText(pred_node, source);
+        if (std.mem.eql(u8, pred_text, "any") or std.mem.eql(u8, pred_text, "unknown")) {
+            info.has_any_types = true;
+        }
+        if (std.mem.eql(u8, pred_text, "undefined")) {
+            info.has_optional_types = true;
+        }
+        if (std.mem.eql(u8, pred_text, "null")) {
+            info.has_null_types = true;
+        }
+    }
+
+    return info;
+}
+
+/// Extract Python-specific type constraints from AST
+fn extractPythonConstraints(
+    allocator: Allocator,
+    t: Traversal,
+    root: Node,
+    source: []const u8,
+) !TypeConstraintInfo {
+    var info = TypeConstraintInfo{
+        .confidence = 0.95,
+    };
+
+    // Find type hint nodes (Python uses 'type' nodes for annotations)
+    for (TypeAnnotationNodeTypes.python) |node_type| {
+        const type_nodes = try t.findByType(root, node_type);
+        defer allocator.free(type_nodes);
+
+        info.type_annotation_count += @intCast(type_nodes.len);
+
+        for (type_nodes) |type_node| {
+            const type_text = t.getNodeText(type_node, source);
+
+            // Python's Any type from typing module
+            if (std.mem.indexOf(u8, type_text, "Any") != null) {
+                info.has_any_types = true;
+            }
+
+            // Python's Optional[T] or T | None (3.10+)
+            if (std.mem.indexOf(u8, type_text, "Optional") != null or
+                std.mem.indexOf(u8, type_text, "| None") != null or
+                std.mem.indexOf(u8, type_text, "|None") != null)
+            {
+                info.has_optional_types = true;
+            }
+
+            // Python's None type
+            if (std.mem.indexOf(u8, type_text, "None") != null) {
+                info.has_null_types = true;
+            }
+
+            // Python's Union type
+            if (std.mem.indexOf(u8, type_text, "Union") != null or
+                std.mem.indexOf(u8, type_text, "|") != null)
+            {
+                info.has_union_types = true;
+            }
+        }
+    }
+
+    return info;
+}
+
+/// Extract generic type constraints for languages without specific handling
+fn extractGenericConstraints(
+    allocator: Allocator,
+    t: Traversal,
+    root: Node,
+    source: []const u8,
+) !TypeConstraintInfo {
+    var info = TypeConstraintInfo{
+        .confidence = 0.80, // Lower confidence for generic extraction
+    };
+
+    // Look for generic type identifier nodes
+    for (TypeAnnotationNodeTypes.generic) |node_type| {
+        const type_nodes = try t.findByType(root, node_type);
+        defer allocator.free(type_nodes);
+
+        info.type_annotation_count += @intCast(type_nodes.len);
+
+        for (type_nodes) |type_node| {
+            const type_text = t.getNodeText(type_node, source);
+
+            // Generic checks (conservative)
+            if (std.mem.eql(u8, type_text, "any") or
+                std.mem.eql(u8, type_text, "Any"))
+            {
+                info.has_any_types = true;
+            }
+        }
+    }
+
+    return info;
+}
+
+/// Check if a type text contains a specific type keyword as a standalone type.
+/// Avoids matching "any" in "company" or "many".
+fn containsTypeKeyword(text: []const u8, keyword: []const u8) bool {
+    var pos: usize = 0;
+    while (pos < text.len) {
+        if (std.mem.indexOfPos(u8, text, pos, keyword)) |idx| {
+            // Check that it's a standalone word (not part of another identifier)
+            const before_ok = idx == 0 or !isIdentifierChar(text[idx - 1]);
+            const after_idx = idx + keyword.len;
+            const after_ok = after_idx >= text.len or !isIdentifierChar(text[after_idx]);
+
+            if (before_ok and after_ok) {
+                return true;
+            }
+            pos = idx + 1;
+        } else {
+            break;
+        }
+    }
+    return false;
+}
+
+/// Check if a character can be part of an identifier
+fn isIdentifierChar(c: u8) bool {
+    return (c >= 'a' and c <= 'z') or
+        (c >= 'A' and c <= 'Z') or
+        (c >= '0' and c <= '9') or
+        c == '_';
+}
