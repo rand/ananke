@@ -411,38 +411,198 @@ pub const Clew = struct {
         source: []const u8,
         language: []const u8,
     ) ![]Constraint {
-        _ = language;
-
         var constraints = std.ArrayList(Constraint){};
-        defer constraints.deinit(self.allocator);
+        errdefer constraints.deinit(self.allocator);
 
-        // Check for any/unknown types (TypeScript specific)
-        if (std.mem.indexOf(u8, source, ": any") != null or
-            std.mem.indexOf(u8, source, ": unknown") != null)
-        {
-            const constraint = Constraint{
+        // Try AST-based extraction first (high confidence)
+        const ast_constraints = self.extractTypeConstraintsFromAST(source, language) catch |err| {
+            // Log the error and fall back to string matching only
+            std.log.debug("AST-based type extraction failed: {}, using fallback only", .{err});
+            return try self.extractTypeConstraintsFallback(source, language);
+        };
+        defer self.allocator.free(ast_constraints);
+
+        // Add AST constraints
+        for (ast_constraints) |c| {
+            try constraints.append(self.allocator, c);
+        }
+
+        // ALWAYS run fallback for patterns AST might miss (like ?. and ?? operators)
+        // The fallback uses lower confidence (0.75) so AST results are preferred
+        const fallback_constraints = try self.extractTypeConstraintsFallback(source, language);
+        defer self.allocator.free(fallback_constraints);
+
+        // Add fallback constraints, avoiding duplicates by name
+        for (fallback_constraints) |fc| {
+            var is_duplicate = false;
+            for (constraints.items) |existing| {
+                if (std.mem.eql(u8, existing.name, fc.name)) {
+                    is_duplicate = true;
+                    break;
+                }
+            }
+            if (!is_duplicate) {
+                try constraints.append(self.allocator, fc);
+            }
+        }
+
+        return try constraints.toOwnedSlice(self.allocator);
+    }
+
+    /// AST-based type constraint extraction using Tree-sitter
+    fn extractTypeConstraintsFromAST(
+        self: *Clew,
+        source: []const u8,
+        language: []const u8,
+    ) ![]Constraint {
+        var constraints = std.ArrayList(Constraint){};
+        errdefer constraints.deinit(self.allocator);
+
+        // Map language name to tree-sitter Language enum
+        const lang = languageFromName(language) orelse {
+            // Language not supported by tree-sitter, return empty
+            return try constraints.toOwnedSlice(self.allocator);
+        };
+
+        // Parse source with tree-sitter
+        var parser = tree_sitter.TreeSitterParser.init(self.allocator, lang) catch |err| {
+            std.log.debug("Failed to initialize tree-sitter parser: {}", .{err});
+            return try constraints.toOwnedSlice(self.allocator);
+        };
+        defer parser.deinit();
+
+        var tree = parser.parse(source) catch |err| {
+            std.log.debug("Tree-sitter parsing failed: {}", .{err});
+            return try constraints.toOwnedSlice(self.allocator);
+        };
+        defer tree.deinit();
+
+        const root_node = tree.rootNode();
+
+        // Extract type constraint info using AST traversal
+        const type_info = try tree_sitter.traversal.extractTypeConstraintInfo(
+            self.allocator,
+            root_node,
+            source,
+            language,
+        );
+
+        // Convert TypeConstraintInfo to Constraint objects
+        if (type_info.has_any_types) {
+            try constraints.append(self.allocator, Constraint{
                 .kind = .type_safety,
                 .severity = .warning,
                 .name = "avoid_any_type",
-                .description = "Avoid using 'any' or 'unknown' types",
+                .description = "Avoid using 'any' or 'unknown' types - use specific types for better type safety",
                 .source = .Type_System,
-            };
-            try constraints.append(self.allocator, constraint);
+                .confidence = type_info.confidence,
+            });
         }
 
-        // Check for null safety
-        if (std.mem.indexOf(u8, source, "?") != null or
-            std.mem.indexOf(u8, source, "null") != null or
-            std.mem.indexOf(u8, source, "undefined") != null)
-        {
-            const constraint = Constraint{
+        if (type_info.has_optional_types or type_info.has_null_types) {
+            try constraints.append(self.allocator, Constraint{
                 .kind = .type_safety,
                 .severity = .info,
                 .name = "null_safety",
-                .description = "Handle null/undefined values properly",
+                .description = "Handle null/undefined values properly - optional types detected in annotations",
                 .source = .Type_System,
-            };
-            try constraints.append(self.allocator, constraint);
+                .confidence = type_info.confidence,
+            });
+        }
+
+        if (type_info.has_union_types) {
+            try constraints.append(self.allocator, Constraint{
+                .kind = .type_safety,
+                .severity = .info,
+                .name = "union_types",
+                .description = "Union types require exhaustive handling of all variants",
+                .source = .Type_System,
+                .confidence = type_info.confidence,
+            });
+        }
+
+        return try constraints.toOwnedSlice(self.allocator);
+    }
+
+    /// Fallback type constraint extraction using string matching (lower confidence)
+    /// Used when Tree-sitter parsing is unavailable or fails
+    fn extractTypeConstraintsFallback(
+        self: *Clew,
+        source: []const u8,
+        language: []const u8,
+    ) ![]Constraint {
+        var constraints = std.ArrayList(Constraint){};
+        defer constraints.deinit(self.allocator);
+
+        // Only apply TypeScript-specific patterns to TypeScript/JavaScript
+        const is_typescript = std.mem.eql(u8, language, "typescript") or
+            std.mem.eql(u8, language, "javascript") or
+            std.mem.eql(u8, language, "tsx") or
+            std.mem.eql(u8, language, "jsx");
+
+        if (is_typescript) {
+            // Check for any/unknown types (TypeScript specific)
+            if (std.mem.indexOf(u8, source, ": any") != null or
+                std.mem.indexOf(u8, source, ": unknown") != null)
+            {
+                try constraints.append(self.allocator, Constraint{
+                    .kind = .type_safety,
+                    .severity = .warning,
+                    .name = "avoid_any_type",
+                    .description = "Avoid using 'any' or 'unknown' types",
+                    .source = .Type_System,
+                    .confidence = 0.75, // Lower confidence for string matching
+                });
+            }
+
+            // Check for null safety indicators
+            // Includes optional type annotations (?:), union types with null/undefined,
+            // optional chaining (?.), and nullish coalescing (??)
+            if (std.mem.indexOf(u8, source, "?:") != null or
+                std.mem.indexOf(u8, source, "| null") != null or
+                std.mem.indexOf(u8, source, "| undefined") != null or
+                std.mem.indexOf(u8, source, "?.") != null or
+                std.mem.indexOf(u8, source, "??") != null)
+            {
+                try constraints.append(self.allocator, Constraint{
+                    .kind = .type_safety,
+                    .severity = .info,
+                    .name = "null_safety",
+                    .description = "Handle null/undefined values properly",
+                    .source = .Type_System,
+                    .confidence = 0.75,
+                });
+            }
+        }
+
+        // Python type hint patterns
+        const is_python = std.mem.eql(u8, language, "python");
+        if (is_python) {
+            if (std.mem.indexOf(u8, source, ": Any") != null or
+                std.mem.indexOf(u8, source, "-> Any") != null)
+            {
+                try constraints.append(self.allocator, Constraint{
+                    .kind = .type_safety,
+                    .severity = .warning,
+                    .name = "avoid_any_type",
+                    .description = "Avoid using 'Any' type hint - use specific types",
+                    .source = .Type_System,
+                    .confidence = 0.75,
+                });
+            }
+
+            if (std.mem.indexOf(u8, source, "Optional[") != null or
+                std.mem.indexOf(u8, source, "| None") != null)
+            {
+                try constraints.append(self.allocator, Constraint{
+                    .kind = .type_safety,
+                    .severity = .info,
+                    .name = "null_safety",
+                    .description = "Handle None values properly - Optional types detected",
+                    .source = .Type_System,
+                    .confidence = 0.75,
+                });
+            }
         }
 
         return try constraints.toOwnedSlice(self.allocator);
@@ -590,6 +750,23 @@ fn convertSeverity(claude_severity: claude_api.Severity) Severity {
         .info => .info,
         .hint => .hint,
     };
+}
+
+/// Map language name string to tree-sitter Language enum
+fn languageFromName(name: []const u8) ?tree_sitter.Language {
+    if (std.mem.eql(u8, name, "typescript")) return .typescript;
+    if (std.mem.eql(u8, name, "javascript")) return .javascript;
+    if (std.mem.eql(u8, name, "python")) return .python;
+    if (std.mem.eql(u8, name, "rust")) return .rust;
+    if (std.mem.eql(u8, name, "go")) return .go;
+    if (std.mem.eql(u8, name, "zig")) return .zig;
+    if (std.mem.eql(u8, name, "c")) return .c;
+    if (std.mem.eql(u8, name, "cpp")) return .cpp;
+    if (std.mem.eql(u8, name, "java")) return .java;
+    // Additional aliases
+    if (std.mem.eql(u8, name, "tsx")) return .typescript;
+    if (std.mem.eql(u8, name, "jsx")) return .javascript;
+    return null;
 }
 
 /// Telemetry data structure

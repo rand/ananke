@@ -16,8 +16,9 @@ Ananke is a constraint-driven code generation system that transforms AI code gen
 **Location**: Runs locally or at edge (no GPU required)
 
 #### Capabilities:
-- **Static Analysis**: Pure Zig structural parsers for syntactic pattern extraction
-  - Note: Tree-sitter integration deferred to v0.2 for extended language support
+- **Static Analysis**: Tree-sitter AST parsing via C FFI for robust syntactic extraction
+  - 9 languages supported: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
+  - Hybrid extraction: Tree-sitter AST (primary) + pattern matching (fallback)
 - **Semantic Understanding**: Optional Claude/OpenAI integration for deeper analysis
 - **Pattern Mining**: Extracts constraints from:
   - Source code (syntactic, type, architectural patterns)
@@ -307,11 +308,12 @@ ananke generate "implement feature"
 
 ### Clew (Constraint Extraction)
 **Status**: PRODUCTION READY
-- **Parser**: Pure Zig structural parsers (not tree-sitter)
-  - Lexical analysis for TypeScript/Python
-  - AST-based pattern extraction
+- **Parser**: Tree-sitter AST via C FFI
+  - Direct binding to tree-sitter C library
+  - Hybrid extraction: AST-based (0.95 confidence) + pattern matching fallback
   - ~100ms extraction time for typical files
-- **Supported Languages**: TypeScript, JavaScript, Python (v0.2: Rust, Go, Zig)
+- **Supported Languages**: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
+  - All 9 parsers compiled as static libraries and linked at build time
 - **Pattern Library**: 101 constraint patterns implemented
 - **Claude Integration**: Optional semantic analysis working correctly
 - **Tests**: 40+ unit tests, 100% pass rate
@@ -357,10 +359,9 @@ ananke generate "implement feature"
 - **Performance**: All test suites complete in <5 seconds
 
 ### Known Gaps
-- **Tree-sitter**: Not integrated (Zig 0.15.x compatibility issue, planned v0.2)
-- **Extended Extractors**: Rust/Go/Zig extraction pending (v0.2)
 - **Distributed Cache**: Single-machine in-memory only
 - **Type Checking in Ariadne**: Deferred to v0.2
+- **Type Extraction Robustness**: Some fallback paths use string matching instead of AST
 
 ## Performance Characteristics
 
@@ -468,7 +469,7 @@ Ananke provides well-defined extension points for developers to add custom funct
 
 **Complexity**: High (4-8 hours depending on language)
 
-**Supported**: TypeScript, Python, Rust, Go, Zig (partial)
+**Supported**: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
 
 **Example**: See `EXTENDING.md > Adding Language Support`
 
