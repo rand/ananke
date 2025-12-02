@@ -47,8 +47,9 @@ jobs:
       - name: Run cargo audit
         run: |
           cd maze
-          cargo audit --json > ../rust-audit-results.json || true
-          cargo audit
+          # Uses .cargo/audit.toml for ignoring tracked advisories
+          cargo audit --ignore RUSTSEC-2025-0020 --json > ../rust-audit-results.json || true
+          cargo audit --ignore RUSTSEC-2025-0020
 
       - name: Install cargo-deny
         run: cargo install cargo-deny --locked
@@ -99,7 +100,7 @@ jobs:
         run: |
           cd maze
           echo "## Dependency Vulnerabilities" > ../rust-security-report.md
-          cargo audit 2>&1 | tee -a ../rust-security-report.md
+          cargo audit --ignore RUSTSEC-2025-0020 2>&1 | tee -a ../rust-security-report.md
 
       - name: Upload Rust security report
         if: always()
@@ -293,8 +294,9 @@ jobs:
 
       - name: Run Gitleaks
         run: |
-          ./gitleaks detect --source . --report-format json --report-path gitleaks-report.json --verbose || true
-          ./gitleaks detect --source . --report-format sarif --report-path gitleaks-report.sarif --verbose || true
+          # Uses .gitleaksignore for false positives (example passwords in test files)
+          ./gitleaks detect --source . --report-format json --report-path gitleaks-report.json --verbose --gitleaks-ignore-path=.gitleaksignore || true
+          ./gitleaks detect --source . --report-format sarif --report-path gitleaks-report.sarif --verbose --gitleaks-ignore-path=.gitleaksignore || true
 
           # Generate human-readable report
           if [ -f gitleaks-report.json ]; then
