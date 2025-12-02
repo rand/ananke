@@ -2,10 +2,8 @@
 
 > Constraint-driven code generation that transforms AI from probabilistic guessing into controlled search through valid program spaces.
 
-[![CI](https://github.com/ananke-ai/ananke/actions/workflows/ci.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/ci.yml)
-[![Maze Tests](https://github.com/ananke-ai/ananke/actions/workflows/maze-tests.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/maze-tests.yml)
-[![Security](https://github.com/ananke-ai/ananke/actions/workflows/security.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/security.yml)
-[![Docs](https://github.com/ananke-ai/ananke/actions/workflows/docs.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/docs.yml)
+[![CI](https://github.com/rand/ananke/actions/workflows/ci.yml/badge.svg)](https://github.com/rand/ananke/actions/workflows/ci.yml)
+[![Security](https://github.com/rand/ananke/actions/workflows/security.yml/badge.svg)](https://github.com/rand/ananke/actions/workflows/security.yml)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Language: Zig](https://img.shields.io/badge/Language-Zig-blue.svg)](https://ziglang.org/)
 [![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-green.svg)](RELEASE_NOTES.md)
@@ -74,7 +72,7 @@ Get started with constraint extraction and analysis in 10 minutes:
 
 ```bash
 # Clone and build
-git clone https://github.com/ananke-ai/ananke.git
+git clone https://github.com/rand/ananke.git
 cd ananke
 zig build
 
@@ -251,7 +249,7 @@ PREFIX=~/.local ./install.sh
 ### Option 2: From Source
 
 ```bash
-git clone https://github.com/ananke-ai/ananke.git
+git clone https://github.com/rand/ananke.git
 cd ananke
 
 # Build all components (Zig + Rust)
@@ -273,7 +271,7 @@ zig build examples
 **Zig Library** - Add to your `build.zig.zon`:
 ```zig
 .ananke = .{
-    .url = "https://github.com/ananke-ai/ananke/archive/refs/tags/v0.1.0.tar.gz",
+    .url = "https://github.com/rand/ananke/archive/refs/tags/v0.1.0.tar.gz",
     .hash = "12207...",
 },
 ```
