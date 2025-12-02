@@ -1,11 +1,12 @@
 //! Python bindings for Maze orchestration layer
 //!
 //! Exposes Rust types and functions to Python via PyO3.
-//! Provides async/await support through pyo3-asyncio.
+//! Provides async/await support through pyo3-async-runtimes.
 
 use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
-use pyo3_asyncio::tokio::future_into_py;
+use pyo3::types::PyDict;
+use pyo3_async_runtimes::tokio::future_into_py;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -468,7 +469,7 @@ impl Ananke {
         &self,
         py: Python<'py>,
         request: PyGenerationRequest,
-    ) -> PyResult<&'py PyAny> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         // Convert Python request to Rust request
         let rust_request = python_request_to_rust(request)?;
 
@@ -500,7 +501,7 @@ impl Ananke {
         &self,
         py: Python<'py>,
         constraints: Vec<PyConstraintIR>,
-    ) -> PyResult<&'py PyAny> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         // Convert Python constraints to Rust constraints
         let rust_constraints: Vec<ConstraintIR> = constraints
             .iter()
@@ -521,8 +522,8 @@ impl Ananke {
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to compile constraints: {}", e)))?;
 
             //  Return as Python dict
-            let result = Python::with_gil(|py| -> PyResult<pyo3::PyObject> {
-                let dict = pyo3::types::PyDict::new(py);
+            let result = Python::attach(|py| -> PyResult<Py<PyAny>> {
+                let dict = PyDict::new(py);
                 dict.set_item("hash", compiled.hash)?;
                 dict.set_item("compiled_at", compiled.compiled_at)?;
                 dict.set_item("schema", compiled.llguidance_schema.to_string())?;
@@ -537,7 +538,7 @@ impl Ananke {
     ///
     /// Returns:
     ///     bool: True if service is healthy, False otherwise
-    fn health_check<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn health_check<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let _orch = self.orchestrator.clone();
 
         future_into_py(py, async move {
@@ -545,7 +546,7 @@ impl Ananke {
             // Since modal_client is private, we need to add a public method
             // For now, we'll return a placeholder
             // TODO: Add health_check method to MazeOrchestrator
-            Ok(Python::with_gil(|_py| true))
+            Ok(true)
         })
     }
 
@@ -553,13 +554,13 @@ impl Ananke {
     ///
     /// Returns:
     ///     None
-    fn clear_cache<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn clear_cache<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let orch = self.orchestrator.clone();
 
         future_into_py(py, async move {
             orch.clear_cache().await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear cache: {}", e)))?;
-            Ok(Python::with_gil(|_py| ()))
+            Ok(())
         })
     }
 
@@ -567,14 +568,14 @@ impl Ananke {
     ///
     /// Returns:
     ///     Dict[str, int]: Cache statistics with 'size' and 'limit' keys
-    fn cache_stats<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    fn cache_stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let orch = self.orchestrator.clone();
 
         future_into_py(py, async move {
             let stats = orch.cache_stats().await;
 
-            let result = Python::with_gil(|py| -> PyResult<pyo3::PyObject> {
-                let dict = pyo3::types::PyDict::new(py);
+            let result = Python::attach(|py| -> PyResult<Py<PyAny>> {
+                let dict = PyDict::new(py);
                 dict.set_item("size", stats.size)?;
                 dict.set_item("limit", stats.limit)?;
                 Ok(dict.into())
@@ -650,7 +651,7 @@ fn rust_response_to_python(response: GenerationResponse) -> PyResult<PyGeneratio
 
 /// Python module definition
 #[pymodule]
-fn ananke(_py: Python, m: &PyModule) -> PyResult<()> {
+fn ananke(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Ananke>()?;
     m.add_class::<PyModalConfig>()?;
     m.add_class::<PyConstraintIR>()?;

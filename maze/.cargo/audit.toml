@@ -2,8 +2,5 @@
 # See: https://github.com/rustsec/rustsec/tree/main/cargo-audit
 
 [advisories]
-# RUSTSEC-2025-0020: pyo3 PyString::from_object buffer overflow
-# Tracked for upgrade in future PR - requires significant API migration
-# The vulnerability requires specific conditions (malformed Python string input)
-# which are unlikely in our controlled use case
-ignore = ["RUSTSEC-2025-0020"]
+# No advisories are currently ignored.
+# RUSTSEC-2025-0020 was fixed by upgrading pyo3 from 0.20 to 0.27.
