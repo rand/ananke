@@ -1,0 +1,80 @@
+{
+  "task_id": "algo_002_merge_sort",
+  "constraints": {
+    "grammar": "export function mergeSort(arr: number[]): number[] {\n  // Base case: array length <= 1\n  // Divide: split array in half using Math.floor and slice\n  // Conquer: recursively call mergeSort on both halves\n  // Combine: merge sorted halves using merge function\n}\n\nfunction merge(left: number[], right: number[]): number[] {\n  // Merge two sorted arrays into one sorted array\n  // Compare elements from both arrays\n  // Add smaller element to result\n}",
+    "regex_pattern": "^export\\s+function\\s+mergeSort\\s*\\(\\s*arr\\s*:\\s*number\\[\\]\\s*\\)\\s*:\\s*number\\[\\]\\s*\\{",
+    "type_constraints": {
+      "parameters": [
+        {
+          "name": "arr",
+          "type": "number[]",
+          "required": true
+        }
+      ],
+      "return_type": "number[]"
+    },
+    "naming_constraints": {
+      "function_name": "mergeSort",
+      "helper_function": "merge",
+      "variable_patterns": [
+        "mid",
+        "left",
+        "right",
+        "result",
+        "leftIndex",
+        "rightIndex"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "recursion (mergeSort calls itself)",
+        "separate merge helper function",
+        "Math.floor for midpoint calculation",
+        "array.slice for splitting",
+        "while loops in merge function",
+        "comparison operators (<= or <)"
+      ],
+      "must_not_use": [
+        "Array.sort() method",
+        "iteration-based sorting (must be recursive)",
+        "in-place modification of input array",
+        "external sorting libraries"
+      ],
+      "required_structure": [
+        "Base case: return array if length <= 1",
+        "Recursive case: split, sort halves, merge",
+        "Separate merge function that combines sorted arrays"
+      ]
+    },
+    "behavior_constraints": {
+      "required_features": [
+        "Divide-and-conquer approach",
+        "Recursive splitting of array",
+        "Merge sorted subarrays",
+        "Return new sorted array",
+        "Do not modify input array",
+        "Handle empty arrays",
+        "Handle single-element arrays",
+        "Correctly handle duplicates"
+      ],
+      "edge_cases": [
+        "Empty array",
+        "Single element",
+        "Two elements",
+        "Already sorted",
+        "Reverse sorted",
+        "Duplicates",
+        "Negative numbers",
+        "Decimal numbers"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n log n) - divide into log n levels, merge n elements per level",
+      "space_complexity": "O(n) - new arrays created during merge operations",
+      "recursion_depth": "O(log n)"
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/algorithms/merge_sort.ts",
+  "extraction_method": "manual",
+  "verified": true
+}

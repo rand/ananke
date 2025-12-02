@@ -1,0 +1,80 @@
+{
+  "task_id": "db_001_query_builder",
+  "constraints": {
+    "grammar": "export class QueryBuilder { select(table: string): this; where(field: string, operator: string, value: any): this; orderBy(field: string, direction: 'ASC' | 'DESC'): this; limit(count: number): this; build(): {sql: string, params: any[]}; }",
+    "regex_pattern": "^export\\s+class\\s+QueryBuilder\\s*\\{",
+    "type_constraints": {
+      "class_name": "QueryBuilder",
+      "methods": [
+        {
+          "name": "select",
+          "parameters": [{"name": "table", "type": "string"}],
+          "return_type": "this"
+        },
+        {
+          "name": "where",
+          "parameters": [
+            {"name": "field", "type": "string"},
+            {"name": "operator", "type": "string"},
+            {"name": "value", "type": "any"}
+          ],
+          "return_type": "this"
+        },
+        {
+          "name": "orderBy",
+          "parameters": [
+            {"name": "field", "type": "string"},
+            {"name": "direction", "type": "'ASC' | 'DESC'"}
+          ],
+          "return_type": "this"
+        },
+        {
+          "name": "limit",
+          "parameters": [{"name": "count", "type": "number"}],
+          "return_type": "this"
+        },
+        {
+          "name": "build",
+          "parameters": [],
+          "return_type": "{sql: string, params: any[]}"
+        }
+      ]
+    },
+    "naming_constraints": {
+      "class_name": "QueryBuilder",
+      "method_names": ["select", "where", "orderBy", "limit", "build"],
+      "variable_patterns": [
+        "Use 'sql' for SQL string",
+        "Use 'params' for parameter array",
+        "Use descriptive names for query parts (e.g., 'tableName', 'whereConditions', 'orderByClause')"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "Fluent interface (method chaining via 'return this')",
+        "Parameterized queries with ? placeholders",
+        "Array for parameter values",
+        "Multiple WHERE clauses joined with AND"
+      ],
+      "must_not_use": [
+        "String interpolation for values (SQL injection vulnerability)",
+        "Direct value embedding in SQL string"
+      ],
+      "patterns": [
+        "Store query state in instance variables",
+        "Each builder method returns 'this' for chaining",
+        "build() constructs SQL string with placeholders",
+        "build() returns object with sql string and params array",
+        "WHERE clauses use ? placeholders",
+        "Parameters array matches ? placeholder order"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n) where n is number of clauses",
+      "space_complexity": "O(n) for storing query parts"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/database_query_builder.json",
+  "extraction_method": "manual",
+  "verified": true
+}

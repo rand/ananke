@@ -1,0 +1,50 @@
+{
+  "task_id": "algo_001_binary_search",
+  "constraints": {
+    "grammar": "export function binarySearch(arr: number[], target: number): number {\n  // Implementation must use iterative approach with while loop\n  // Must declare left and right pointers\n  // Must calculate mid using Math.floor\n  // Must return number type\n}",
+    "regex_pattern": "^export\\s+function\\s+binarySearch\\s*\\(\\s*arr\\s*:\\s*number\\[\\]\\s*,\\s*target\\s*:\\s*number\\s*\\)\\s*:\\s*number\\s*\\{",
+    "type_constraints": {
+      "parameters": [
+        {
+          "name": "arr",
+          "type": "number[]",
+          "required": true
+        },
+        {
+          "name": "target",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "return_type": "number"
+    },
+    "naming_constraints": {
+      "function_name": "binarySearch",
+      "variable_patterns": [
+        "left",
+        "right",
+        "mid"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "while loop",
+        "Math.floor",
+        "comparison operators (===, <, >)"
+      ],
+      "must_not_use": [
+        "recursion",
+        "Array.indexOf",
+        "Array.find",
+        "for loop"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(log n)",
+      "space_complexity": "O(1)"
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/algorithms/binary_search.ts",
+  "extraction_method": "manual",
+  "verified": true
+}

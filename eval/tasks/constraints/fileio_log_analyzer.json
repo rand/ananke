@@ -1,0 +1,51 @@
+{
+  "task_id": "fileio_001_log_analyzer",
+  "constraints": {
+    "grammar": "export function analyzeLog(logContent: string): LogStats",
+    "regex_pattern": "^export\\s+function\\s+analyzeLog\\s*\\(\\s*logContent\\s*:\\s*string\\s*\\)\\s*:\\s*LogStats\\s*\\{",
+    "type_constraints": {
+      "function_name": "analyzeLog",
+      "parameters": [
+        {"name": "logContent", "type": "string"}
+      ],
+      "return_type": "LogStats"
+    },
+    "naming_constraints": {
+      "function_name": "analyzeLog",
+      "variable_patterns": [
+        "Use 'errorCount', 'warningCount', 'infoCount' for level counters",
+        "Use 'topErrors' for most frequent errors",
+        "Use 'errorMap' or 'errorCounts' for tracking error frequencies",
+        "Use 'lines' for split log lines"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "String splitting by newlines",
+        "Regex or string matching for log format: [LEVEL] timestamp - message",
+        "Map or object for counting error occurrences",
+        "Sorting for top errors by frequency"
+      ],
+      "must_not_use": [
+        "External logging libraries",
+        "Database or filesystem operations"
+      ],
+      "patterns": [
+        "Split log content into lines",
+        "Parse each line for level, timestamp, message",
+        "Count occurrences by level (ERROR, WARNING, INFO)",
+        "Track error message frequencies",
+        "Sort errors by count descending",
+        "Return top 5 most frequent errors",
+        "Ignore malformed lines gracefully"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n log n) where n is number of log lines (due to sorting)",
+      "space_complexity": "O(m) where m is number of unique error messages"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/fileio_log_analyzer.json",
+  "extraction_method": "manual",
+  "verified": true
+}

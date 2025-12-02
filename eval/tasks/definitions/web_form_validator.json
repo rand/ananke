@@ -1,0 +1,56 @@
+{
+  "id": "web_001_form_validator",
+  "version": "1.0.0",
+  "title": "Form Field Validator",
+  "description": "Implement a form validation function that validates multiple form fields according to specified rules. The validator should support required fields, min/max length, pattern matching, and email validation.",
+  "category": "web_components",
+  "language": "typescript",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(1)"
+    },
+    "tags": [
+      "form",
+      "validation",
+      "input",
+      "web"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'validateForm'",
+    "Takes two parameters: form data object and validation rules object",
+    "Returns { isValid: boolean, fieldErrors: Record<string, string[]> }",
+    "Support 'required' rule (field must not be empty)",
+    "Support 'minLength' and 'maxLength' rules",
+    "Support 'pattern' rule (regex matching)",
+    "Support 'email' rule (valid email format)",
+    "Collect all errors per field (multiple rules can fail)",
+    "Field with no errors should not appear in fieldErrors",
+    "Return isValid: false if any field has errors"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/web/form_validator.ts",
+  "test_suite_path": "eval/tasks/fixtures/web/form_validator.test.ts",
+  "constraint_path": "eval/tasks/constraints/web_form_validator.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function that checks if a string matches a regex pattern.",
+      "code": "export function matchesPattern(value: string, pattern: RegExp): boolean {\n  return pattern.test(value);\n}"
+    },
+    {
+      "prompt": "Implement a function that checks if a string is a valid email.",
+      "code": "export function isValidEmail(email: string): boolean {\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  return emailRegex.test(email);\n}"
+    },
+    {
+      "prompt": "Implement a function that validates string length constraints.",
+      "code": "export function validateLength(value: string, min?: number, max?: number): boolean {\n  if (min !== undefined && value.length < min) return false;\n  if (max !== undefined && value.length > max) return false;\n  return true;\n}"
+    }
+  ]
+}

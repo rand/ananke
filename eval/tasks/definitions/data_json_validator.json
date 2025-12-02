@@ -1,0 +1,54 @@
+{
+  "id": "data_002_json_validator",
+  "version": "1.0.0",
+  "title": "JSON Schema Validator",
+  "description": "Implement a basic JSON schema validator that validates data objects against a simple schema definition supporting required fields and type checking.",
+  "category": "data_processing",
+  "language": "typescript",
+  "difficulty": "medium",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(d)"
+    },
+    "tags": [
+      "json",
+      "validation",
+      "schema",
+      "recursive"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'validateJSON'",
+    "Takes two parameters: data object and schema definition",
+    "Returns {valid: boolean, errors: string[]}",
+    "Support types: 'string', 'number', 'boolean', 'object', 'array'",
+    "Check required fields are present",
+    "Validate field types match schema",
+    "Collect all validation errors, not just first one",
+    "Handle nested objects"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/data_processing/json_validator.ts",
+  "test_suite_path": "eval/tasks/fixtures/data_processing/json_validator.test.ts",
+  "constraint_path": "eval/tasks/constraints/data_json_validator.json",
+  "expected_loc": 60,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function to check if an object has all required properties.",
+      "code": "export function hasRequiredProps(obj: Record<string, any>, required: string[]): boolean {\n  return required.every(prop => prop in obj);\n}"
+    },
+    {
+      "prompt": "Implement a type checking function for JavaScript values.",
+      "code": "export function checkType(value: any, expectedType: string): boolean {\n  if (expectedType === 'array') {\n    return Array.isArray(value);\n  }\n  if (expectedType === 'null') {\n    return value === null;\n  }\n  return typeof value === expectedType;\n}"
+    },
+    {
+      "prompt": "Validate an email address format and return errors.",
+      "code": "export function validateEmail(email: string): { valid: boolean; errors: string[] } {\n  const errors: string[] = [];\n  \n  if (!email || email.length === 0) {\n    errors.push('Email is required');\n  } else {\n    if (!email.includes('@')) {\n      errors.push('Email must contain @');\n    }\n    if (!email.includes('.')) {\n      errors.push('Email must contain a domain');\n    }\n    if (email.startsWith('@') || email.endsWith('@')) {\n      errors.push('Email has invalid @ position');\n    }\n  }\n  \n  return { valid: errors.length === 0, errors };\n}"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "task_id": "async_001_rate_limiter",
+  "constraints": {
+    "grammar": "export class RateLimiter { constructor(capacity: number, refillRate: number); tryAcquire(tokens?: number): boolean; }",
+    "regex_pattern": "^export\\s+class\\s+RateLimiter\\s*\\{",
+    "type_constraints": {
+      "class_name": "RateLimiter",
+      "constructor_params": [
+        {"name": "capacity", "type": "number"},
+        {"name": "refillRate", "type": "number"}
+      ],
+      "methods": [
+        {
+          "name": "tryAcquire",
+          "parameters": [{"name": "tokens", "type": "number", "optional": true}],
+          "return_type": "boolean"
+        }
+      ]
+    },
+    "naming_constraints": {
+      "class_name": "RateLimiter",
+      "method_names": ["tryAcquire"],
+      "variable_patterns": [
+        "Use 'tokens' or 'availableTokens' for current token count",
+        "Use 'lastRefill' or 'lastUpdate' for timestamp tracking",
+        "Use 'capacity' for maximum tokens",
+        "Use 'refillRate' for tokens per second"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "Token bucket algorithm",
+        "Timestamp-based refill calculation (Date.now() or performance.now())",
+        "No background processes or intervals"
+      ],
+      "must_not_use": [
+        "setInterval or setTimeout",
+        "Background workers or processes",
+        "Sleep or delay functions"
+      ],
+      "patterns": [
+        "Calculate elapsed time since last refill",
+        "Refill tokens based on elapsed time and refill rate",
+        "Cap tokens at capacity",
+        "Deduct requested tokens if available",
+        "Return true if tokens available, false otherwise"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(1) for tryAcquire operation",
+      "space_complexity": "O(1)"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/concurrency_rate_limiter.json",
+  "extraction_method": "manual",
+  "verified": true
+}

@@ -1,0 +1,53 @@
+{
+  "config": {
+    "run_id": "1764692481",
+    "framework_version": "1.0.0",
+    "endpoint_url": "https://rand--ananke-eval-inference-inferenceservice-fastapi-app.modal.run",
+    "model": {
+      "name": "Qwen/Qwen2.5-Coder-7B-Instruct",
+      "provider": "vLLM",
+      "quantization": null
+    },
+    "hardware": {
+      "gpu_type": "NVIDIA H100",
+      "gpu_count": 1,
+      "platform": "Modal"
+    },
+    "constraint_system": {
+      "backend": "llguidance",
+      "integration": "vLLM regex-guided decoding",
+      "compiler": "Braid"
+    },
+    "evaluation": {
+      "temperature": 0.0,
+      "max_tokens_multiplier": 20,
+      "max_tokens_cap": 4096,
+      "samples_per_task": 1
+    }
+  },
+  "statistics": {
+    "total_tasks": 15,
+    "completed_tasks": 15,
+    "failed_tasks": 0,
+    "baseline_wins": 0,
+    "constrained_wins": 15,
+    "ties": 0,
+    "avg_baseline_duration_ms": 25158,
+    "avg_constrained_duration_ms": 4869,
+    "total_baseline_tests_passed": 56,
+    "total_constrained_tests_passed": 133,
+    "run_duration_seconds": 578
+  },
+  "timing_breakdown": {
+    "total_constraint_compilation_ms": 68,
+    "avg_constraint_compilation_ms": 4,
+    "total_generation_ms_baseline": 377371,
+    "avg_generation_ms_baseline": 25158,
+    "total_generation_ms_constrained": 73049,
+    "avg_generation_ms_constrained": 4869,
+    "total_test_execution_ms_baseline": 69009,
+    "avg_test_execution_ms_baseline": 4600,
+    "total_test_execution_ms_constrained": 58279,
+    "avg_test_execution_ms_constrained": 3885
+  }
+}

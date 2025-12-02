@@ -1,0 +1,87 @@
+{
+  "task_id": "security_001_input_sanitizer",
+  "constraints": {
+    "grammar": "export function sanitizeInput(input: string | null | undefined): string {\n  // Handle null/undefined\n  // Remove script tags\n  // Remove event handlers\n  // Remove javascript: URLs\n  // Escape HTML special characters\n  return sanitized;\n}",
+    "regex_pattern": "^export\\s+function\\s+sanitizeInput\\s*\\(\\s*input\\s*:\\s*string\\s*\\|\\s*null\\s*\\|\\s*undefined\\s*\\)\\s*:\\s*string\\s*\\{",
+    "type_constraints": {
+      "parameters": [
+        {
+          "name": "input",
+          "type": "string | null | undefined",
+          "required": true
+        }
+      ],
+      "return_type": "string"
+    },
+    "naming_constraints": {
+      "function_name": "sanitizeInput",
+      "helper_functions": [
+        "removeScriptTags (recommended)",
+        "removeEventHandlers (recommended)",
+        "removeJavaScriptUrls (recommended)",
+        "escapeHtml (recommended)"
+      ],
+      "variable_patterns": [
+        "sanitized",
+        "htmlEscapes"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "string.replace() with regex",
+        "regex with case-insensitive flag /i",
+        "HTML entity escaping for special characters",
+        "null/undefined check"
+      ],
+      "must_not_use": [
+        "eval() or Function constructor",
+        "external sanitization libraries (DOMPurify, etc.)",
+        "innerHTML or DOM manipulation"
+      ],
+      "recommended_patterns": [
+        "Multi-step sanitization (remove then escape)",
+        "Helper functions for each sanitization step",
+        "Regex patterns for script tags, event handlers, protocols",
+        "Map/object for HTML entity escaping"
+      ]
+    },
+    "behavior_constraints": {
+      "required_sanitizations": [
+        "Remove <script> tags and content (case-insensitive)",
+        "Remove event handler attributes (onclick, onerror, etc.)",
+        "Remove javascript: protocol from URLs",
+        "Escape < > & \" ' to HTML entities",
+        "Handle null and undefined input",
+        "Preserve safe text content"
+      ],
+      "security_requirements": [
+        "Prevent XSS via script injection",
+        "Prevent XSS via event handlers",
+        "Prevent XSS via javascript: URLs",
+        "Prevent HTML injection",
+        "No bypass via case variation",
+        "No bypass via malformed tags"
+      ],
+      "edge_cases": [
+        "Null and undefined input",
+        "Empty string",
+        "Script tags with attributes",
+        "Multiple script tags",
+        "Nested script tags",
+        "Case variations (SCRIPT, Script, etc.)",
+        "Multiple event handlers",
+        "Unclosed tags",
+        "Safe text preservation"
+      ]
+    },
+    "regex_patterns": {
+      "script_removal": "/<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>/gi",
+      "event_handlers": "/\\s*on\\w+\\s*=\\s*[\"'][^\"']*[\"']/gi",
+      "javascript_protocol": "/javascript:/gi",
+      "html_special_chars": "/[<>&\"']/g"
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/security/input_sanitizer.ts",
+  "extraction_method": "manual",
+  "verified": true
+}

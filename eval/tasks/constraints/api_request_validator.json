@@ -1,0 +1,83 @@
+{
+  "task_id": "api_001_request_validator",
+  "constraints": {
+    "grammar": "export interface ValidationSchema {\n  [key: string]: {\n    type: 'string' | 'number' | 'boolean' | 'array' | 'object';\n    required?: boolean;\n    properties?: ValidationSchema;\n  };\n}\n\nexport interface ValidationResult {\n  valid: boolean;\n  errors: string[];\n}\n\nexport function validateRequest(\n  request: Record<string, any>,\n  schema: ValidationSchema\n): ValidationResult",
+    "regex_pattern": "^export\\s+interface\\s+ValidationSchema\\s*\\{",
+    "type_constraints": {
+      "interfaces": [
+        {
+          "name": "ValidationSchema",
+          "properties": {
+            "type": "'string' | 'number' | 'boolean' | 'array' | 'object'",
+            "required": "boolean (optional)",
+            "properties": "ValidationSchema (optional, recursive)"
+          }
+        },
+        {
+          "name": "ValidationResult",
+          "properties": {
+            "valid": "boolean",
+            "errors": "string[]"
+          }
+        }
+      ],
+      "parameters": [
+        {
+          "name": "request",
+          "type": "Record<string, any>",
+          "required": true
+        },
+        {
+          "name": "schema",
+          "type": "ValidationSchema",
+          "required": true
+        }
+      ],
+      "return_type": "ValidationResult"
+    },
+    "naming_constraints": {
+      "function_name": "validateRequest",
+      "interface_names": ["ValidationSchema", "ValidationResult"],
+      "variable_patterns": [
+        "errors",
+        "fieldName",
+        "fieldSchema",
+        "value"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "for...of loop or Object.entries",
+        "type checking (typeof or Array.isArray)",
+        "errors array accumulation",
+        "recursive validation for nested objects"
+      ],
+      "must_not_use": [
+        "throw exceptions for validation errors",
+        "stop at first error (must collect all)"
+      ],
+      "must_export": [
+        "validateRequest",
+        "ValidationSchema",
+        "ValidationResult"
+      ]
+    },
+    "behavior_constraints": {
+      "required_checks": [
+        "Check for required fields",
+        "Validate field types",
+        "Handle nested objects",
+        "Collect all errors before returning"
+      ],
+      "edge_cases": [
+        "Handle null and undefined values",
+        "Handle empty schema",
+        "Handle empty request",
+        "Handle missing optional fields"
+      ]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/api/request_validator.ts",
+  "extraction_method": "manual",
+  "verified": true
+}

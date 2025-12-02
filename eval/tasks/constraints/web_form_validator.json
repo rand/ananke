@@ -1,0 +1,109 @@
+{
+  "task_id": "web_001_form_validator",
+  "constraints": {
+    "grammar": "export interface FieldRule {\n  required?: boolean;\n  minLength?: number;\n  maxLength?: number;\n  pattern?: RegExp;\n  email?: boolean;\n}\n\nexport type ValidationRules = Record<string, FieldRule>;\nexport type FormData = Record<string, string>;\n\nexport interface ValidationResult {\n  isValid: boolean;\n  fieldErrors: Record<string, string[]>;\n}\n\nexport function validateForm(\n  formData: FormData,\n  rules: ValidationRules\n): ValidationResult",
+    "regex_pattern": "^export\\s+interface\\s+FieldRule\\s*\\{",
+    "type_constraints": {
+      "interfaces": [
+        {
+          "name": "FieldRule",
+          "properties": {
+            "required": "boolean (optional)",
+            "minLength": "number (optional)",
+            "maxLength": "number (optional)",
+            "pattern": "RegExp (optional)",
+            "email": "boolean (optional)"
+          }
+        },
+        {
+          "name": "ValidationResult",
+          "properties": {
+            "isValid": "boolean",
+            "fieldErrors": "Record<string, string[]>"
+          }
+        }
+      ],
+      "type_aliases": [
+        {
+          "name": "ValidationRules",
+          "type": "Record<string, FieldRule>"
+        },
+        {
+          "name": "FormData",
+          "type": "Record<string, string>"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "formData",
+          "type": "FormData",
+          "required": true
+        },
+        {
+          "name": "rules",
+          "type": "ValidationRules",
+          "required": true
+        }
+      ],
+      "return_type": "ValidationResult"
+    },
+    "naming_constraints": {
+      "function_name": "validateForm",
+      "interface_names": ["FieldRule", "ValidationResult"],
+      "type_alias_names": ["ValidationRules", "FormData"],
+      "helper_function": "isValidEmail (optional)",
+      "variable_patterns": [
+        "fieldErrors",
+        "fieldName",
+        "fieldRules",
+        "value",
+        "errors"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "for...of loop or Object.entries to iterate rules",
+        "errors array accumulation per field",
+        "string.trim() for whitespace handling",
+        "regex.test() for pattern/email validation"
+      ],
+      "must_not_use": [
+        "throw exceptions for validation errors",
+        "stop at first error per field (must collect all)",
+        "external validation libraries"
+      ],
+      "must_export": [
+        "validateForm",
+        "FieldRule",
+        "ValidationRules",
+        "FormData",
+        "ValidationResult"
+      ]
+    },
+    "behavior_constraints": {
+      "required_validations": [
+        "required: check if field is empty or whitespace-only",
+        "minLength: check string length >= minLength",
+        "maxLength: check string length <= maxLength",
+        "pattern: check if value matches RegExp",
+        "email: check if value is valid email format"
+      ],
+      "error_handling": [
+        "Collect all errors for each field",
+        "Only add field to fieldErrors if it has errors",
+        "Return isValid: false if any field has errors",
+        "Skip non-required validations if field is empty"
+      ],
+      "edge_cases": [
+        "Missing fields in formData (treat as empty string)",
+        "Empty rules object (return valid)",
+        "Whitespace-only values for required fields",
+        "Optional fields (no required rule)",
+        "Multiple validation failures per field"
+      ]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/web/form_validator.ts",
+  "extraction_method": "manual",
+  "verified": true
+}

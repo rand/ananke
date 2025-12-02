@@ -1,0 +1,54 @@
+{
+  "id": "string_001_url_parser",
+  "version": "1.0.0",
+  "title": "URL Parser",
+  "description": "Implement a URL parser that extracts components (protocol, host, port, path, query parameters, fragment) from a URL string.",
+  "category": "string_processing",
+  "language": "typescript",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "url",
+      "parsing",
+      "regex",
+      "string-manipulation"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'parseURL'",
+    "Takes URL string as parameter",
+    "Returns object with: protocol, host, port, path, query, fragment",
+    "Query should be parsed into key-value object",
+    "Port defaults to null if not specified",
+    "Handle URLs with and without protocol",
+    "Handle special characters in query params",
+    "Return null for invalid URLs"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/string_processing/url_parser.ts",
+  "test_suite_path": "eval/tasks/fixtures/string_processing/url_parser.test.ts",
+  "constraint_path": "eval/tasks/constraints/string_url_parser.json",
+  "expected_loc": 40,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function to parse query parameters from a query string.",
+      "code": "export function parseQueryString(query: string): Record<string, string> {\n  const params: Record<string, string> = {};\n  \n  if (!query || query.length === 0) {\n    return params;\n  }\n  \n  const pairs = query.split('&');\n  for (const pair of pairs) {\n    const [key, value] = pair.split('=');\n    if (key) {\n      params[decodeURIComponent(key)] = decodeURIComponent(value || '');\n    }\n  }\n  \n  return params;\n}"
+    },
+    {
+      "prompt": "Implement a function to split a string by a delimiter.",
+      "code": "export function splitString(str: string, delimiter: string): string[] {\n  const result: string[] = [];\n  let current = '';\n  \n  for (const char of str) {\n    if (char === delimiter) {\n      result.push(current);\n      current = '';\n    } else {\n      current += char;\n    }\n  }\n  \n  if (current.length > 0) {\n    result.push(current);\n  }\n  \n  return result;\n}"
+    },
+    {
+      "prompt": "Parse an email address into its components.",
+      "code": "export function parseEmail(email: string): { local: string; domain: string; tld: string } | null {\n  if (!email || !email.includes('@')) {\n    return null;\n  }\n  \n  const atIndex = email.lastIndexOf('@');\n  const local = email.substring(0, atIndex);\n  const domainPart = email.substring(atIndex + 1);\n  \n  const dotIndex = domainPart.lastIndexOf('.');\n  if (dotIndex === -1) {\n    return null;\n  }\n  \n  const domain = domainPart.substring(0, dotIndex);\n  const tld = domainPart.substring(dotIndex + 1);\n  \n  return { local, domain, tld };\n}"
+    }
+  ]
+}

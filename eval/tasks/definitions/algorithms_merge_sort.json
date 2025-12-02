@@ -1,0 +1,56 @@
+{
+  "id": "algo_002_merge_sort",
+  "version": "1.0.0",
+  "title": "Merge Sort Algorithm",
+  "description": "Implement the merge sort algorithm to sort an array of numbers in ascending order. The implementation should use the divide-and-conquer approach with a separate merge function.",
+  "category": "algorithms",
+  "language": "typescript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval-style algorithmic task",
+    "complexity": {
+      "time": "O(n log n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "sorting",
+      "divide-and-conquer",
+      "recursive",
+      "stable-sort"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints",
+      "naming_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'mergeSort'",
+    "Takes an array of numbers as parameter",
+    "Returns a new sorted array (do not modify input array)",
+    "Must use divide-and-conquer approach (split array recursively)",
+    "Must implement a separate 'merge' helper function",
+    "Handle arrays with duplicates correctly",
+    "Handle empty arrays and single-element arrays",
+    "Time complexity must be O(n log n)",
+    "Space complexity O(n) is acceptable"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/algorithms/merge_sort.ts",
+  "test_suite_path": "eval/tasks/fixtures/algorithms/merge_sort.test.ts",
+  "constraint_path": "eval/tasks/constraints/algorithms_merge_sort.json",
+  "expected_loc": 35,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function that merges two sorted arrays into one sorted array.",
+      "code": "export function mergeSortedArrays(left: number[], right: number[]): number[] {\n  const result: number[] = [];\n  let i = 0, j = 0;\n  \n  while (i < left.length && j < right.length) {\n    if (left[i] <= right[j]) {\n      result.push(left[i++]);\n    } else {\n      result.push(right[j++]);\n    }\n  }\n  \n  return result.concat(left.slice(i)).concat(right.slice(j));\n}"
+    },
+    {
+      "prompt": "Implement a function that recursively divides an array in half.",
+      "code": "export function divideArray<T>(arr: T[]): [T[], T[]] {\n  const mid = Math.floor(arr.length / 2);\n  const left = arr.slice(0, mid);\n  const right = arr.slice(mid);\n  return [left, right];\n}"
+    },
+    {
+      "prompt": "Implement a simple recursive function to reverse an array.",
+      "code": "export function reverseArray<T>(arr: T[]): T[] {\n  if (arr.length <= 1) {\n    return arr;\n  }\n  return reverseArray(arr.slice(1)).concat(arr[0]);\n}"
+    }
+  ]
+}
