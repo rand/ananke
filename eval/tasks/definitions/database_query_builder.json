@@ -1,0 +1,56 @@
+{
+  "id": "db_001_query_builder",
+  "version": "1.0.0",
+  "title": "SQL Query Builder",
+  "description": "Implement a fluent SQL query builder that constructs SELECT queries with WHERE clauses, ORDER BY, and LIMIT. Should prevent SQL injection through parameterization.",
+  "category": "database",
+  "language": "typescript",
+  "difficulty": "medium",
+  "metadata": {
+    "benchmark_inspired_by": "SQL query builder patterns",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "sql",
+      "query",
+      "builder-pattern",
+      "fluent-api"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints",
+      "structural_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'QueryBuilder'",
+    "Implement select(table: string): this method",
+    "Implement where(field: string, operator: string, value: any): this method",
+    "Implement orderBy(field: string, direction: 'ASC' | 'DESC'): this method",
+    "Implement limit(count: number): this method",
+    "Implement build(): {sql: string, params: any[]} method",
+    "Use parameterized queries (? placeholders)",
+    "Support multiple WHERE clauses with AND",
+    "Methods should be chainable"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/database/query_builder.ts",
+  "test_suite_path": "eval/tasks/fixtures/database/query_builder.test.ts",
+  "constraint_path": "eval/tasks/constraints/database_query_builder.json",
+  "expected_loc": 65,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple fluent builder pattern for creating objects.",
+      "code": "export class PersonBuilder {\n  private name?: string;\n  private age?: number;\n  private email?: string;\n  \n  setName(name: string): this {\n    this.name = name;\n    return this;\n  }\n  \n  setAge(age: number): this {\n    this.age = age;\n    return this;\n  }\n  \n  setEmail(email: string): this {\n    this.email = email;\n    return this;\n  }\n  \n  build(): Person {\n    if (!this.name || !this.age) {\n      throw new Error('Name and age are required');\n    }\n    return {\n      name: this.name,\n      age: this.age,\n      email: this.email\n    };\n  }\n}\n\nexport interface Person {\n  name: string;\n  age: number;\n  email?: string;\n}"
+    },
+    {
+      "prompt": "Implement a URL builder with chainable methods.",
+      "code": "export class UrlBuilder {\n  private protocol: string = 'https';\n  private host: string = '';\n  private path: string = '';\n  private queryParams: Map<string, string> = new Map();\n  \n  setProtocol(protocol: string): this {\n    this.protocol = protocol;\n    return this;\n  }\n  \n  setHost(host: string): this {\n    this.host = host;\n    return this;\n  }\n  \n  setPath(path: string): this {\n    this.path = path;\n    return this;\n  }\n  \n  addParam(key: string, value: string): this {\n    this.queryParams.set(key, value);\n    return this;\n  }\n  \n  build(): string {\n    let url = `${this.protocol}://${this.host}${this.path}`;\n    if (this.queryParams.size > 0) {\n      const params = Array.from(this.queryParams.entries())\n        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)\n        .join('&');\n      url += '?' + params;\n    }\n    return url;\n  }\n}"
+    },
+    {
+      "prompt": "Implement a string builder with append operations.",
+      "code": "export class StringBuilder {\n  private parts: string[] = [];\n  \n  append(str: string): this {\n    this.parts.push(str);\n    return this;\n  }\n  \n  appendLine(str: string): this {\n    this.parts.push(str + '\\n');\n    return this;\n  }\n  \n  prepend(str: string): this {\n    this.parts.unshift(str);\n    return this;\n  }\n  \n  clear(): this {\n    this.parts = [];\n    return this;\n  }\n  \n  build(): string {\n    return this.parts.join('');\n  }\n}"
+    }
+  ]
+}

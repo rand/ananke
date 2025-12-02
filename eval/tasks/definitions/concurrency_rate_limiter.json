@@ -1,0 +1,55 @@
+{
+  "id": "async_001_rate_limiter",
+  "version": "1.0.0",
+  "title": "Token Bucket Rate Limiter",
+  "description": "Implement a token bucket rate limiter that controls the rate of operations. Allow bursts up to capacity while maintaining average rate over time.",
+  "category": "concurrency",
+  "language": "typescript",
+  "difficulty": "medium",
+  "metadata": {
+    "benchmark_inspired_by": "Production async/concurrent patterns",
+    "complexity": {
+      "time": "O(1)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "async",
+      "throttling",
+      "token-bucket",
+      "concurrent"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints",
+      "behavior_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'RateLimiter'",
+    "Constructor takes capacity and refill rate (tokens per second)",
+    "Implement tryAcquire(): boolean method",
+    "Implement tryAcquire(tokens: number): boolean method",
+    "Tokens refill continuously at specified rate",
+    "Cannot exceed bucket capacity",
+    "Use timestamp-based refill calculation",
+    "No setInterval or background processes"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/concurrency/rate_limiter.ts",
+  "test_suite_path": "eval/tasks/fixtures/concurrency/rate_limiter.test.ts",
+  "constraint_path": "eval/tasks/constraints/concurrency_rate_limiter.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple counter with increment and decrement.",
+      "code": "export class Counter {\n  private count: number = 0;\n  \n  increment(): number {\n    this.count++;\n    return this.count;\n  }\n  \n  decrement(): number {\n    this.count--;\n    return this.count;\n  }\n  \n  getCount(): number {\n    return this.count;\n  }\n  \n  reset(): void {\n    this.count = 0;\n  }\n}"
+    },
+    {
+      "prompt": "Implement a simple timer class that tracks elapsed time.",
+      "code": "export class Timer {\n  private startTime: number | null = null;\n  private elapsed: number = 0;\n  \n  start(): void {\n    this.startTime = Date.now();\n  }\n  \n  stop(): number {\n    if (this.startTime !== null) {\n      this.elapsed += Date.now() - this.startTime;\n      this.startTime = null;\n    }\n    return this.elapsed;\n  }\n  \n  getElapsed(): number {\n    if (this.startTime !== null) {\n      return this.elapsed + (Date.now() - this.startTime);\n    }\n    return this.elapsed;\n  }\n}"
+    },
+    {
+      "prompt": "Implement a semaphore class that limits concurrent access.",
+      "code": "export class Semaphore {\n  private permits: number;\n  private maxPermits: number;\n  \n  constructor(maxPermits: number) {\n    this.maxPermits = maxPermits;\n    this.permits = maxPermits;\n  }\n  \n  tryAcquire(): boolean {\n    if (this.permits > 0) {\n      this.permits--;\n      return true;\n    }\n    return false;\n  }\n  \n  release(): void {\n    if (this.permits < this.maxPermits) {\n      this.permits++;\n    }\n  }\n  \n  availablePermits(): number {\n    return this.permits;\n  }\n}"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "id": "ds_001_lru_cache",
+  "version": "1.0.0",
+  "title": "LRU Cache Implementation",
+  "description": "Implement a Least Recently Used (LRU) cache with get and put operations. The cache should evict the least recently used item when capacity is reached.",
+  "category": "data_structures",
+  "language": "typescript",
+  "difficulty": "medium",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(1)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "cache",
+      "data-structure",
+      "linked-list",
+      "hash-map"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'LRUCache'",
+    "Constructor takes capacity as parameter",
+    "Implement get(key: number): number | null method",
+    "Implement put(key: number, value: number): void method",
+    "Both operations must run in O(1) time complexity",
+    "When cache reaches capacity, evict least recently used item",
+    "Getting a key marks it as recently used",
+    "Putting a key marks it as recently used"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/data_structures/lru_cache.ts",
+  "test_suite_path": "eval/tasks/fixtures/data_structures/lru_cache.test.ts",
+  "constraint_path": "eval/tasks/constraints/datastructures_lru_cache.json",
+  "expected_loc": 50,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple stack data structure with push and pop operations.",
+      "code": "export class Stack<T> {\n  private items: T[] = [];\n  \n  push(item: T): void {\n    this.items.push(item);\n  }\n  \n  pop(): T | undefined {\n    return this.items.pop();\n  }\n  \n  peek(): T | undefined {\n    return this.items[this.items.length - 1];\n  }\n  \n  isEmpty(): boolean {\n    return this.items.length === 0;\n  }\n}"
+    },
+    {
+      "prompt": "Implement a queue data structure with enqueue and dequeue operations.",
+      "code": "export class Queue<T> {\n  private items: T[] = [];\n  \n  enqueue(item: T): void {\n    this.items.push(item);\n  }\n  \n  dequeue(): T | undefined {\n    return this.items.shift();\n  }\n  \n  front(): T | undefined {\n    return this.items[0];\n  }\n  \n  isEmpty(): boolean {\n    return this.items.length === 0;\n  }\n}"
+    },
+    {
+      "prompt": "Implement a simple hash map with get and set operations.",
+      "code": "export class HashMap<K, V> {\n  private data: Map<K, V> = new Map();\n  \n  get(key: K): V | undefined {\n    return this.data.get(key);\n  }\n  \n  set(key: K, value: V): void {\n    this.data.set(key, value);\n  }\n  \n  has(key: K): boolean {\n    return this.data.has(key);\n  }\n  \n  delete(key: K): boolean {\n    return this.data.delete(key);\n  }\n  \n  size(): number {\n    return this.data.size;\n  }\n}"
+    }
+  ]
+}

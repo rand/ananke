@@ -1,0 +1,55 @@
+{
+  "id": "api_001_request_validator",
+  "version": "1.0.0",
+  "title": "HTTP Request Validator",
+  "description": "Implement a function that validates HTTP request objects against a schema. The validator should check required fields, validate types, and return detailed error messages for invalid requests.",
+  "category": "api",
+  "language": "typescript",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "Real-world API development patterns",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(1)"
+    },
+    "tags": [
+      "validation",
+      "http",
+      "json",
+      "middleware"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints",
+      "structural_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'validateRequest'",
+    "Takes two parameters: request object and validation schema",
+    "Returns { valid: boolean, errors: string[] }",
+    "Check for required fields in request body",
+    "Validate field types (string, number, boolean, array)",
+    "Collect all validation errors (don't stop at first error)",
+    "Handle nested objects in validation schema",
+    "Return empty errors array when validation passes"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/api/request_validator.ts",
+  "test_suite_path": "eval/tasks/fixtures/api/request_validator.test.ts",
+  "constraint_path": "eval/tasks/constraints/api_request_validator.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function that validates email addresses using a regex pattern.",
+      "code": "export function validateEmail(email: string): boolean {\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  return emailRegex.test(email);\n}"
+    },
+    {
+      "prompt": "Implement a function that checks if an object has all required properties.",
+      "code": "export function hasRequiredProps(obj: Record<string, any>, required: string[]): boolean {\n  for (const prop of required) {\n    if (!(prop in obj)) {\n      return false;\n    }\n  }\n  return true;\n}"
+    },
+    {
+      "prompt": "Implement a function that validates data types at runtime.",
+      "code": "export function validateType(value: any, expectedType: string): boolean {\n  if (expectedType === 'array') {\n    return Array.isArray(value);\n  }\n  return typeof value === expectedType;\n}"
+    }
+  ]
+}

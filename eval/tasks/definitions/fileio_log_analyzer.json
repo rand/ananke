@@ -1,0 +1,54 @@
+{
+  "id": "fileio_001_log_analyzer",
+  "version": "1.0.0",
+  "title": "Log File Analyzer",
+  "description": "Implement a log file analyzer that parses log entries and generates statistics including error counts, warning counts, and most frequent error messages.",
+  "category": "file_io",
+  "language": "typescript",
+  "difficulty": "medium",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(n)"
+    },
+    "tags": [
+      "log-parsing",
+      "file-io",
+      "regex",
+      "aggregation"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'analyzeLog'",
+    "Takes log content as string parameter",
+    "Parse lines with format: [LEVEL] timestamp - message",
+    "Return object with: errorCount, warningCount, infoCount, topErrors",
+    "topErrors should be array of {message: string, count: number}",
+    "topErrors sorted by count descending, limit to top 5",
+    "Ignore malformed log lines",
+    "Handle empty input gracefully"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/file_io/log_analyzer.ts",
+  "test_suite_path": "eval/tasks/fixtures/file_io/log_analyzer.test.ts",
+  "constraint_path": "eval/tasks/constraints/fileio_log_analyzer.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function to count word occurrences in text.",
+      "code": "export function countWords(text: string): Map<string, number> {\n  const words = text.toLowerCase().split(/\\s+/);\n  const counts = new Map<string, number>();\n  \n  for (const word of words) {\n    const cleaned = word.replace(/[^a-z0-9]/g, '');\n    if (cleaned.length > 0) {\n      counts.set(cleaned, (counts.get(cleaned) || 0) + 1);\n    }\n  }\n  \n  return counts;\n}"
+    },
+    {
+      "prompt": "Implement a function to parse CSV lines.",
+      "code": "export function parseCSVLine(line: string): string[] {\n  const fields: string[] = [];\n  let current = '';\n  let inQuotes = false;\n  \n  for (let i = 0; i < line.length; i++) {\n    const char = line[i];\n    \n    if (char === '\"') {\n      inQuotes = !inQuotes;\n    } else if (char === ',' && !inQuotes) {\n      fields.push(current.trim());\n      current = '';\n    } else {\n      current += char;\n    }\n  }\n  \n  fields.push(current.trim());\n  return fields;\n}"
+    },
+    {
+      "prompt": "Parse key-value pairs from a config file and return statistics.",
+      "code": "export function parseConfig(content: string): { entries: Record<string, string>; lineCount: number; errorCount: number } {\n  const entries: Record<string, string> = {};\n  let errorCount = 0;\n  const lines = content.split('\\n');\n  \n  for (const line of lines) {\n    const trimmed = line.trim();\n    if (trimmed.length === 0 || trimmed.startsWith('#')) continue;\n    \n    const eqIndex = trimmed.indexOf('=');\n    if (eqIndex === -1) {\n      errorCount++;\n      continue;\n    }\n    \n    const key = trimmed.substring(0, eqIndex).trim();\n    const value = trimmed.substring(eqIndex + 1).trim();\n    entries[key] = value;\n  }\n  \n  return { entries, lineCount: lines.length, errorCount };\n}"
+    }
+  ]
+}

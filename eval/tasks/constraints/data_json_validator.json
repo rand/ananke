@@ -1,0 +1,48 @@
+{
+  "task_id": "data_002_json_validator",
+  "constraints": {
+    "grammar": "export interface Schema { properties: Record<string, {type: string}>; required?: string[] }\nexport function validateJSON(data: any, schema: Schema): {valid: boolean, errors: string[]}",
+    "regex_pattern": "^export\\s+interface\\s+Schema\\s*\\{",
+    "type_constraints": {
+      "function_name": "validateJSON",
+      "parameters": [
+        {"name": "data", "type": "any"},
+        {"name": "schema", "type": "Schema"}
+      ],
+      "return_type": "{valid: boolean, errors: string[]}"
+    },
+    "naming_constraints": {
+      "function_name": "validateJSON",
+      "variable_patterns": [
+        "Use 'errors' for collecting validation errors",
+        "Use 'valid' for validation result",
+        "Use descriptive names for schema properties (e.g., 'required', 'type')"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "Error array to collect all validation errors",
+        "Type checking for: string, number, boolean, object, array",
+        "Required field validation",
+        "Nested object validation (recursive or iterative)"
+      ],
+      "must_not_use": [
+        "Early return on first error (must collect all errors)",
+        "External validation libraries"
+      ],
+      "patterns": [
+        "Check all required fields are present",
+        "Validate type of each field",
+        "Return object with valid flag and errors array",
+        "Handle nested objects recursively or iteratively"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(n) where n is number of fields in data",
+      "space_complexity": "O(e) where e is number of errors"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/data_json_validator.json",
+  "extraction_method": "manual",
+  "verified": true
+}

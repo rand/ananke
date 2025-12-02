@@ -1,0 +1,54 @@
+{
+  "id": "math_001_prime_generator",
+  "version": "1.0.0",
+  "title": "Prime Number Generator",
+  "description": "Implement a prime number generator using the Sieve of Eratosthenes algorithm to find all prime numbers up to a given limit.",
+  "category": "mathematics",
+  "language": "typescript",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "Custom evaluation task",
+    "complexity": {
+      "time": "O(n sqrt(n))",
+      "space": "O(n)"
+    },
+    "tags": [
+      "prime",
+      "sieve",
+      "number-theory",
+      "generator"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'generatePrimes'",
+    "Takes limit (number) as parameter",
+    "Returns array of all primes up to and including limit",
+    "Must use Sieve of Eratosthenes algorithm",
+    "Handle edge cases: limit < 2 returns empty array",
+    "Results should be in ascending order",
+    "Optimize for space and time",
+    "Time complexity should be O(n log log n)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/mathematics/prime_generator.ts",
+  "test_suite_path": "eval/tasks/fixtures/mathematics/prime_generator.test.ts",
+  "constraint_path": "eval/tasks/constraints/math_prime_generator.json",
+  "expected_loc": 30,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a function to check if a number is prime.",
+      "code": "export function isPrime(n: number): boolean {\n  if (n <= 1) return false;\n  if (n <= 3) return true;\n  if (n % 2 === 0 || n % 3 === 0) return false;\n  \n  for (let i = 5; i * i <= n; i += 6) {\n    if (n % i === 0 || n % (i + 2) === 0) {\n      return false;\n    }\n  }\n  \n  return true;\n}"
+    },
+    {
+      "prompt": "Implement a function to find factors of a number.",
+      "code": "export function findFactors(n: number): number[] {\n  const factors: number[] = [];\n  \n  for (let i = 1; i <= Math.sqrt(n); i++) {\n    if (n % i === 0) {\n      factors.push(i);\n      if (i !== n / i) {\n        factors.push(n / i);\n      }\n    }\n  }\n  \n  return factors.sort((a, b) => a - b);\n}"
+    },
+    {
+      "prompt": "Generate Fibonacci numbers up to a limit.",
+      "code": "export function generateFibonacci(limit: number): number[] {\n  if (limit < 0) return [];\n  if (limit === 0) return [0];\n  \n  const result: number[] = [0, 1];\n  \n  while (true) {\n    const next = result[result.length - 1] + result[result.length - 2];\n    if (next > limit) break;\n    result.push(next);\n  }\n  \n  return result;\n}"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "task_id": "ds_001_lru_cache",
+  "constraints": {
+    "grammar": "export class LRUCache { constructor(capacity: number); get(key: number): number | null; put(key: number, value: number): void; }",
+    "regex_pattern": "^export\\s+class\\s+LRUCache\\s*\\{",
+    "type_constraints": {
+      "class_name": "LRUCache",
+      "constructor_params": [
+        {"name": "capacity", "type": "number"}
+      ],
+      "methods": [
+        {
+          "name": "get",
+          "parameters": [{"name": "key", "type": "number"}],
+          "return_type": "number | null"
+        },
+        {
+          "name": "put",
+          "parameters": [
+            {"name": "key", "type": "number"},
+            {"name": "value", "type": "number"}
+          ],
+          "return_type": "void"
+        }
+      ]
+    },
+    "naming_constraints": {
+      "class_name": "LRUCache",
+      "method_names": ["get", "put"],
+      "variable_patterns": [
+        "Use descriptive names for internal data structures (e.g., 'cache', 'map', 'list')"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "Hash map for O(1) key lookup",
+        "Doubly-linked list or equivalent for O(1) eviction"
+      ],
+      "must_not_use": [
+        "Linear search through array",
+        "Sorting for eviction"
+      ],
+      "patterns": [
+        "Get operation moves key to most recently used position",
+        "Put operation moves key to most recently used position",
+        "Evict least recently used item when capacity exceeded"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(1) for both get and put operations",
+      "space_complexity": "O(capacity)"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/datastructures_lru_cache.json",
+  "extraction_method": "manual",
+  "verified": true
+}

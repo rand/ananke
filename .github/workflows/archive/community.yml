@@ -1,0 +1,39 @@
+name: Community
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  welcome-contributor:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Welcome first-time issue opener
+        if: github.event_name == 'issues'
+        uses: actions/first-interaction@v1
+        with:
+          repo-token: \${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            Thanks for opening your first issue! We appreciate your interest in Ananke.
+            
+            Before proceeding, please ensure you've:
+            - Checked our FAQ documentation
+            - Reviewed the relevant docs
+            - Provided minimal reproduction steps (if bug report)
+            
+            A maintainer will review this soon!
+          pr-message: |
+            Thanks for your first contribution! We're excited to review your changes.
+            
+            Before we proceed, please ensure:
+            - Tests pass locally (zig build test)
+            - Code is formatted (zig fmt src/)
+            - Changes are focused and minimal
+            - Commit messages follow conventional format
+            
+            We'll provide feedback shortly!

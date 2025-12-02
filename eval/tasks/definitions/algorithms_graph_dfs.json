@@ -1,0 +1,54 @@
+{
+  "id": "algo_003_graph_dfs",
+  "version": "1.0.0",
+  "title": "Graph Depth-First Search",
+  "description": "Implement depth-first search (DFS) traversal for an undirected graph represented as an adjacency list. Return all visited nodes in DFS order.",
+  "category": "algorithms",
+  "language": "typescript",
+  "difficulty": "medium",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval-style algorithmic task",
+    "complexity": {
+      "time": "O(V + E)",
+      "space": "O(V)"
+    },
+    "tags": [
+      "graph",
+      "traversal",
+      "recursion",
+      "stack"
+    ],
+    "constraint_types": [
+      "regex_pattern",
+      "type_constraints",
+      "naming_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'depthFirstSearch'",
+    "Takes two parameters: adjacency list (Map<number, number[]>) and starting node",
+    "Returns array of visited nodes in DFS order",
+    "Must use iterative approach with explicit stack",
+    "Handle disconnected graphs by only visiting reachable nodes",
+    "Avoid revisiting nodes (track visited set)",
+    "Handle empty graph and invalid start node"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/algorithms/graph_dfs.ts",
+  "test_suite_path": "eval/tasks/fixtures/algorithms/graph_dfs.test.ts",
+  "constraint_path": "eval/tasks/constraints/algorithms_graph_dfs.json",
+  "expected_loc": 35,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement breadth-first search for a binary tree.",
+      "code": "export interface TreeNode {\n  value: number;\n  left?: TreeNode;\n  right?: TreeNode;\n}\n\nexport function bfs(root: TreeNode | null): number[] {\n  if (!root) return [];\n  \n  const result: number[] = [];\n  const queue: TreeNode[] = [root];\n  \n  while (queue.length > 0) {\n    const node = queue.shift()!;\n    result.push(node.value);\n    \n    if (node.left) queue.push(node.left);\n    if (node.right) queue.push(node.right);\n  }\n  \n  return result;\n}"
+    },
+    {
+      "prompt": "Implement iterative in-order traversal of a binary tree using a stack.",
+      "code": "export function inorderTraversal(root: TreeNode | null): number[] {\n  const result: number[] = [];\n  const stack: TreeNode[] = [];\n  let current = root;\n  \n  while (current !== null || stack.length > 0) {\n    while (current !== null) {\n      stack.push(current);\n      current = current.left ?? null;\n    }\n    \n    current = stack.pop()!;\n    result.push(current.value);\n    current = current.right ?? null;\n  }\n  \n  return result;\n}"
+    },
+    {
+      "prompt": "Find all nodes reachable from a starting node in an adjacency list.",
+      "code": "export function findReachable(graph: Map<number, number[]>, start: number): Set<number> {\n  const visited = new Set<number>();\n  const stack: number[] = [start];\n  \n  while (stack.length > 0) {\n    const node = stack.pop()!;\n    \n    if (visited.has(node)) continue;\n    visited.add(node);\n    \n    const neighbors = graph.get(node) || [];\n    for (const neighbor of neighbors) {\n      if (!visited.has(neighbor)) {\n        stack.push(neighbor);\n      }\n    }\n  }\n  \n  return visited;\n}"
+    }
+  ]
+}

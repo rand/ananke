@@ -1,0 +1,47 @@
+{
+  "task_id": "algo_003_graph_dfs",
+  "constraints": {
+    "grammar": "export function depthFirstSearch(graph: Map<number, number[]>, start: number): number[]",
+    "regex_pattern": "^export\\s+function\\s+depthFirstSearch\\s*\\(\\s*graph\\s*:\\s*Map<number,\\s*number\\[\\]>\\s*,\\s*start\\s*:\\s*number\\s*\\)\\s*:\\s*number\\[\\]\\s*\\{",
+    "type_constraints": {
+      "function_name": "depthFirstSearch",
+      "parameters": [
+        {"name": "graph", "type": "Map<number, number[]>"},
+        {"name": "start", "type": "number"}
+      ],
+      "return_type": "number[]"
+    },
+    "naming_constraints": {
+      "function_name": "depthFirstSearch",
+      "variable_patterns": [
+        "Use 'visited' for tracking visited nodes",
+        "Use 'stack' for explicit stack data structure",
+        "Use 'current' or 'node' for current node being processed"
+      ]
+    },
+    "structural_constraints": {
+      "must_use": [
+        "Explicit stack (array with push/pop)",
+        "Set or equivalent for tracking visited nodes",
+        "Iterative approach (no recursion)"
+      ],
+      "must_not_use": [
+        "Recursive DFS",
+        "Queue (BFS approach)"
+      ],
+      "patterns": [
+        "Initialize visited set and stack with start node",
+        "Loop while stack is not empty",
+        "Pop from stack, mark as visited, add to result",
+        "Push unvisited neighbors to stack"
+      ]
+    },
+    "complexity_constraints": {
+      "time_complexity": "O(V + E) where V is vertices and E is edges",
+      "space_complexity": "O(V) for visited set and stack"
+    }
+  },
+  "extracted_from": "eval/tasks/definitions/algorithms_graph_dfs.json",
+  "extraction_method": "manual",
+  "verified": true
+}

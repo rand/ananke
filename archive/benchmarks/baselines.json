@@ -1,0 +1,108 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2025-11-24T15:03:00Z",
+  "platform": "darwin-arm64",
+  "zig_version": "0.15.0",
+  "rust_version": "1.75.0",
+  "note": "Initial baselines based on performance targets from ARCHITECTURE_V2.md",
+  
+  "zig": {
+    "typescript_extraction_100": {
+      "mean_ns": 5000000,
+      "std_dev_ns": 500000,
+      "description": "TypeScript extraction for ~100 line file"
+    },
+    "python_extraction_100": {
+      "mean_ns": 5500000,
+      "std_dev_ns": 550000,
+      "description": "Python extraction for ~100 line file"
+    },
+    "rust_extraction_100": {
+      "mean_ns": 6000000,
+      "std_dev_ns": 600000,
+      "description": "Rust extraction for ~100 line file"
+    },
+    "zig_extraction_100": {
+      "mean_ns": 5000000,
+      "std_dev_ns": 500000,
+      "description": "Zig extraction for ~100 line file"
+    },
+    "go_extraction_100": {
+      "mean_ns": 5500000,
+      "std_dev_ns": 550000,
+      "description": "Go extraction for ~100 line file"
+    },
+    "constraint_compilation_10": {
+      "mean_ns": 2000000,
+      "std_dev_ns": 200000,
+      "description": "Compilation of 10 constraints to IR"
+    },
+    "constraint_compilation_50": {
+      "mean_ns": 8000000,
+      "std_dev_ns": 800000,
+      "description": "Compilation of 50 constraints to IR"
+    },
+    "constraint_compilation_100": {
+      "mean_ns": 15000000,
+      "std_dev_ns": 1500000,
+      "description": "Compilation of 100 constraints to IR"
+    },
+    "ffi_roundtrip": {
+      "mean_ns": 500000,
+      "std_dev_ns": 50000,
+      "description": "FFI Zig↔Rust roundtrip for simple structure"
+    },
+    "pipeline_e2e": {
+      "mean_ns": 7000000,
+      "std_dev_ns": 700000,
+      "description": "End-to-end extract + compile for TypeScript small file"
+    }
+  },
+  
+  "rust": {
+    "orchestrator_full_workflow": {
+      "mean_ns": 8000000,
+      "std_dev_ns": 300000,
+      "description": "Full orchestration workflow without Modal call"
+    },
+    "cache_hit": {
+      "mean_ns": 500,
+      "std_dev_ns": 50,
+      "description": "Cache hit latency (nanoseconds)"
+    },
+    "cache_miss": {
+      "mean_ns": 800000,
+      "std_dev_ns": 80000,
+      "description": "Cache miss latency (microseconds)"
+    },
+    "hash_generation_10": {
+      "mean_ns": 5000,
+      "std_dev_ns": 500,
+      "description": "Cache key hash generation for 10 constraints"
+    },
+    "llguidance_schema_generation": {
+      "mean_ns": 100000,
+      "std_dev_ns": 10000,
+      "description": "llguidance schema compilation"
+    },
+    "constraint_serialization": {
+      "mean_ns": 50000,
+      "std_dev_ns": 5000,
+      "description": "JSON serialization of ConstraintIR"
+    },
+    "ffi_struct_roundtrip": {
+      "mean_ns": 100000,
+      "std_dev_ns": 10000,
+      "description": "FFI structure serialization + deserialization"
+    }
+  },
+  
+  "targets": {
+    "typescript_extraction_75_lines": "4-7ms",
+    "constraint_compilation_10": "<2ms",
+    "ffi_roundtrip": "<1ms",
+    "full_pipeline": "6-9ms",
+    "cache_hit": "<1μs",
+    "cache_miss": "<1ms"
+  }
+}
