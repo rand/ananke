@@ -464,6 +464,6 @@ zig build test --debug
 
 - **General questions**: Open a GitHub Discussion
 - **Bugs**: Create an Issue
-- **Security issues**: Email security@ananke-ai.dev (if configured)
+
 
 Thank you for contributing to Ananke!
