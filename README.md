@@ -6,7 +6,7 @@
 [![Maze Tests](https://github.com/ananke-ai/ananke/actions/workflows/maze-tests.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/maze-tests.yml)
 [![Security](https://github.com/ananke-ai/ananke/actions/workflows/security.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/security.yml)
 [![Docs](https://github.com/ananke-ai/ananke/actions/workflows/docs.yml/badge.svg)](https://github.com/ananke-ai/ananke/actions/workflows/docs.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Language: Zig](https://img.shields.io/badge/Language-Zig-blue.svg)](https://ziglang.org/)
 [![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-green.svg)](RELEASE_NOTES.md)
 [![Status: Beta (Core Ready)](https://img.shields.io/badge/Status-Beta%20(Core%20Ready)-yellowgreen.svg)](#current-project-status)
@@ -926,7 +926,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License - See LICENSE file for details
+All Rights Reserved - See LICENSE file for details
 
 ---
 
