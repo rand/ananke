@@ -464,6 +464,38 @@ pub fn build(b: *std.Build) void {
     lib.linkLibrary(java_parser_lib);
     b.installArtifact(lib);
 
+    // Build dynamic/shared library for FFI integration with Node.js (VSCode extension)
+    const shared_lib = b.addLibrary(.{
+        .name = "ananke_shared",
+        .linkage = .dynamic,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/ffi/zig_ffi.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+    shared_lib.linkSystemLibrary("tree-sitter");
+    shared_lib.linkLibrary(ts_parser_lib);
+    shared_lib.linkLibrary(py_parser_lib);
+    shared_lib.linkLibrary(js_parser_lib);
+    shared_lib.linkLibrary(rust_parser_lib);
+    shared_lib.linkLibrary(go_parser_lib);
+    shared_lib.linkLibrary(zig_parser_lib);
+    shared_lib.linkLibrary(c_parser_lib);
+    shared_lib.linkLibrary(cpp_parser_lib);
+    shared_lib.linkLibrary(java_parser_lib);
+    b.installArtifact(shared_lib);
+
+    // Build step for VSCode extension shared library
+    const vscode_lib_step = b.step("vscode-lib", "Build shared library for VSCode extension FFI");
+    vscode_lib_step.dependOn(&shared_lib.step);
+
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
     // to the module defined above, it's sometimes preferable to split business
