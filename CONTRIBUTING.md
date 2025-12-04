@@ -30,8 +30,13 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/ananke.git
+git clone https://github.com/rand/ananke.git
 cd ananke
+
+# Set up configuration (one-time)
+cp .ananke.toml.example .ananke.toml
+cp .env.example .env
+# Edit these files with your Modal workspace and API keys
 
 # Build the project
 zig build
@@ -57,7 +62,7 @@ zig version
 ### 2. Clone and Build
 
 ```bash
-git clone https://github.com/your-org/ananke.git
+git clone https://github.com/rand/ananke.git
 cd ananke
 zig build
 ```
@@ -100,6 +105,29 @@ Recommended `.vscode/settings.json`:
 - **Vim/Neovim**: Install [zig.vim](https://github.com/ziglang/zig.vim)
 - **Emacs**: Install [zig-mode](https://github.com/ziglang/zig-mode)
 - **Sublime Text**: Install Zig package from Package Control
+
+### 5. Configuration Files
+
+Ananke uses local configuration files that are not tracked in git:
+
+```bash
+# Copy configuration templates
+cp .ananke.toml.example .ananke.toml
+cp .env.example .env
+
+# Edit with your values
+# - Update Modal endpoint with your workspace name
+# - Add API keys as needed
+```
+
+**Required for Modal inference:**
+- Edit `.ananke.toml` and replace `<YOUR_MODAL_WORKSPACE>` with your Modal workspace name
+- Or set `ANANKE_MODAL_ENDPOINT` environment variable
+
+**Optional for Claude integration:**
+- Set `ANTHROPIC_API_KEY` in `.env` or environment
+
+See `.env.example` for all available configuration options.
 
 ## Project Structure
 
