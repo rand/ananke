@@ -1,3 +1,3 @@
 # False positives - example/test passwords in documentation and fixture files
 # Fingerprint format: commit:file:rule:lineNumber
-49e3469fe62d0e10e4c2d4f7a8854e9ce6c69a8c:examples/03-ariadne-dsl/api_design.ariadne:hashicorp-tf-password:559
+c169337231ca4c46cdd242bee611e033b435943f:examples/03-ariadne-dsl/api_design.ariadne:hashicorp-tf-password:559
