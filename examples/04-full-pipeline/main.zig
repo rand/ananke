@@ -32,11 +32,11 @@ pub fn main() !void {
     };
     defer clew.deinit();
 
-    const constraint_set = clew.extractFromCode(source_code, "typescript") catch |err| {
+    var constraint_set = clew.extractFromCode(source_code, "typescript") catch |err| {
         std.debug.print("Error: Failed to extract constraints: {}\n", .{err});
         return err;
     };
-    // Note: constraint_set cleanup handled by clew.deinit()
+    defer constraint_set.deinit();
 
     std.debug.print("  ✓ Extracted {d} constraints\n", .{constraint_set.constraints.items.len});
 
