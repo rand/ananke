@@ -72,7 +72,7 @@ Get started with constraint extraction and analysis in 10 minutes:
 
 ```bash
 # Clone and build
-git clone https://github.com/rand/ananke.git
+git clone --recurse-submodules https://github.com/rand/ananke.git
 cd ananke
 zig build
 
