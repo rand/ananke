@@ -1,13 +1,24 @@
-# Ananke Configuration File Example
-# Copy this file to .ananke.toml and customize for your environment
+# Ananke Configuration File
+#
+# Copy this file to .ananke.toml and update with your values:
+#   cp .ananke.toml.example .ananke.toml
+#
+# Replace <YOUR_MODAL_WORKSPACE> with your Modal workspace name
 
 [modal]
 # Modal inference endpoint URL
-# Default: https://ananke--ananke-inference-inference.modal.run
-endpoint = "https://ananke--ananke-inference-inference.modal.run"
+# Replace <YOUR_MODAL_WORKSPACE> with your Modal workspace name
+endpoint = "https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run"
 
 # Modal API key (optional - can also use ANANKE_MODAL_API_KEY env var)
 # api_key = "your-modal-api-key"
+
+[claude]
+# Claude API configuration for semantic analysis
+# API key should be stored in environment variable ANTHROPIC_API_KEY
+# endpoint = "https://api.anthropic.com/v1/messages"
+model = "claude-sonnet-4-5-20250929"
+enabled = false
 
 [defaults]
 # Default language for code generation
