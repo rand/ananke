@@ -22,10 +22,8 @@ pub fn main() !void {
     var clew_static = try ananke.clew.Clew.init(allocator);
     defer clew_static.deinit();
 
-    const static_constraints = try clew_static.extractFromCode(source_code, "python");
-    defer {
-        for (static_constraints.constraints.items) |_| {}
-    }
+    var static_constraints = try clew_static.extractFromCode(source_code, "python");
+    defer static_constraints.deinit();
 
     std.debug.print("Static analysis found {} constraints\n\n", .{static_constraints.constraints.items.len});
 
