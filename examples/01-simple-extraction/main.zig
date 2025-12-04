@@ -24,11 +24,8 @@ pub fn main() !void {
     std.debug.print("Extracting constraints (without Claude)...\n\n", .{});
 
     // Extract constraints from the TypeScript code
-    const constraints = try clew.extractFromCode(source_code, "typescript");
-    defer {
-        for (constraints.constraints.items) |_| {}
-        // Note: Would need proper cleanup if constraints owned memory
-    }
+    var constraints = try clew.extractFromCode(source_code, "typescript");
+    defer constraints.deinit();
 
     // Display results
     std.debug.print("Found {} constraints:\n\n", .{constraints.constraints.items.len});
