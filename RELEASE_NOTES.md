@@ -1,6 +1,6 @@
 # Release Notes: Ananke v0.1.0
 
-**Release Date**: November 24, 2025  
+**Release Date**: December 2025  
 **Codename**: Foundation  
 **Status**: Production Ready
 
