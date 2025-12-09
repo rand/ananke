@@ -37,6 +37,9 @@
 pub mod ffi;
 pub mod modal_client;
 pub mod python;
+pub mod progressive_refinement;
+pub mod diffusion;
+pub mod model_selector;
 
 use anyhow::{Context, Result};
 use lru::LruCache;
@@ -46,8 +49,14 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub use ffi::{ConstraintIR, GenerationResult, Intent};
+pub use ffi::{ConstraintIR, FillConstraint, GenerationResult, HoleSpec, Intent};
 pub use modal_client::{ModalClient, ModalConfig};
+pub use progressive_refinement::{
+    FailureStrategy, HoleState, HoleStatus, ProgressiveRefiner, RefinementConfig,
+    RefinementResult,
+};
+pub use diffusion::{DiffusionConfig, DiffusionGenerator, DiffusionResult, NoiseSchedule};
+pub use model_selector::{ModelChoice, ModelSelector};
 
 /// Main orchestrator for constrained code generation
 ///

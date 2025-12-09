@@ -522,6 +522,101 @@ pub unsafe extern "C" fn free_generation_result_ffi(ptr: *mut GenerationResultFF
     }
 }
 
+// ============================================================================
+// HoleSpec FFI Types
+// ============================================================================
+
+/// Specification for a typed hole to be filled
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HoleSpec {
+    /// Unique identifier for the hole
+    pub hole_id: u64,
+
+    /// Optional JSON schema constraint for the fill
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fill_schema: Option<JsonSchema>,
+
+    /// Optional grammar constraint for the fill
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fill_grammar: Option<Grammar>,
+
+    /// List of constraints that must be satisfied
+    #[serde(default)]
+    pub fill_constraints: Vec<FillConstraint>,
+
+    /// Reference to a named grammar definition
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grammar_ref: Option<String>,
+}
+
+/// A constraint on hole filling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FillConstraint {
+    /// Type/kind of constraint (e.g., "type", "security", "style")
+    pub kind: String,
+
+    /// Constraint value or specification
+    pub value: String,
+
+    /// Optional custom error message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+impl HoleSpec {
+    /// Create a new hole specification
+    pub fn new(hole_id: u64) -> Self {
+        Self {
+            hole_id,
+            fill_schema: None,
+            fill_grammar: None,
+            fill_constraints: vec![],
+            grammar_ref: None,
+        }
+    }
+
+    /// Add a JSON schema constraint
+    pub fn with_schema(mut self, schema: JsonSchema) -> Self {
+        self.fill_schema = Some(schema);
+        self
+    }
+
+    /// Add a grammar constraint
+    pub fn with_grammar(mut self, grammar: Grammar) -> Self {
+        self.fill_grammar = Some(grammar);
+        self
+    }
+
+    /// Add a fill constraint
+    pub fn with_constraint(mut self, constraint: FillConstraint) -> Self {
+        self.fill_constraints.push(constraint);
+        self
+    }
+
+    /// Add a grammar reference
+    pub fn with_grammar_ref(mut self, grammar_ref: String) -> Self {
+        self.grammar_ref = Some(grammar_ref);
+        self
+    }
+}
+
+impl FillConstraint {
+    /// Create a new fill constraint
+    pub fn new(kind: String, value: String) -> Self {
+        Self {
+            kind,
+            value,
+            error_message: None,
+        }
+    }
+
+    /// Add a custom error message
+    pub fn with_error_message(mut self, message: String) -> Self {
+        self.error_message = Some(message);
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
