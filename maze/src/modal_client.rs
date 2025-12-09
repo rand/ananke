@@ -3,10 +3,17 @@
 //! Handles communication with Modal-hosted vLLM + llguidance inference service
 
 use anyhow::{anyhow, Context, Result};
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 use url::Url;
 
+use crate::ffi::{ConstraintIR, HoleSpec};
+use crate::model_router::{ModelEndpoint, ModelRouter, RoutingDecision};
 use crate::GenerationContext;
 
 /// Configuration for Modal inference service
@@ -83,6 +90,7 @@ impl ModalConfig {
 }
 
 /// Client for Modal inference service
+#[derive(Clone)]
 pub struct ModalClient {
     /// HTTP client
     client: reqwest::Client,
@@ -130,6 +138,26 @@ pub struct InferenceResponse {
     pub stats: GenerationStats,
 }
 
+impl InferenceResponse {
+    /// Calculate confidence score based on generation stats
+    pub fn confidence(&self) -> f32 {
+        // Simple heuristic: higher confidence if generation was fast and had few constraint checks
+        // In production, this should use actual model confidence scores
+        if self.tokens_generated == 0 {
+            return 0.0;
+        }
+
+        let token_speed = self.stats.time_per_token_us as f32;
+        let constraint_overhead = self.stats.avg_constraint_check_us as f32;
+
+        // Normalize to 0-1 range (faster = higher confidence)
+        let speed_score = 1.0 - (token_speed / 10000.0).min(1.0);
+        let constraint_score = 1.0 - (constraint_overhead / 1000.0).min(1.0);
+
+        (speed_score * 0.6 + constraint_score * 0.4).clamp(0.0, 1.0)
+    }
+}
+
 /// Statistics from generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerationStats {
@@ -144,6 +172,34 @@ pub struct GenerationStats {
 
     /// Average constraint check time in microseconds
     pub avg_constraint_check_us: u64,
+}
+
+/// A chunk of streaming generation output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamChunk {
+    /// The token or text chunk
+    pub text: String,
+
+    /// Whether this is the final chunk
+    pub is_final: bool,
+
+    /// Token index in the sequence
+    pub token_index: usize,
+
+    /// Generation timestamp in milliseconds
+    pub timestamp_ms: u64,
+}
+
+/// Type alias for the streaming generation result
+pub type StreamingResult = Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>;
+
+/// Server-Sent Event data from Modal streaming endpoint
+#[derive(Debug, Deserialize)]
+struct SSEData {
+    token: Option<String>,
+    done: Option<bool>,
+    #[allow(dead_code)]
+    error: Option<String>,
 }
 
 impl ModalClient {
@@ -309,16 +365,442 @@ impl ModalClient {
         Ok(models)
     }
 
-    /// Stream generation (for future implementation)
-    pub async fn generate_stream(&self, _request: InferenceRequest) -> Result<()> {
-        // TODO: Implement streaming generation
-        Err(anyhow!("Streaming generation not yet implemented"))
+    /// Stream generation with token-by-token output
+    ///
+    /// Returns a stream of `StreamChunk` items representing each token as it's generated.
+    /// The stream completes when the final token is received (chunk with `is_final = true`).
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut stream = client.generate_stream(request).await?;
+    /// while let Some(chunk) = stream.next().await {
+    ///     match chunk {
+    ///         Ok(c) => print!("{}", c.text),
+    ///         Err(e) => eprintln!("Error: {}", e),
+    ///     }
+    /// }
+    /// ```
+    pub async fn generate_stream(&self, request: InferenceRequest) -> Result<StreamingResult> {
+        // Build request URL for streaming endpoint
+        let url = self
+            .base_url
+            .join("/generate/stream")
+            .context("Failed to build streaming request URL")?;
+
+        // Build request body
+        let body = serde_json::json!({
+            "prompt": request.prompt,
+            "constraints": request.constraints,
+            "max_tokens": request.max_tokens,
+            "temperature": request.temperature,
+            "model": self.config.model,
+            "context": request.context,
+            "stream": true,
+        });
+
+        // Build HTTP request
+        let mut http_request = self
+            .client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .json(&body);
+
+        // Add API key if present
+        if let Some(ref api_key) = self.config.api_key {
+            http_request = http_request.header("Authorization", format!("Bearer {}", api_key));
+        }
+
+        // Send request and get streaming response
+        tracing::debug!("Starting streaming generation request to Modal");
+        let response = http_request
+            .send()
+            .await
+            .context("Failed to send streaming request to Modal")?;
+
+        // Check response status
+        let status = response.status();
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unable to read error response".to_string());
+            return Err(anyhow!(
+                "Modal streaming inference failed with status {}: {}",
+                status,
+                error_text
+            ));
+        }
+
+        // Get the byte stream
+        let byte_stream = response.bytes_stream();
+        let start_time = std::time::Instant::now();
+
+        // Transform the byte stream into StreamChunk items
+        let stream = byte_stream
+            .enumerate()
+            .map(move |(idx, result)| {
+                match result {
+                    Ok(bytes) => {
+                        // Parse SSE data (newline-delimited JSON)
+                        let text = String::from_utf8_lossy(&bytes);
+
+                        // Handle SSE format: "data: {...}\n\n"
+                        let chunks: Vec<StreamChunk> = text
+                            .lines()
+                            .filter(|line| line.starts_with("data: "))
+                            .filter_map(|line| {
+                                let json_str = line.strip_prefix("data: ")?;
+                                if json_str == "[DONE]" {
+                                    Some(StreamChunk {
+                                        text: String::new(),
+                                        is_final: true,
+                                        token_index: idx,
+                                        timestamp_ms: start_time.elapsed().as_millis() as u64,
+                                    })
+                                } else {
+                                    serde_json::from_str::<SSEData>(json_str).ok().map(|sse| {
+                                        StreamChunk {
+                                            text: sse.token.unwrap_or_default(),
+                                            is_final: sse.done.unwrap_or(false),
+                                            token_index: idx,
+                                            timestamp_ms: start_time.elapsed().as_millis() as u64,
+                                        }
+                                    })
+                                }
+                            })
+                            .collect();
+
+                        // Return first chunk or empty
+                        if let Some(chunk) = chunks.into_iter().next() {
+                            Ok(chunk)
+                        } else {
+                            // If no valid SSE data, return raw text as a chunk
+                            Ok(StreamChunk {
+                                text: text.trim().to_string(),
+                                is_final: false,
+                                token_index: idx,
+                                timestamp_ms: start_time.elapsed().as_millis() as u64,
+                            })
+                        }
+                    }
+                    Err(e) => Err(anyhow!("Stream read error: {}", e)),
+                }
+            })
+            .filter(|result| {
+                // Filter out empty chunks
+                futures::future::ready(match result {
+                    Ok(chunk) => !chunk.text.is_empty() || chunk.is_final,
+                    Err(_) => true,
+                })
+            });
+
+        Ok(Box::pin(stream))
+    }
+}
+
+// ============================================================================
+// Ensemble Client
+// ============================================================================
+
+/// Configuration for ensemble of models
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnsembleConfig {
+    pub endpoints: Vec<ModelEndpoint>,
+    pub fallback_enabled: bool,
+    pub best_of_n: Option<usize>,
+    pub max_fallback_attempts: usize,
+}
+
+impl Default for EnsembleConfig {
+    fn default() -> Self {
+        Self {
+            endpoints: vec![],
+            fallback_enabled: true,
+            best_of_n: None,
+            max_fallback_attempts: 3,
+        }
+    }
+}
+
+/// Metrics for ensemble operations
+#[derive(Debug, Default, Clone)]
+pub struct EnsembleMetrics {
+    pub per_model: HashMap<String, ModelMetrics>,
+    pub total_requests: u64,
+    pub total_fallbacks: u64,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ModelMetrics {
+    pub requests: u64,
+    pub successes: u64,
+    pub failures: u64,
+    pub total_latency_ms: u64,
+    pub avg_confidence: f32,
+}
+
+impl ModelMetrics {
+    pub fn success_rate(&self) -> f32 {
+        if self.requests == 0 {
+            0.0
+        } else {
+            self.successes as f32 / self.requests as f32
+        }
+    }
+
+    pub fn avg_latency_ms(&self) -> u64 {
+        if self.requests == 0 {
+            0
+        } else {
+            self.total_latency_ms / self.requests
+        }
+    }
+}
+
+/// Ensemble client wrapping multiple ModalClient instances
+pub struct EnsembleClient {
+    clients: HashMap<String, ModalClient>,
+    router: ModelRouter,
+    config: EnsembleConfig,
+    metrics: Arc<Mutex<EnsembleMetrics>>,
+}
+
+impl EnsembleClient {
+    /// Create from ensemble configuration
+    pub fn from_config(config: EnsembleConfig) -> Result<Self> {
+        let mut clients = HashMap::new();
+
+        for endpoint in &config.endpoints {
+            let modal_config = ModalConfig {
+                endpoint_url: endpoint.endpoint_url.clone(),
+                api_key: endpoint.api_key.clone(),
+                timeout_secs: endpoint.timeout_secs,
+                model: endpoint.model.clone(),
+                enable_retry: true,
+                max_retries: 3,
+            };
+
+            let client = ModalClient::new(modal_config)?;
+            clients.insert(endpoint.name.clone(), client);
+        }
+
+        let router = ModelRouter::new(config.endpoints.clone());
+
+        Ok(Self {
+            clients,
+            router,
+            config,
+            metrics: Arc::new(Mutex::new(EnsembleMetrics::default())),
+        })
+    }
+
+    /// Generate with automatic routing and fallback
+    pub async fn generate_routed(
+        &self,
+        request: InferenceRequest,
+        hole_spec: &HoleSpec,
+        constraints: &[ConstraintIR],
+    ) -> Result<InferenceResponse> {
+        let routing = self.router.route(hole_spec, constraints);
+
+        if self.config.fallback_enabled {
+            self.generate_with_fallback(request, routing).await
+        } else {
+            self.generate_single(request, &routing.primary_model).await
+        }
+    }
+
+    /// Generate with fallback on failure
+    pub async fn generate_with_fallback(
+        &self,
+        request: InferenceRequest,
+        routing: RoutingDecision,
+    ) -> Result<InferenceResponse> {
+        let mut last_error = None;
+        let mut attempts = 0;
+
+        for model_name in routing.all_models() {
+            if attempts >= self.config.max_fallback_attempts {
+                break;
+            }
+
+            let client = match self.clients.get(model_name) {
+                Some(c) => c,
+                None => {
+                    tracing::warn!("Model {} not found in ensemble", model_name);
+                    continue;
+                }
+            };
+
+            let start = std::time::Instant::now();
+            match client.generate_constrained(request.clone()).await {
+                Ok(response) => {
+                    self.record_success(
+                        model_name,
+                        start.elapsed().as_millis() as u64,
+                        response.confidence(),
+                    )
+                    .await;
+                    return Ok(response);
+                }
+                Err(e) => {
+                    self.record_failure(model_name).await;
+                    tracing::warn!("Model {} failed: {}, trying fallback", model_name, e);
+                    last_error = Some(e);
+
+                    if attempts > 0 {
+                        let mut metrics = self.metrics.lock().await;
+                        metrics.total_fallbacks += 1;
+                    }
+                }
+            }
+
+            attempts += 1;
+        }
+
+        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("No models available in ensemble")))
+    }
+
+    /// Generate using best-of-N selection
+    pub async fn generate_best_of_n(
+        &self,
+        request: InferenceRequest,
+        n: usize,
+        model_name: &str,
+    ) -> Result<InferenceResponse> {
+        let client = self
+            .clients
+            .get(model_name)
+            .ok_or_else(|| anyhow::anyhow!("Model {} not found", model_name))?;
+
+        let tasks: Vec<_> = (0..n)
+            .map(|_| {
+                let req = request.clone();
+                let cli = client.clone();
+                async move { cli.generate_constrained(req).await }
+            })
+            .collect();
+
+        let results = futures::future::join_all(tasks).await;
+
+        // Select best by confidence
+        let best = results.into_iter().filter_map(Result::ok).max_by(|a, b| {
+            a.confidence()
+                .partial_cmp(&b.confidence())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        best.ok_or_else(|| anyhow::anyhow!("All {} attempts failed", n))
+    }
+
+    async fn generate_single(
+        &self,
+        request: InferenceRequest,
+        model_name: &str,
+    ) -> Result<InferenceResponse> {
+        let client = self
+            .clients
+            .get(model_name)
+            .ok_or_else(|| anyhow::anyhow!("Model {} not found", model_name))?;
+
+        let start = std::time::Instant::now();
+        match client.generate_constrained(request).await {
+            Ok(response) => {
+                self.record_success(
+                    model_name,
+                    start.elapsed().as_millis() as u64,
+                    response.confidence(),
+                )
+                .await;
+                Ok(response)
+            }
+            Err(e) => {
+                self.record_failure(model_name).await;
+                Err(e)
+            }
+        }
+    }
+
+    async fn record_success(&self, model: &str, latency_ms: u64, confidence: f32) {
+        let mut metrics = self.metrics.lock().await;
+        metrics.total_requests += 1;
+
+        let model_metrics = metrics
+            .per_model
+            .entry(model.to_string())
+            .or_default();
+        model_metrics.requests += 1;
+        model_metrics.successes += 1;
+        model_metrics.total_latency_ms += latency_ms;
+
+        // Update rolling average confidence
+        let total_success = model_metrics.successes as f32;
+        model_metrics.avg_confidence =
+            (model_metrics.avg_confidence * (total_success - 1.0) + confidence) / total_success;
+    }
+
+    async fn record_failure(&self, model: &str) {
+        let mut metrics = self.metrics.lock().await;
+        metrics.total_requests += 1;
+
+        let model_metrics = metrics
+            .per_model
+            .entry(model.to_string())
+            .or_default();
+        model_metrics.requests += 1;
+        model_metrics.failures += 1;
+    }
+
+    /// Get current metrics
+    pub fn get_metrics(&self) -> Arc<Mutex<EnsembleMetrics>> {
+        Arc::clone(&self.metrics)
+    }
+
+    /// Get the router for direct routing decisions
+    pub fn router(&self) -> &ModelRouter {
+        &self.router
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_ensemble_config_default() {
+        let config = EnsembleConfig::default();
+        assert!(config.fallback_enabled);
+        assert_eq!(config.max_fallback_attempts, 3);
+        assert!(config.best_of_n.is_none());
+    }
+
+    #[test]
+    fn test_model_metrics_success_rate() {
+        let mut metrics = ModelMetrics::default();
+        metrics.requests = 10;
+        metrics.successes = 7;
+        metrics.failures = 3;
+
+        assert_eq!(metrics.success_rate(), 0.7);
+    }
+
+    #[test]
+    fn test_model_metrics_avg_latency() {
+        let mut metrics = ModelMetrics::default();
+        metrics.requests = 5;
+        metrics.total_latency_ms = 500;
+
+        assert_eq!(metrics.avg_latency_ms(), 100);
+    }
+
+    #[test]
+    fn test_ensemble_metrics_default() {
+        let metrics = EnsembleMetrics::default();
+        assert_eq!(metrics.total_requests, 0);
+        assert_eq!(metrics.total_fallbacks, 0);
+        assert!(metrics.per_model.is_empty());
+    }
 
     #[test]
     fn test_modal_config_new() {

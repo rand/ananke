@@ -72,23 +72,23 @@ fn benchmarkCache(
     var braid = try Braid.init(allocator);
     defer braid.deinit();
 
-    // Cold cache: first compilation
+    // Cold cache: first compilation (uses full compilation path)
     const cold_start = std.time.nanoTimestamp();
-    var compiled1 = try braid.compile(constraints);
+    const compiled1 = try braid.compileShared(constraints);
     const cold_end = std.time.nanoTimestamp();
-    compiled1.deinit(allocator);
+    compiled1.release(); // Release the reference
 
     const cold_latency_ns: u64 = @intCast(cold_end - cold_start);
 
-    // Warm cache: repeated compilations
+    // Warm cache: repeated compilations using COW (O(1) reference acquire)
     const iterations: usize = 100;
     var total_warm_ns: u64 = 0;
 
     for (0..iterations) |_| {
         const warm_start = std.time.nanoTimestamp();
-        var compiled2 = try braid.compile(constraints);
+        const compiled2 = try braid.compileShared(constraints);
         const warm_end = std.time.nanoTimestamp();
-        compiled2.deinit(allocator);
+        compiled2.release(); // O(1) release - just atomic decrement
 
         total_warm_ns += @as(u64, @intCast(warm_end - warm_start));
     }

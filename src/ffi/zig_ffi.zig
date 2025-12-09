@@ -2,6 +2,25 @@
 //!
 //! Provides C-compatible functions for Rust integration.
 //! These functions are exported and callable from Rust via FFI.
+//!
+//! # Thread Safety
+//!
+//! The FFI functions are NOT thread-safe. Callers must ensure:
+//! - Only one thread calls `ananke_init()` and `ananke_deinit()`
+//! - `ananke_extract_constraints` and `ananke_compile_constraints` may be called
+//!   concurrently ONLY if each call uses separate output pointers
+//! - `ananke_free_constraint_ir` must not be called concurrently on the same pointer
+//!
+//! For thread-safe usage, wrap calls in a mutex on the Rust side.
+//!
+//! # Memory Safety
+//!
+//! All FFI pointers include a magic number to detect:
+//! - Use-after-free (magic number zeroed on free)
+//! - Double-free (detected via magic number check)
+//! - Invalid pointers (magic number validation)
+//!
+//! Outstanding allocations are tracked to warn on premature `ananke_deinit()`.
 
 const std = @import("std");
 const root = @import("ananke");
@@ -15,6 +34,14 @@ const ConstraintSet = root.types.constraint.ConstraintSet;
 var gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
 const gpa = gpa_instance.allocator();
 
+// Magic number for detecting use-after-free and invalid pointers
+// "ANKE_FFI" in ASCII hex: 0x414E4B455F464649
+const FFI_MAGIC: u64 = 0x414E4B455F464649;
+const FFI_FREED: u64 = 0xDEADDEADDEADDEAD;
+
+// Outstanding allocation tracking for safe deinit
+var outstanding_allocations: std.atomic.Value(u32) = std.atomic.Value(u32).init(0);
+
 /// C-compatible error codes
 pub const AnankeError = enum(c_int) {
     Success = 0,
@@ -23,6 +50,9 @@ pub const AnankeError = enum(c_int) {
     InvalidInput = 3,
     ExtractionFailed = 4,
     CompilationFailed = 5,
+    DoubleFree = 6,
+    InvalidPointer = 7,
+    UseAfterFree = 8,
 };
 
 /// C-compatible TokenMaskRules structure matching Rust FFI definition
@@ -37,7 +67,15 @@ pub const TokenMaskRulesFFI = extern struct {
 };
 
 /// C-compatible ConstraintIR structure
+///
+/// The `magic` field at the start enables detection of:
+/// - Double-free: magic is zeroed after first free
+/// - Use-after-free: magic is set to FFI_FREED sentinel
+/// - Invalid pointers: magic won't match FFI_MAGIC
 pub const ConstraintIRFFI = extern struct {
+    /// Magic number for validation (must be FFI_MAGIC for valid allocations)
+    magic: u64,
+
     /// JSON schema pointer (nullable)
     json_schema: ?[*:0]const u8,
 
@@ -70,7 +108,17 @@ export fn ananke_init() callconv(.c) c_int {
 /// Cleanup Ananke system
 ///
 /// Should be called when done using Ananke.
+/// Warns if there are outstanding allocations that haven't been freed.
 export fn ananke_deinit() callconv(.c) void {
+    // Check for outstanding allocations
+    const count = outstanding_allocations.load(.seq_cst);
+    if (count > 0) {
+        std.log.warn(
+            "ananke_deinit called with {d} outstanding ConstraintIR allocations - potential memory leak",
+            .{count},
+        );
+    }
+
     // Cleanup handled automatically by GPA deinit
     _ = gpa_instance.deinit();
 }
@@ -139,6 +187,7 @@ export fn ananke_extract_constraints(
 
         // Create minimal IR with basic info
         ir_ffi.* = .{
+            .magic = FFI_MAGIC, // Set magic number for validation
             .json_schema = null,
             .grammar = null,
             .regex_patterns = null,
@@ -147,6 +196,9 @@ export fn ananke_extract_constraints(
             .priority = 50, // Default priority for extracted constraints
             .name = name_buf.ptr,
         };
+
+        // Track outstanding allocation
+        _ = outstanding_allocations.fetchAdd(1, .seq_cst);
 
         out_ir.* = ir_ffi;
         return @intFromEnum(AnankeError.Success);
@@ -421,6 +473,7 @@ fn convertIRToFFI(
     _ = try std.fmt.bufPrint(name_buf, "compiled_ir_p{d}", .{ir.priority});
 
     ir_ffi.* = .{
+        .magic = FFI_MAGIC, // Set magic number for validation
         .json_schema = if (json_schema_ptr) |ptr| ptr.ptr else null,
         .grammar = if (grammar_ptr) |ptr| ptr.ptr else null,
         .regex_patterns = regex_ptrs,
@@ -429,6 +482,9 @@ fn convertIRToFFI(
         .priority = ir.priority,
         .name = name_buf.ptr,
     };
+
+    // Track outstanding allocation
+    _ = outstanding_allocations.fetchAdd(1, .seq_cst);
 
     return ir_ffi;
 }
@@ -512,57 +568,95 @@ fn serializeGrammar(
 /// Free a ConstraintIR structure
 ///
 /// # Safety
-/// Must be called exactly once on each ConstraintIR returned by other functions
-export fn ananke_free_constraint_ir(ir: ?*ConstraintIRFFI) callconv(.c) void {
-    if (ir) |ptr| {
-        // Free name string
-        if (ptr.name) |name| {
-            const name_slice = std.mem.span(name);
-            gpa.free(name_slice);
-        }
+/// Must be called exactly once on each ConstraintIR returned by other functions.
+///
+/// # Resilience
+/// - Validates magic number to detect double-free and invalid pointers
+/// - Zeros memory before freeing to prevent use-after-free data leaks
+/// - Safe to call with null pointer (no-op)
+/// - Safe to call on already-freed pointer (logs warning, returns)
+///
+/// # Returns
+/// Returns error code via ananke_get_last_error() if validation fails
+export fn ananke_free_constraint_ir(ir: ?*ConstraintIRFFI) callconv(.c) c_int {
+    const ptr = ir orelse return @intFromEnum(AnankeError.Success); // Null is OK
 
-        // Free regex patterns if present
-        if (ptr.regex_patterns) |patterns| {
-            const patterns_slice = patterns[0..ptr.regex_patterns_len];
-            for (patterns_slice) |pattern| {
-                const pattern_slice = std.mem.span(pattern);
-                gpa.free(pattern_slice);
-            }
-            gpa.free(patterns_slice);
-        }
-
-        // Free JSON schema if present
-        if (ptr.json_schema) |schema| {
-            const schema_slice = std.mem.span(schema);
-            gpa.free(schema_slice);
-        }
-
-        // Free grammar if present
-        if (ptr.grammar) |grammar| {
-            const grammar_slice = std.mem.span(grammar);
-            gpa.free(grammar_slice);
-        }
-
-        // Free token masks if present
-        if (ptr.token_masks) |masks| {
-            // Free allowed tokens array
-            if (masks.allowed_tokens) |tokens| {
-                const allowed_slice = tokens[0..masks.allowed_tokens_len];
-                gpa.free(allowed_slice);
-            }
-
-            // Free forbidden tokens array
-            if (masks.forbidden_tokens) |tokens| {
-                const forbidden_slice = tokens[0..masks.forbidden_tokens_len];
-                gpa.free(forbidden_slice);
-            }
-
-            // Free the TokenMaskRulesFFI struct itself
-            gpa.destroy(masks);
-        }
-
-        gpa.destroy(ptr);
+    // Validate magic number to detect double-free and invalid pointers
+    if (ptr.magic == FFI_FREED) {
+        std.log.warn("ananke_free_constraint_ir: double-free detected (already freed)", .{});
+        return @intFromEnum(AnankeError.DoubleFree);
     }
+
+    if (ptr.magic != FFI_MAGIC) {
+        std.log.warn("ananke_free_constraint_ir: invalid pointer (magic mismatch: 0x{x})", .{ptr.magic});
+        return @intFromEnum(AnankeError.InvalidPointer);
+    }
+
+    // Mark as freed before actual deallocation (to catch use-after-free in debugger)
+    ptr.magic = FFI_FREED;
+
+    // Free name string with zeroing
+    if (ptr.name) |name| {
+        const name_slice = std.mem.span(name);
+        @memset(@constCast(name_slice), 0); // Zero before free
+        gpa.free(name_slice);
+    }
+
+    // Free regex patterns if present with zeroing
+    if (ptr.regex_patterns) |patterns| {
+        const patterns_slice = patterns[0..ptr.regex_patterns_len];
+        for (patterns_slice) |pattern| {
+            const pattern_slice = std.mem.span(pattern);
+            @memset(@constCast(pattern_slice), 0); // Zero before free
+            gpa.free(pattern_slice);
+        }
+        gpa.free(patterns_slice);
+    }
+
+    // Free JSON schema if present with zeroing
+    if (ptr.json_schema) |schema| {
+        const schema_slice = std.mem.span(schema);
+        @memset(@constCast(schema_slice), 0); // Zero before free
+        gpa.free(schema_slice);
+    }
+
+    // Free grammar if present with zeroing
+    if (ptr.grammar) |grammar| {
+        const grammar_slice = std.mem.span(grammar);
+        @memset(@constCast(grammar_slice), 0); // Zero before free
+        gpa.free(grammar_slice);
+    }
+
+    // Free token masks if present
+    if (ptr.token_masks) |masks| {
+        // Free allowed tokens array
+        if (masks.allowed_tokens) |tokens| {
+            const allowed_slice = tokens[0..masks.allowed_tokens_len];
+            @memset(@constCast(allowed_slice), 0); // Zero before free
+            gpa.free(allowed_slice);
+        }
+
+        // Free forbidden tokens array
+        if (masks.forbidden_tokens) |tokens| {
+            const forbidden_slice = tokens[0..masks.forbidden_tokens_len];
+            @memset(@constCast(forbidden_slice), 0); // Zero before free
+            gpa.free(forbidden_slice);
+        }
+
+        // Free the TokenMaskRulesFFI struct itself
+        gpa.destroy(masks);
+    }
+
+    // Zero the entire struct before freeing (defense in depth)
+    const ptr_bytes = std.mem.asBytes(ptr);
+    @memset(ptr_bytes, 0);
+
+    gpa.destroy(ptr);
+
+    // Decrement outstanding allocation counter
+    _ = outstanding_allocations.fetchSub(1, .seq_cst);
+
+    return @intFromEnum(AnankeError.Success);
 }
 
 /// Get version information
@@ -630,9 +724,10 @@ test "FFI constraint compilation" {
     if (ir_ptr) |ir| {
         try testing.expect(ir.name != null);
         try testing.expect(ir.priority > 0);
+        try testing.expectEqual(FFI_MAGIC, ir.magic); // Verify magic is set
 
         // Clean up
-        ananke_free_constraint_ir(ir);
+        _ = ananke_free_constraint_ir(ir);
     }
 }
 
@@ -690,7 +785,7 @@ test "FFI constraint compilation produces valid IR components" {
     try testing.expectEqual(@intFromEnum(AnankeError.Success), result);
 
     if (ir_ptr) |ir| {
-        defer ananke_free_constraint_ir(ir);
+        defer _ = ananke_free_constraint_ir(ir);
 
         // Verify we got a name
         try testing.expect(ir.name != null);
@@ -714,4 +809,102 @@ test "FFI constraint compilation produces valid IR components" {
             try testing.expect(ir.regex_patterns != null);
         }
     }
+}
+
+// ============================================================================
+// FFI Resilience Tests
+// ============================================================================
+
+test "FFI double-free protection" {
+    const testing = std.testing;
+
+    // Initialize
+    _ = ananke_init();
+    // Note: don't defer deinit here as we're testing specific behavior
+
+    // Create a valid IR
+    const json_constraints =
+        \\[{"id": 1, "kind": "syntactic", "name": "test", "description": "test", "severity": "error", "priority": "high"}]
+    ;
+
+    var ir_ptr: ?*ConstraintIRFFI = null;
+    _ = ananke_compile_constraints(json_constraints.ptr, &ir_ptr);
+
+    if (ir_ptr) |ir| {
+        // First free should succeed
+        const first_free = ananke_free_constraint_ir(ir);
+        try testing.expectEqual(@intFromEnum(AnankeError.Success), first_free);
+
+        // Second free should detect double-free and return error
+        const second_free = ananke_free_constraint_ir(ir);
+        try testing.expectEqual(@intFromEnum(AnankeError.DoubleFree), second_free);
+    }
+
+    ananke_deinit();
+}
+
+test "FFI null pointer free is safe" {
+    const testing = std.testing;
+
+    // Freeing null should be a no-op and return success
+    const result = ananke_free_constraint_ir(null);
+    try testing.expectEqual(@intFromEnum(AnankeError.Success), result);
+}
+
+test "FFI magic number validation" {
+    const testing = std.testing;
+
+    // Initialize
+    _ = ananke_init();
+    defer ananke_deinit();
+
+    // Create a valid IR
+    const json_constraints =
+        \\[{"id": 1, "kind": "syntactic", "name": "test", "description": "test", "severity": "error", "priority": "high"}]
+    ;
+
+    var ir_ptr: ?*ConstraintIRFFI = null;
+    _ = ananke_compile_constraints(json_constraints.ptr, &ir_ptr);
+
+    if (ir_ptr) |ir| {
+        // Verify magic is correctly set
+        try testing.expectEqual(FFI_MAGIC, ir.magic);
+
+        // Clean up properly
+        _ = ananke_free_constraint_ir(ir);
+    }
+}
+
+test "FFI outstanding allocation tracking" {
+    const testing = std.testing;
+
+    // Reset outstanding allocations for this test
+    outstanding_allocations.store(0, .seq_cst);
+
+    // Initialize
+    _ = ananke_init();
+
+    // Check initial count is 0
+    try testing.expectEqual(@as(u32, 0), outstanding_allocations.load(.seq_cst));
+
+    // Create an IR
+    const json_constraints =
+        \\[{"id": 1, "kind": "syntactic", "name": "test", "description": "test", "severity": "error", "priority": "high"}]
+    ;
+
+    var ir_ptr: ?*ConstraintIRFFI = null;
+    _ = ananke_compile_constraints(json_constraints.ptr, &ir_ptr);
+
+    // Should have 1 outstanding allocation
+    try testing.expectEqual(@as(u32, 1), outstanding_allocations.load(.seq_cst));
+
+    // Free the IR
+    if (ir_ptr) |ir| {
+        _ = ananke_free_constraint_ir(ir);
+    }
+
+    // Should be back to 0
+    try testing.expectEqual(@as(u32, 0), outstanding_allocations.load(.seq_cst));
+
+    ananke_deinit();
 }

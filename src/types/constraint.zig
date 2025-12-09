@@ -174,6 +174,12 @@ pub const ConstraintIR = struct {
     /// true if this IR owns grammar strings (from clone), false if borrowed from interner
     owns_grammar_strings: bool = false,
 
+    /// Hole specifications for progressive refinement
+    hole_specs: []const HoleSpec = &.{},
+
+    /// Whether this IR supports iterative refinement
+    supports_refinement: bool = false,
+
     /// Free all allocated memory in this ConstraintIR
     pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
         // Free json_schema if present
@@ -305,8 +311,63 @@ pub const ConstraintIR = struct {
     }
 };
 
+/// Reference-counted wrapper for ConstraintIR enabling copy-on-write semantics.
+/// This provides O(1) cache hits by avoiding deep clones on every access.
+pub const SharedConstraintIR = struct {
+    ir: ConstraintIR,
+    ref_count: std.atomic.Value(u32),
+    allocator: std.mem.Allocator,
+
+    /// Create a new SharedConstraintIR wrapping the given IR.
+    /// Takes ownership of the IR - caller should not use or free it after this.
+    pub fn create(allocator: std.mem.Allocator, ir: ConstraintIR) !*SharedConstraintIR {
+        const self = try allocator.create(SharedConstraintIR);
+        self.* = .{
+            .ir = ir,
+            .ref_count = std.atomic.Value(u32).init(1),
+            .allocator = allocator,
+        };
+        return self;
+    }
+
+    /// Acquire a reference to this SharedConstraintIR.
+    /// Increments the reference count atomically.
+    pub fn acquire(self: *SharedConstraintIR) *SharedConstraintIR {
+        _ = self.ref_count.fetchAdd(1, .monotonic);
+        return self;
+    }
+
+    /// Release a reference to this SharedConstraintIR.
+    /// When the last reference is released, the IR and wrapper are freed.
+    pub fn release(self: *SharedConstraintIR) void {
+        // release ensures code before release() happens-before the count is decremented
+        if (self.ref_count.fetchSub(1, .release) == 1) {
+            // seeing 1 in the counter means other release()s have happened,
+            // but it doesn't mean uses before each release() are visible.
+            // The load acquires the release-sequence created by previous release()s
+            // to ensure visibility of uses before dropping.
+            _ = self.ref_count.load(.acquire);
+            var ir = self.ir;
+            ir.deinit(self.allocator);
+            self.allocator.destroy(self);
+        }
+    }
+
+    /// Get the current reference count (for debugging/testing).
+    pub fn getRefCount(self: *const SharedConstraintIR) u32 {
+        return self.ref_count.load(.monotonic);
+    }
+
+    /// Create a deep clone with its own reference count of 1.
+    /// Use this when you need to modify the IR independently.
+    pub fn cloneDeep(self: *const SharedConstraintIR) !*SharedConstraintIR {
+        const cloned_ir = try self.ir.clone(self.allocator);
+        return try SharedConstraintIR.create(self.allocator, cloned_ir);
+    }
+};
+
 /// Helper function to clone JsonSchema
-fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema {
+pub fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema {
     var cloned = JsonSchema{
         .type = try allocator.dupe(u8, schema.type),
         .additional_properties = schema.additional_properties,
@@ -337,7 +398,7 @@ fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema
 }
 
 /// Helper function to clone a JSON value
-fn cloneJsonValue(allocator: std.mem.Allocator, value: std.json.Value) !std.json.Value {
+pub fn cloneJsonValue(allocator: std.mem.Allocator, value: std.json.Value) !std.json.Value {
     return switch (value) {
         .null => .null,
         .bool => |b| .{ .bool = b },
@@ -391,7 +452,7 @@ fn freeJsonValue(allocator: std.mem.Allocator, value: std.json.Value) void {
 }
 
 /// Helper function to clone Grammar
-fn cloneGrammar(allocator: std.mem.Allocator, grammar: Grammar) !Grammar {
+pub fn cloneGrammar(allocator: std.mem.Allocator, grammar: Grammar) !Grammar {
     const rules = try allocator.alloc(GrammarRule, grammar.rules.len);
 
     for (grammar.rules, 0..) |rule, i| {
@@ -459,6 +520,32 @@ pub const Regex = struct {
     is_static: bool = false, // true if pattern points to static RegexPatternPool constant
 };
 
+/// Specification for filling a hole
+pub const HoleSpec = struct {
+    hole_id: u64,
+    fill_schema: ?JsonSchema = null,
+    fill_grammar: ?Grammar = null,
+    fill_patterns: []const Regex = &.{},
+    fill_constraints: []const FillConstraint = &.{},
+    grammar_ref: ?[]const u8 = null,
+};
+
+pub const FillConstraint = struct {
+    kind: FillConstraintKind,
+    value: []const u8,
+    error_message: ?[]const u8 = null,
+};
+
+pub const FillConstraintKind = enum {
+    must_have_type,
+    must_use_binding,
+    must_not_use_binding,
+    must_satisfy_predicate,
+    must_match_pattern,
+    must_be_pure,
+    must_terminate,
+};
+
 /// Individual token mask rule
 pub const TokenMaskRule = struct {
     mask_type: MaskType,
@@ -500,6 +587,51 @@ pub const TokenMaskRules = struct {
                 }
             }
         }
+    }
+};
+
+/// Fingerprint for tracking constraint changes in incremental compilation
+pub const ConstraintFingerprint = struct {
+    /// Content hash of the constraint
+    hash: u64,
+    /// When the constraint was first created
+    created_at: i64,
+    /// When the constraint was last modified
+    modified_at: i64,
+
+    /// Compute a fingerprint from a constraint's content
+    pub fn compute(constraint: *const Constraint) ConstraintFingerprint {
+        var hasher = std.hash.Wyhash.init(0);
+
+        // Hash all relevant fields that affect compilation
+        hasher.update(constraint.name);
+        hasher.update(constraint.description);
+
+        const kind_bytes = std.mem.asBytes(&@intFromEnum(constraint.kind));
+        hasher.update(kind_bytes);
+
+        const source_bytes = std.mem.asBytes(&@intFromEnum(constraint.source));
+        hasher.update(source_bytes);
+
+        const enforcement_bytes = std.mem.asBytes(&@intFromEnum(constraint.enforcement));
+        hasher.update(enforcement_bytes);
+
+        const priority_bytes = std.mem.asBytes(&constraint.priority.toNumeric());
+        hasher.update(priority_bytes);
+
+        const severity_bytes = std.mem.asBytes(&@intFromEnum(constraint.severity));
+        hasher.update(severity_bytes);
+
+        return .{
+            .hash = hasher.final(),
+            .created_at = constraint.created_at,
+            .modified_at = std.time.timestamp(),
+        };
+    }
+
+    /// Check if this fingerprint differs from another
+    pub fn hasChanged(self: ConstraintFingerprint, other: ConstraintFingerprint) bool {
+        return self.hash != other.hash;
     }
 };
 

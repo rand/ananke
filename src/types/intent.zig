@@ -104,16 +104,81 @@ pub const IntentMetadata = struct {
     /// Priority level
     priority: Priority = .normal,
 
+    /// Session ID buffer (stack allocated)
+    session_id_buf: [37]u8 = undefined,
+
     pub fn init() IntentMetadata {
-        return .{
+        var meta: IntentMetadata = .{
             .timestamp = std.time.timestamp(),
-            .session_id = generateSessionId(),
+            .session_id = undefined,
         };
+        meta.session_id = generateSessionId(&meta.session_id_buf);
+        return meta;
     }
 
-    fn generateSessionId() []const u8 {
-        // TODO: Implement proper session ID generation
-        return "session-default";
+    /// Generate a UUID v4 style session ID
+    /// Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    /// where y is one of 8, 9, a, or b
+    fn generateSessionId(buf: *[37]u8) []const u8 {
+        var random_bytes: [16]u8 = undefined;
+        std.crypto.random.bytes(&random_bytes);
+
+        // Set version 4 (0100) in bits 12-15 of time_hi_and_version
+        random_bytes[6] = (random_bytes[6] & 0x0f) | 0x40;
+
+        // Set variant (10) in bits 6-7 of clock_seq_hi_and_reserved
+        random_bytes[8] = (random_bytes[8] & 0x3f) | 0x80;
+
+        // Format as UUID string
+        const hex_chars = "0123456789abcdef";
+        var i: usize = 0;
+        var buf_idx: usize = 0;
+
+        // First group: 8 chars (4 bytes)
+        while (i < 4) : (i += 1) {
+            buf[buf_idx] = hex_chars[random_bytes[i] >> 4];
+            buf[buf_idx + 1] = hex_chars[random_bytes[i] & 0x0f];
+            buf_idx += 2;
+        }
+        buf[buf_idx] = '-';
+        buf_idx += 1;
+
+        // Second group: 4 chars (2 bytes)
+        while (i < 6) : (i += 1) {
+            buf[buf_idx] = hex_chars[random_bytes[i] >> 4];
+            buf[buf_idx + 1] = hex_chars[random_bytes[i] & 0x0f];
+            buf_idx += 2;
+        }
+        buf[buf_idx] = '-';
+        buf_idx += 1;
+
+        // Third group: 4 chars (2 bytes)
+        while (i < 8) : (i += 1) {
+            buf[buf_idx] = hex_chars[random_bytes[i] >> 4];
+            buf[buf_idx + 1] = hex_chars[random_bytes[i] & 0x0f];
+            buf_idx += 2;
+        }
+        buf[buf_idx] = '-';
+        buf_idx += 1;
+
+        // Fourth group: 4 chars (2 bytes)
+        while (i < 10) : (i += 1) {
+            buf[buf_idx] = hex_chars[random_bytes[i] >> 4];
+            buf[buf_idx + 1] = hex_chars[random_bytes[i] & 0x0f];
+            buf_idx += 2;
+        }
+        buf[buf_idx] = '-';
+        buf_idx += 1;
+
+        // Fifth group: 12 chars (6 bytes)
+        while (i < 16) : (i += 1) {
+            buf[buf_idx] = hex_chars[random_bytes[i] >> 4];
+            buf[buf_idx + 1] = hex_chars[random_bytes[i] & 0x0f];
+            buf_idx += 2;
+        }
+        buf[buf_idx] = 0; // Null terminate
+
+        return buf[0..36];
     }
 };
 

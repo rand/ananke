@@ -73,8 +73,12 @@ pub fn formatJson(
         try writer.print("      \"id\": {d},\n", .{c.id});
         try writer.print("      \"kind\": \"{s}\",\n", .{@tagName(c.kind)});
         try writer.print("      \"severity\": \"{s}\",\n", .{@tagName(c.severity)});
-        try writer.print("      \"name\": \"{s}\",\n", .{escapeJson(c.name)});
-        try writer.print("      \"description\": \"{s}\",\n", .{escapeJson(c.description)});
+        try writer.writeAll("      \"name\": \"");
+        try writeJsonEscaped(writer, c.name);
+        try writer.writeAll("\",\n");
+        try writer.writeAll("      \"description\": \"");
+        try writeJsonEscaped(writer, c.description);
+        try writer.writeAll("\",\n");
         try writer.print("      \"source\": \"{s}\",\n", .{@tagName(c.source)});
         try writer.print("      \"priority\": \"{s}\",\n", .{@tagName(c.priority)});
         try writer.print("      \"confidence\": {d:.2},\n", .{c.confidence});
@@ -306,11 +310,26 @@ pub const Spinner = struct {
     }
 };
 
-/// Escape JSON special characters
-fn escapeJson(s: []const u8) []const u8 {
-    // TODO: Implement proper JSON escaping for quotes, backslashes, etc.
-    // For now, return as-is
-    return s;
+/// Write a JSON-escaped string to the writer
+/// Escapes quotes, backslashes, newlines, tabs, carriage returns, and control characters
+fn writeJsonEscaped(writer: anytype, s: []const u8) !void {
+    const hex_digits = "0123456789abcdef";
+    for (s) |c| {
+        switch (c) {
+            '"' => try writer.writeAll("\\\""),
+            '\\' => try writer.writeAll("\\\\"),
+            '\n' => try writer.writeAll("\\n"),
+            '\r' => try writer.writeAll("\\r"),
+            '\t' => try writer.writeAll("\\t"),
+            0x00...0x08, 0x0B...0x0C, 0x0E...0x1F => {
+                // Escape control characters as \uXXXX
+                try writer.writeAll("\\u00");
+                try writer.writeByte(hex_digits[(c >> 4) & 0x0F]);
+                try writer.writeByte(hex_digits[c & 0x0F]);
+            },
+            else => try writer.writeByte(c),
+        }
+    }
 }
 
 /// Print a table of constraints

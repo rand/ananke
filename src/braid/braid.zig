@@ -7,10 +7,12 @@ const root = @import("ananke");
 const RingQueue = root.utils.RingQueue;
 const Constraint = root.types.constraint.Constraint;
 const ConstraintIR = root.types.constraint.ConstraintIR;
+const SharedConstraintIR = root.types.constraint.SharedConstraintIR;
 const ConstraintSet = root.types.constraint.ConstraintSet;
 const ConstraintKind = root.types.constraint.ConstraintKind;
 const ConstraintSource = root.types.constraint.ConstraintSource;
 const ConstraintPriority = root.types.constraint.ConstraintPriority;
+const ConstraintFingerprint = root.types.constraint.ConstraintFingerprint;
 const JsonSchema = root.types.constraint.JsonSchema;
 const Grammar = root.types.constraint.Grammar;
 const GrammarRule = root.types.constraint.GrammarRule;
@@ -27,12 +29,75 @@ const RegexPatternPool = string_interner.RegexPatternPool;
 // Import sanitizer for security
 const sanitizer = @import("sanitizer.zig");
 
+/// Set of changes between constraint compilations
+pub const ChangeSet = struct {
+    added: std.ArrayList(usize),
+    modified: std.ArrayList(usize),
+    removed: std.ArrayList(usize),
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) ChangeSet {
+        return .{
+            .added = std.ArrayList(usize){},
+            .modified = std.ArrayList(usize){},
+            .removed = std.ArrayList(usize){},
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *ChangeSet) void {
+        self.added.deinit(self.allocator);
+        self.modified.deinit(self.allocator);
+        self.removed.deinit(self.allocator);
+    }
+
+    pub fn isEmpty(self: *const ChangeSet) bool {
+        return self.added.items.len == 0 and
+            self.modified.items.len == 0 and
+            self.removed.items.len == 0;
+    }
+};
+
+/// State for incremental compilation
+pub const IncrementalState = struct {
+    fingerprints: std.AutoHashMap(u64, ConstraintFingerprint),
+    last_full_ir: ?ConstraintIR,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) IncrementalState {
+        return .{
+            .fingerprints = std.AutoHashMap(u64, ConstraintFingerprint).init(allocator),
+            .last_full_ir = null,
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *IncrementalState) void {
+        self.fingerprints.deinit();
+        if (self.last_full_ir) |*ir| {
+            var ir_copy = ir.*;
+            ir_copy.deinit(self.allocator);
+        }
+    }
+
+    /// Set the last full IR, freeing any previous value first
+    pub fn setLastFullIR(self: *IncrementalState, new_ir: ConstraintIR) void {
+        // Free old IR if present
+        if (self.last_full_ir) |*old_ir| {
+            var old_copy = old_ir.*;
+            old_copy.deinit(self.allocator);
+        }
+        self.last_full_ir = new_ir;
+    }
+};
+
 /// Main Braid compilation engine
 pub const Braid = struct {
     allocator: std.mem.Allocator,
     llm_client: ?*claude_api.ClaudeClient = null,
     cache: IRCache,
     grammar_interner: GrammarInterner,
+    incremental_state: ?IncrementalState = null,
 
     pub fn init(allocator: std.mem.Allocator) !Braid {
         return .{
@@ -45,6 +110,9 @@ pub const Braid = struct {
     pub fn deinit(self: *Braid) void {
         self.cache.deinit();
         self.grammar_interner.deinit();
+        if (self.incremental_state) |*state| {
+            state.deinit();
+        }
     }
 
     /// Set Claude client for conflict resolution
@@ -102,11 +170,323 @@ pub const Braid = struct {
         // Compile to IR
         const ir = try self.compileToIR(&graph);
 
-        // Store in cache (clone for cache storage)
-        const ir_for_cache = try ir.clone(self.allocator);
-        try self.cache.put(cache_key, ir_for_cache);
+        // Store in cache - cache takes ownership via SharedConstraintIR
+        try self.cache.put(cache_key, ir);
 
-        return ir;
+        // Return a clone for the caller (cache owns the original now)
+        if (self.cache.getShared(cache_key)) |shared| {
+            defer shared.release();
+            return try shared.ir.clone(self.allocator);
+        }
+        unreachable; // We just put it in the cache
+    }
+
+    /// Compile with copy-on-write semantics for O(1) cache hits.
+    /// Returns an acquired SharedConstraintIR reference.
+    /// Caller MUST call release() when done with the returned reference.
+    /// This is the high-performance API - prefer over compile() for repeated access.
+    pub fn compileShared(self: *Braid, constraints: []const Constraint) !*SharedConstraintIR {
+        // Compute cache key
+        const cache_key = try self.computeCacheKey(constraints);
+
+        // Check cache first (fast path) - O(1) atomic increment
+        if (self.cache.getShared(cache_key)) |shared| {
+            return shared;
+        }
+
+        // Cache miss - do full compilation (slow path)
+        var graph = try self.buildDependencyGraph(constraints);
+        defer graph.deinit();
+
+        // Detect and resolve conflicts
+        const conflicts = try self.detectConflicts(&graph);
+        defer self.allocator.free(conflicts);
+
+        if (conflicts.len > 0) {
+            // Use LLM for complex conflict resolution if available
+            if (self.llm_client) |client| {
+                // Convert conflicts to Claude format
+                const conflict_descriptions = try self.convertConflictsForClaude(&graph, conflicts);
+                defer {
+                    for (conflict_descriptions) |desc| {
+                        self.allocator.free(desc.constraint_a_name);
+                        self.allocator.free(desc.constraint_a_desc);
+                        self.allocator.free(desc.constraint_b_name);
+                        self.allocator.free(desc.constraint_b_desc);
+                        self.allocator.free(desc.issue);
+                    }
+                    self.allocator.free(conflict_descriptions);
+                }
+
+                const resolution = try client.suggestResolution(conflict_descriptions);
+                defer self.allocator.free(resolution.actions);
+
+                try self.applyClaudeResolution(&graph, resolution);
+            } else {
+                // Default conflict resolution
+                try self.defaultConflictResolution(&graph, conflicts);
+            }
+        }
+
+        // Optimize constraint evaluation order
+        try self.optimizeGraph(&graph);
+
+        // Compile to IR
+        const ir = try self.compileToIR(&graph);
+
+        // Store in cache - cache takes ownership
+        try self.cache.put(cache_key, ir);
+
+        // Return acquired reference from cache
+        return self.cache.getShared(cache_key).?;
+    }
+
+    /// Compile with incremental support - only recompiles changed constraints
+    pub fn compileIncremental(
+        self: *Braid,
+        constraints: []const Constraint,
+    ) !ConstraintIR {
+        // Initialize incremental state if needed
+        if (self.incremental_state == null) {
+            self.incremental_state = IncrementalState.init(self.allocator);
+        }
+        var state = &self.incremental_state.?;
+
+        // Build current graph
+        var graph = try self.buildDependencyGraph(constraints);
+        defer graph.deinit();
+
+        // Detect what changed
+        var changes = try graph.detectChanges(&state.fingerprints);
+        defer changes.deinit();
+
+        if (changes.isEmpty()) {
+            // No changes - return cached full IR if available
+            if (state.last_full_ir) |ir| {
+                return try ir.clone(self.allocator);
+            }
+            // Fall through to full compile if no cache
+        }
+
+        // Get affected subgraph (only if we have changes and a previous IR)
+        const needs_partial = !changes.isEmpty() and state.last_full_ir != null;
+        var affected: []usize = &.{};
+        defer if (needs_partial) self.allocator.free(affected);
+
+        if (needs_partial) {
+            affected = try graph.getAffectedSubgraph(&changes);
+
+            // Check if too many nodes are affected (>80% = full rebuild faster)
+            const affected_ratio = @as(f64, @floatFromInt(affected.len)) / @as(f64, @floatFromInt(graph.nodes.items.len));
+            if (affected_ratio > 0.8) {
+                // Too many affected - do full recompile
+                const ir = try self.compile(constraints);
+                state.setLastFullIR(try ir.clone(self.allocator));
+
+                // Update all fingerprints
+                try self.updateAllFingerprints(state, &graph);
+
+                return ir;
+            }
+        }
+
+        // Do full or partial compile based on state
+        if (!needs_partial or affected.len == 0) {
+            // Full recompile needed
+            const ir = try self.compile(constraints);
+            state.setLastFullIR(try ir.clone(self.allocator));
+
+            // Update all fingerprints
+            try self.updateAllFingerprints(state, &graph);
+
+            return ir;
+        }
+
+        // Partial recompile: compile affected subgraph and merge with cached IR
+        const partial_ir = try self.compileSubgraph(&graph, affected);
+        defer {
+            var partial_copy = partial_ir;
+            partial_copy.deinit(self.allocator);
+        }
+
+        const merged = try self.mergeIR(state.last_full_ir.?, partial_ir, affected);
+        state.setLastFullIR(try merged.clone(self.allocator));
+
+        // Update fingerprints for affected constraints only
+        try self.updateAffectedFingerprints(state, &graph, affected);
+
+        return merged;
+    }
+
+    /// Compile a subgraph of constraints
+    fn compileSubgraph(
+        self: *Braid,
+        graph: *const ConstraintGraph,
+        indices: []const usize,
+    ) !ConstraintIR {
+        // Extract constraints for the given indices
+        var subconstraints = std.ArrayList(Constraint){};
+        defer subconstraints.deinit(self.allocator);
+
+        for (indices) |idx| {
+            if (idx < graph.nodes.items.len) {
+                try subconstraints.append(self.allocator, graph.nodes.items[idx].constraint);
+            }
+        }
+
+        // Compile just those constraints
+        return try self.compile(subconstraints.items);
+    }
+
+    /// Merge partial IR into base IR
+    fn mergeIR(
+        self: *Braid,
+        base: ConstraintIR,
+        partial: ConstraintIR,
+        affected_indices: []const usize,
+    ) !ConstraintIR {
+        _ = affected_indices; // TODO: Use for more granular merging
+
+        // Create merged IR by cloning base
+        var merged = try base.clone(self.allocator);
+
+        // Merge json_schema if present in partial
+        if (partial.json_schema) |partial_schema| {
+            if (merged.json_schema) |*base_schema| {
+                // Merge properties from partial into base
+                if (partial_schema.properties) |partial_props| {
+                    var props_iter = partial_props.iterator();
+                    while (props_iter.next()) |entry| {
+                        const key = try self.allocator.dupe(u8, entry.key_ptr.*);
+                        const value = try root.types.constraint.cloneJsonValue(self.allocator, entry.value_ptr.*);
+                        if (base_schema.properties) |*base_props| {
+                            try base_props.put(key, value);
+                        } else {
+                            var new_props = std.json.ObjectMap.init(self.allocator);
+                            try new_props.put(key, value);
+                            base_schema.properties = new_props;
+                        }
+                    }
+                }
+            } else {
+                // No base schema - use partial
+                merged.json_schema = try root.types.constraint.cloneJsonSchema(self.allocator, partial_schema);
+            }
+        }
+
+        // Merge grammar (replace if partial has grammar)
+        if (partial.grammar) |partial_grammar| {
+            // Free old grammar if it exists
+            if (merged.grammar) |old_grammar| {
+                if (merged.owns_grammar_strings) {
+                    self.allocator.free(old_grammar.start_symbol);
+                    for (old_grammar.rules) |rule| {
+                        self.allocator.free(rule.lhs);
+                        for (rule.rhs) |rhs_item| {
+                            self.allocator.free(rhs_item);
+                        }
+                        self.allocator.free(rule.rhs);
+                    }
+                } else {
+                    for (old_grammar.rules) |rule| {
+                        self.allocator.free(rule.rhs);
+                    }
+                }
+                self.allocator.free(old_grammar.rules);
+            }
+
+            // Clone partial grammar
+            merged.grammar = try root.types.constraint.cloneGrammar(self.allocator, partial_grammar);
+        }
+
+        // Merge regex patterns (append unique patterns)
+        if (partial.regex_patterns.len > 0) {
+            var all_patterns = std.ArrayList(root.types.constraint.Regex){};
+            defer all_patterns.deinit(self.allocator);
+
+            // Add existing patterns
+            for (merged.regex_patterns) |pattern| {
+                try all_patterns.append(self.allocator, pattern);
+            }
+
+            // Add new patterns if not duplicate
+            for (partial.regex_patterns) |new_pattern| {
+                var is_duplicate = false;
+                for (all_patterns.items) |existing| {
+                    if (std.mem.eql(u8, existing.pattern, new_pattern.pattern)) {
+                        is_duplicate = true;
+                        break;
+                    }
+                }
+                if (!is_duplicate) {
+                    if (new_pattern.is_static) {
+                        try all_patterns.append(self.allocator, new_pattern);
+                    } else {
+                        try all_patterns.append(self.allocator, .{
+                            .pattern = try self.allocator.dupe(u8, new_pattern.pattern),
+                            .flags = try self.allocator.dupe(u8, new_pattern.flags),
+                            .is_static = false,
+                        });
+                    }
+                }
+            }
+
+            // Free old patterns
+            for (merged.regex_patterns) |pattern| {
+                if (!pattern.is_static) {
+                    self.allocator.free(pattern.pattern);
+                    if (pattern.flags.len > 0) {
+                        self.allocator.free(pattern.flags);
+                    }
+                }
+            }
+            if (merged.regex_patterns.len > 0) {
+                self.allocator.free(merged.regex_patterns);
+            }
+
+            merged.regex_patterns = try all_patterns.toOwnedSlice(self.allocator);
+        }
+
+        // Use higher priority
+        if (partial.priority > merged.priority) {
+            merged.priority = partial.priority;
+        }
+
+        return merged;
+    }
+
+    /// Update fingerprints for all constraints in the graph
+    fn updateAllFingerprints(
+        self: *Braid,
+        state: *IncrementalState,
+        graph: *const ConstraintGraph,
+    ) !void {
+        _ = self;
+        state.fingerprints.clearRetainingCapacity();
+
+        for (graph.nodes.items) |node| {
+            const id = computeConstraintId(&node.constraint);
+            const fp = ConstraintFingerprint.compute(&node.constraint);
+            try state.fingerprints.put(id, fp);
+        }
+    }
+
+    /// Update fingerprints only for affected constraints
+    fn updateAffectedFingerprints(
+        self: *Braid,
+        state: *IncrementalState,
+        graph: *const ConstraintGraph,
+        affected: []const usize,
+    ) !void {
+        _ = self;
+        for (affected) |idx| {
+            if (idx < graph.nodes.items.len) {
+                const node = graph.nodes.items[idx];
+                const id = computeConstraintId(&node.constraint);
+                const fp = ConstraintFingerprint.compute(&node.constraint);
+                try state.fingerprints.put(id, fp);
+            }
+        }
     }
 
     /// Compute a content-based cache key from constraint set.
@@ -1492,6 +1872,16 @@ fn containsAny(haystack: []const u8, needles: []const []const u8) bool {
     return false;
 }
 
+/// Compute a unique ID for a constraint based on its content
+fn computeConstraintId(constraint: *const Constraint) u64 {
+    var hasher = std.hash.Wyhash.init(0);
+    hasher.update(constraint.name);
+    hasher.update(constraint.description);
+    const kind_bytes = std.mem.asBytes(&@intFromEnum(constraint.kind));
+    hasher.update(kind_bytes);
+    return hasher.final();
+}
+
 /// Constraint dependency graph
 pub const ConstraintGraph = struct {
     allocator: std.mem.Allocator,
@@ -1671,17 +2061,18 @@ pub const ConstraintGraph = struct {
     }
 
     pub fn detectCycle(self: *ConstraintGraph) !bool {
-        // Use DFS-based cycle detection
-        var visited = try std.ArrayList(bool).initCapacity(self.allocator, self.nodes.items.len);
-        defer visited.deinit(self.allocator);
-        try visited.appendNTimes(self.allocator, false, self.nodes.items.len);
+        // Use DFS-based cycle detection with BitSet for 8x memory reduction
+        const n = self.nodes.items.len;
+        if (n == 0) return false;
 
-        var rec_stack = try std.ArrayList(bool).initCapacity(self.allocator, self.nodes.items.len);
-        defer rec_stack.deinit(self.allocator);
-        try rec_stack.appendNTimes(self.allocator, false, self.nodes.items.len);
+        var visited = try std.DynamicBitSet.initEmpty(self.allocator, n);
+        defer visited.deinit();
 
-        for (0..self.nodes.items.len) |node| {
-            if (!visited.items[node]) {
+        var rec_stack = try std.DynamicBitSet.initEmpty(self.allocator, n);
+        defer rec_stack.deinit();
+
+        for (0..n) |node| {
+            if (!visited.isSet(node)) {
                 if (try self.hasCycleDFS(node, &visited, &rec_stack)) {
                     return true;
                 }
@@ -1693,26 +2084,26 @@ pub const ConstraintGraph = struct {
     fn hasCycleDFS(
         self: *ConstraintGraph,
         node: usize,
-        visited: *std.ArrayList(bool),
-        rec_stack: *std.ArrayList(bool),
+        visited: *std.DynamicBitSet,
+        rec_stack: *std.DynamicBitSet,
     ) !bool {
-        visited.items[node] = true;
-        rec_stack.items[node] = true;
+        visited.set(node);
+        rec_stack.set(node);
 
         // Visit all neighbors
         for (self.edges.items) |edge| {
             if (edge.from == node) {
-                if (!visited.items[edge.to]) {
+                if (!visited.isSet(edge.to)) {
                     if (try self.hasCycleDFS(edge.to, visited, rec_stack)) {
                         return true;
                     }
-                } else if (rec_stack.items[edge.to]) {
+                } else if (rec_stack.isSet(edge.to)) {
                     return true;
                 }
             }
         }
 
-        rec_stack.items[node] = false;
+        rec_stack.unset(node);
         return false;
     }
 
@@ -1826,6 +2217,93 @@ pub const ConstraintGraph = struct {
         return false;
     }
 
+    /// Detect changes between old fingerprints and current constraint set
+    pub fn detectChanges(
+        self: *ConstraintGraph,
+        old_fingerprints: *const std.AutoHashMap(u64, ConstraintFingerprint),
+    ) !ChangeSet {
+        var changes = ChangeSet.init(self.allocator);
+
+        // Build set of current constraint IDs for removed detection
+        var current_ids = std.AutoHashMap(u64, void).init(self.allocator);
+        defer current_ids.deinit();
+
+        // Check for added and modified constraints
+        for (self.nodes.items, 0..) |node, i| {
+            const new_fp = ConstraintFingerprint.compute(&node.constraint);
+            const constraint_id = computeConstraintId(&node.constraint);
+
+            try current_ids.put(constraint_id, {});
+
+            if (old_fingerprints.get(constraint_id)) |old_fp| {
+                if (new_fp.hasChanged(old_fp)) {
+                    try changes.modified.append(self.allocator, i);
+                }
+            } else {
+                try changes.added.append(self.allocator, i);
+            }
+        }
+
+        // Check for removed constraints
+        var old_iter = old_fingerprints.iterator();
+        while (old_iter.next()) |entry| {
+            if (!current_ids.contains(entry.key_ptr.*)) {
+                try changes.removed.append(self.allocator, entry.key_ptr.*);
+            }
+        }
+
+        return changes;
+    }
+
+    /// Get all node indices affected by changes via dependency traversal
+    pub fn getAffectedSubgraph(
+        self: *ConstraintGraph,
+        changes: *const ChangeSet,
+    ) ![]usize {
+        var affected = std.AutoHashMap(usize, void).init(self.allocator);
+        defer affected.deinit();
+
+        // Start with directly changed nodes
+        for (changes.added.items) |idx| {
+            try affected.put(idx, {});
+        }
+        for (changes.modified.items) |idx| {
+            try affected.put(idx, {});
+        }
+
+        // BFS to find all dependents (nodes that depend on changed nodes)
+        var queue = std.ArrayList(usize){};
+        defer queue.deinit(self.allocator);
+
+        var keys_iter = affected.keyIterator();
+        while (keys_iter.next()) |key| {
+            try queue.append(self.allocator, key.*);
+        }
+
+        while (queue.items.len > 0) {
+            const current = queue.orderedRemove(0);
+
+            // Find all nodes that depend on current (reverse edges)
+            for (self.edges.items) |edge| {
+                if (edge.from == current and !affected.contains(edge.to)) {
+                    try affected.put(edge.to, {});
+                    try queue.append(self.allocator, edge.to);
+                }
+            }
+        }
+
+        // Convert to owned slice
+        var result = std.ArrayList(usize){};
+        defer result.deinit(self.allocator);
+
+        var result_iter = affected.keyIterator();
+        while (result_iter.next()) |key| {
+            try result.append(self.allocator, key.*);
+        }
+
+        return try result.toOwnedSlice(self.allocator);
+    }
+
     pub fn getMaxPriority(self: *const ConstraintGraph) u32 {
         var max: u32 = 0;
         for (self.nodes.items) |node| {
@@ -1837,13 +2315,14 @@ pub const ConstraintGraph = struct {
     }
 };
 
-/// IR cache with performance tracking
+/// IR cache with performance tracking using copy-on-write semantics.
+/// Cache hits are O(1) atomic reference increments instead of O(n) deep clones.
 const IRCache = struct {
     allocator: std.mem.Allocator,
     cache: std.AutoHashMap(u64, CacheEntry),
 
     const CacheEntry = struct {
-        ir: ConstraintIR,
+        shared_ir: *SharedConstraintIR,
         hit_count: u64 = 0,
     };
 
@@ -1853,35 +2332,51 @@ const IRCache = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator) !IRCache {
+        var cache = std.AutoHashMap(u64, CacheEntry).init(allocator);
+        // Pre-allocate capacity for typical workload to avoid rehashing
+        try cache.ensureTotalCapacity(64);
         return .{
             .allocator = allocator,
-            .cache = std.AutoHashMap(u64, CacheEntry).init(allocator),
+            .cache = cache,
         };
     }
 
     pub fn deinit(self: *IRCache) void {
-        // Free all cached ConstraintIR entries
+        // Release all SharedConstraintIR references
         var iter = self.cache.valueIterator();
         while (iter.next()) |entry| {
-            var ir = entry.ir;
-            ir.deinit(self.allocator);
+            entry.shared_ir.release();
         }
         self.cache.deinit();
     }
 
-    /// Get a cached IR, returning a clone for independent ownership.
+    /// Get a cached IR, returning an acquired SharedConstraintIR reference.
     /// Returns null if not found. Increments hit counter on success.
+    /// Caller must call release() on the returned SharedConstraintIR when done.
+    /// This is O(1) - just an atomic increment, no allocations.
+    pub fn getShared(self: *IRCache, key: u64) ?*SharedConstraintIR {
+        if (self.cache.getPtr(key)) |entry| {
+            entry.hit_count += 1;
+            return entry.shared_ir.acquire();
+        }
+        return null;
+    }
+
+    /// Get a cached IR, returning a deep clone for independent ownership.
+    /// Returns null if not found. Increments hit counter on success.
+    /// This is the legacy API for callers that need to modify the IR.
     pub fn get(self: *IRCache, key: u64) !?ConstraintIR {
         if (self.cache.getPtr(key)) |entry| {
             entry.hit_count += 1;
-            return try entry.ir.clone(self.allocator);
+            return try entry.shared_ir.ir.clone(self.allocator);
         }
         return null;
     }
 
     /// Store an IR in the cache. Takes ownership of the IR.
     pub fn put(self: *IRCache, key: u64, ir: ConstraintIR) !void {
-        const entry = CacheEntry{ .ir = ir, .hit_count = 0 };
+        const shared = try SharedConstraintIR.create(self.allocator, ir);
+        const entry = CacheEntry{ .shared_ir = shared, .hit_count = 0 };
         try self.cache.put(key, entry);
     }
 
@@ -2171,3 +2666,6 @@ fn hashUsize(hasher: *std.hash.Wyhash, value: usize) void {
     const bytes = std.mem.asBytes(&value);
     hasher.update(bytes);
 }
+
+// Export hole compiler
+pub const HoleCompiler = @import("hole_compiler.zig").HoleCompiler;

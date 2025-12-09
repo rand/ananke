@@ -1,6 +1,6 @@
 {
   "benchmark_suite": "ananke_v0.1.0",
-  "timestamp": 1764286333,
+  "timestamp": 1765261606,
   "environment": {
     "os": "macos",
     "cpu": "aarch64",
@@ -10,85 +10,85 @@
   "results": {
     "extraction": {
       "small_ts": {
-        "p50_ms": 0.01,
+        "p50_ms": 0.02,
         "p95_ms": 0.02,
         "p99_ms": 0.02,
         "max_ms": 0.02,
         "pass": true
       },
       "medium_ts": {
-        "p50_ms": 0.02,
-        "p95_ms": 0.03,
-        "p99_ms": 0.04,
-        "max_ms": 0.04,
+        "p50_ms": 0.01,
+        "p95_ms": 0.01,
+        "p99_ms": 0.01,
+        "max_ms": 0.01,
         "pass": true
       },
       "large_ts": {
-        "p50_ms": 0.02,
-        "p95_ms": 0.02,
-        "p99_ms": 0.03,
-        "max_ms": 0.03,
+        "p50_ms": 0.00,
+        "p95_ms": 0.01,
+        "p99_ms": 0.01,
+        "max_ms": 0.01,
         "pass": true
       },
       "small_py": {
-        "p50_ms": 0.02,
-        "p95_ms": 0.02,
-        "p99_ms": 0.03,
-        "max_ms": 0.03,
+        "p50_ms": 0.01,
+        "p95_ms": 0.01,
+        "p99_ms": 0.01,
+        "max_ms": 0.01,
         "pass": true
       },
       "medium_py": {
-        "p50_ms": 0.02,
-        "p95_ms": 0.03,
-        "p99_ms": 0.03,
-        "max_ms": 0.03,
+        "p50_ms": 0.01,
+        "p95_ms": 0.01,
+        "p99_ms": 0.01,
+        "max_ms": 0.01,
         "pass": true
       },
       "large_py": {
-        "p50_ms": 0.03,
-        "p95_ms": 0.04,
-        "p99_ms": 0.05,
-        "max_ms": 0.05,
+        "p50_ms": 0.01,
+        "p95_ms": 0.01,
+        "p99_ms": 0.02,
+        "max_ms": 0.02,
         "pass": true
       }
     },
     "compilation": {
       "single_constraint": {
-        "p50_ms": 0.00,
-        "p95_ms": 0.00,
-        "p99_ms": 0.00,
-        "pass": true
-      },
-      "ten_constraints": {
         "p50_ms": 0.01,
         "p95_ms": 0.01,
         "p99_ms": 0.01,
         "pass": true
       },
-      "hundred_constraints": {
+      "ten_constraints": {
         "p50_ms": 0.01,
         "p95_ms": 0.02,
         "p99_ms": 0.02,
+        "pass": true
+      },
+      "hundred_constraints": {
+        "p50_ms": 0.02,
+        "p95_ms": 0.02,
+        "p99_ms": 0.03,
         "pass": true
       }
     },
     "cache": {
       "cache_10_constraints": {
-        "speedup": 11.4,
-        "cold_us": 64,
-        "warm_us": 5,
+        "speedup": 25.1,
+        "cold_us": 59,
+        "warm_us": 2,
         "pass": true
       },
       "cache_50_constraints": {
-        "speedup": 12.6,
-        "cold_us": 124,
-        "warm_us": 9,
+        "speedup": 12.7,
+        "cold_us": 98,
+        "warm_us": 7,
         "pass": true
       },
       "cache_100_constraints": {
-        "speedup": 11.6,
-        "cold_us": 179,
-        "warm_us": 15,
+        "speedup": 12.1,
+        "cold_us": 155,
+        "warm_us": 12,
         "pass": true
       }
     },
@@ -100,15 +100,15 @@
         "pass": true
       },
       "e2e_medium_ts": {
-        "extraction_ms": 2,
-        "compilation_ms": 0,
-        "total_ms": 2,
-        "pass": true
-      },
-      "e2e_large_ts": {
         "extraction_ms": 3,
         "compilation_ms": 0,
         "total_ms": 3,
+        "pass": true
+      },
+      "e2e_large_ts": {
+        "extraction_ms": 5,
+        "compilation_ms": 0,
+        "total_ms": 5,
         "pass": true
       },
       "e2e_small_py": {
@@ -118,15 +118,15 @@
         "pass": true
       },
       "e2e_medium_py": {
-        "extraction_ms": 3,
+        "extraction_ms": 4,
         "compilation_ms": 0,
-        "total_ms": 3,
+        "total_ms": 4,
         "pass": true
       },
       "e2e_large_py": {
-        "extraction_ms": 5,
+        "extraction_ms": 8,
         "compilation_ms": 0,
-        "total_ms": 6,
+        "total_ms": 9,
         "pass": true
       }
     }

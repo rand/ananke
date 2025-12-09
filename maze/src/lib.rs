@@ -34,9 +34,16 @@
 //! }
 //! ```
 
+pub mod adaptive_selector;
+pub mod diffusion;
 pub mod ffi;
 pub mod modal_client;
+pub mod model_router;
+pub mod model_selector;
+pub mod progressive_refinement;
 pub mod python;
+pub mod strategy_stats;
+pub mod telemetry;
 
 use anyhow::{Context, Result};
 use lru::LruCache;
@@ -46,8 +53,21 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub use ffi::{ConstraintIR, GenerationResult, Intent};
-pub use modal_client::{ModalClient, ModalConfig};
+pub use diffusion::{DiffusionConfig, DiffusionGenerator, DiffusionResult, NoiseSchedule};
+pub use ffi::{ConstraintIR, FillConstraint, GenerationResult, HoleSpec, Intent};
+pub use modal_client::{
+    EnsembleClient, EnsembleConfig, EnsembleMetrics, InferenceRequest, InferenceResponse,
+    ModelMetrics, ModalClient, ModalConfig, StreamChunk, StreamingResult,
+};
+pub use model_router::{ModelCapability, ModelEndpoint, ModelRouter, RoutingDecision};
+pub use model_selector::{ModelChoice, ModelSelector};
+pub use progressive_refinement::{
+    FailureStrategy, HoleState, HoleStatus, ProgressiveRefiner, RefinementConfig,
+    RefinementResult,
+};
+pub use adaptive_selector::{AdaptiveConfig, AdaptiveStrategySelector, Strategy, SelectionDecision};
+pub use strategy_stats::{StatsKey, StrategyStats, StrategyStatsStore, StatsSummary};
+pub use telemetry::{FillOutcome, TelemetryStore};
 
 /// Main orchestrator for constrained code generation
 ///
@@ -466,6 +486,13 @@ impl MazeOrchestrator {
             size: cache.len(),
             limit: cache.cap().get(),
         }
+    }
+
+    /// Check if the Modal inference service is healthy
+    ///
+    /// Returns true if the service is reachable and responding, false otherwise.
+    pub async fn health_check(&self) -> Result<bool> {
+        self.modal_client.health_check().await
     }
 }
 

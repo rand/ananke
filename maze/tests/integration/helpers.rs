@@ -2,6 +2,8 @@
 //!
 //! Provides common test utilities, fixtures, and assertion helpers
 
+#![allow(dead_code)]
+
 use maze::{
     ffi::{ConstraintIR, Grammar, GrammarRule, JsonSchema, RegexPattern, TokenMaskRules},
     GenerationContext, GenerationRequest, MazeOrchestrator, ModalConfig,

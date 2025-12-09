@@ -539,14 +539,16 @@ impl Ananke {
     /// Returns:
     ///     bool: True if service is healthy, False otherwise
     fn health_check<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let _orch = self.orchestrator.clone();
+        let orch = self.orchestrator.clone();
 
         future_into_py(py, async move {
-            // Access the modal_client through MazeOrchestrator
-            // Since modal_client is private, we need to add a public method
-            // For now, we'll return a placeholder
-            // TODO: Add health_check method to MazeOrchestrator
-            Ok(true)
+            match orch.health_check().await {
+                Ok(is_healthy) => Ok(is_healthy),
+                Err(e) => {
+                    tracing::warn!("Health check failed: {}", e);
+                    Ok(false)
+                }
+            }
         })
     }
 
@@ -593,17 +595,79 @@ impl Ananke {
 // Helper functions for type conversion
 
 fn python_request_to_rust(py_req: PyGenerationRequest) -> PyResult<GenerationRequest> {
-    // Phase 7a: Simple conversion without full FFI integration
-    // For now, pass empty constraints. Full constraint conversion will be in Phase 7b.
     let constraints_ir: Vec<ConstraintIR> = py_req.constraints_ir
         .iter()
         .map(|py_c| {
-            // Create a simple Rust-native ConstraintIR
+            // Parse JSON schema from Python string if provided
+            let json_schema = py_c.json_schema.as_ref().and_then(|schema_str| {
+                serde_json::from_str::<serde_json::Value>(schema_str)
+                    .ok()
+                    .map(|value| {
+                        crate::ffi::JsonSchema {
+                            schema_type: value.get("type")
+                                .and_then(|t| t.as_str())
+                                .unwrap_or("object")
+                                .to_string(),
+                            properties: value.get("properties")
+                                .and_then(|p| p.as_object())
+                                .map(|obj| obj.iter()
+                                    .map(|(k, v)| (k.clone(), v.clone()))
+                                    .collect())
+                                .unwrap_or_default(),
+                            required: value.get("required")
+                                .and_then(|r| r.as_array())
+                                .map(|arr| arr.iter()
+                                    .filter_map(|v| v.as_str().map(String::from))
+                                    .collect())
+                                .unwrap_or_default(),
+                            additional_properties: value.get("additionalProperties")
+                                .and_then(|a| a.as_bool())
+                                .unwrap_or(true),
+                        }
+                    })
+            });
+
+            // Parse grammar from Python string if provided
+            // Expected format: JSON with { "rules": [...], "start_symbol": "..." }
+            let grammar = py_c.grammar.as_ref().and_then(|grammar_str| {
+                serde_json::from_str::<serde_json::Value>(grammar_str)
+                    .ok()
+                    .and_then(|value| {
+                        let rules = value.get("rules")?
+                            .as_array()?
+                            .iter()
+                            .filter_map(|rule| {
+                                Some(crate::ffi::GrammarRule {
+                                    lhs: rule.get("lhs")?.as_str()?.to_string(),
+                                    rhs: rule.get("rhs")?
+                                        .as_array()?
+                                        .iter()
+                                        .filter_map(|r| r.as_str().map(String::from))
+                                        .collect(),
+                                })
+                            })
+                            .collect();
+                        let start_symbol = value.get("start_symbol")?
+                            .as_str()?
+                            .to_string();
+                        Some(crate::ffi::Grammar { rules, start_symbol })
+                    })
+            });
+
+            // Convert regex patterns from Python strings
+            let regex_patterns: Vec<crate::ffi::RegexPattern> = py_c.regex_patterns
+                .iter()
+                .map(|pattern| crate::ffi::RegexPattern {
+                    pattern: pattern.clone(),
+                    flags: String::new(),
+                })
+                .collect();
+
             ConstraintIR {
                 name: py_c.name.clone(),
-                json_schema: None,  // TODO Phase 7b: Parse JSON schema from Python string
-                grammar: None,      // TODO Phase 7b: Parse grammar from Python string
-                regex_patterns: vec![],  // TODO Phase 7b: Convert regex patterns
+                json_schema,
+                grammar,
+                regex_patterns,
                 token_masks: None,
                 priority: 2,
             }

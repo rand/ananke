@@ -289,6 +289,85 @@ pub const Traversal = struct {
         return try ctx.results.toOwnedSlice(self.allocator);
     }
 
+    /// Find all nodes matching any of the given types in a SINGLE traversal.
+    /// This is 8x more efficient than calling findByType() separately for each type.
+    /// Returns a StringHashMap where keys are node types and values are arrays of matching nodes.
+    /// Caller must free the returned map and its contents.
+    pub fn findByTypes(
+        self: Traversal,
+        root: Node,
+        node_types: []const []const u8,
+    ) !std.StringHashMap([]Node) {
+        // Create context for visitor
+        const Context = struct {
+            allocator: Allocator,
+            node_types: []const []const u8,
+            results: std.StringHashMap(std.ArrayList(Node)),
+        };
+
+        var ctx = Context{
+            .allocator = self.allocator,
+            .node_types = node_types,
+            .results = std.StringHashMap(std.ArrayList(Node)).init(self.allocator),
+        };
+        errdefer {
+            var iter = ctx.results.valueIterator();
+            while (iter.next()) |list| {
+                list.deinit(self.allocator);
+            }
+            ctx.results.deinit();
+        }
+
+        // Pre-populate with empty lists for each type
+        for (node_types) |nt| {
+            try ctx.results.put(nt, std.ArrayList(Node){});
+        }
+
+        // Single traversal collecting all matching types
+        const visitor = struct {
+            fn visit(node: Node, depth: u32, context_ptr: ?*anyopaque) !bool {
+                _ = depth;
+                const c: *Context = @ptrCast(@alignCast(context_ptr.?));
+                const ntype = node.nodeType();
+
+                // Check if this node type is one we're looking for
+                for (c.node_types) |target_type| {
+                    if (std.mem.eql(u8, ntype, target_type)) {
+                        if (c.results.getPtr(target_type)) |list| {
+                            try list.append(c.allocator, node);
+                        }
+                        break; // Node type matched, no need to check others
+                    }
+                }
+                return true;
+            }
+        }.visit;
+
+        try self.traverse(root, .pre_order, visitor, &ctx);
+
+        // Convert ArrayLists to owned slices
+        var final_results = std.StringHashMap([]Node).init(self.allocator);
+        errdefer final_results.deinit();
+
+        var iter = ctx.results.iterator();
+        while (iter.next()) |entry| {
+            const slice = try entry.value_ptr.toOwnedSlice(self.allocator);
+            try final_results.put(entry.key_ptr.*, slice);
+        }
+        ctx.results.deinit();
+
+        return final_results;
+    }
+
+    /// Free the results returned by findByTypes
+    pub fn freeFindByTypesResult(self: Traversal, result: *std.StringHashMap([]Node)) void {
+        var iter = result.valueIterator();
+        while (iter.next()) |slice| {
+            self.allocator.free(slice.*);
+        }
+        result.deinit();
+    }
+
     /// Get text for a node from source
     pub fn getNodeText(self: Traversal, node: Node, source: []const u8) []const u8 {
         _ = self;
