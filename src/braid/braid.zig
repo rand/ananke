@@ -2171,3 +2171,6 @@ fn hashUsize(hasher: *std.hash.Wyhash, value: usize) void {
     const bytes = std.mem.asBytes(&value);
     hasher.update(bytes);
 }
+
+// Export hole compiler
+pub const HoleCompiler = @import("hole_compiler.zig").HoleCompiler;

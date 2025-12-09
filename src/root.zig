@@ -19,6 +19,7 @@ pub const api = struct {
 pub const types = struct {
     pub const constraint = @import("types/constraint.zig");
     pub const intent = @import("types/intent.zig");
+    pub const hole = @import("types/hole.zig");
 };
 
 // Re-export utility modules
@@ -37,6 +38,14 @@ pub const ConstraintKind = types.constraint.ConstraintKind;
 pub const ConstraintSource = types.constraint.ConstraintSource;
 pub const EnforcementType = types.constraint.EnforcementType;
 pub const ConstraintPriority = types.constraint.ConstraintPriority;
+
+// Re-export hole types
+pub const Hole = types.hole.Hole;
+pub const HoleSet = types.hole.HoleSet;
+pub const HoleScale = types.hole.HoleScale;
+pub const HoleOrigin = types.hole.HoleOrigin;
+pub const HoleSpec = types.constraint.HoleSpec;
+pub const FillConstraint = types.constraint.FillConstraint;
 
 // Main Ananke API
 pub const Ananke = struct {

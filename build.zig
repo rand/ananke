@@ -1158,6 +1158,50 @@ pub fn build(b: *std.Build) void {
 
     const run_ariadne_tests = b.addRunArtifact(ariadne_tests);
 
+    // Typed holes tests
+    const hole_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/types/hole_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+            },
+        }),
+    });
+
+    const run_hole_tests = b.addRunArtifact(hole_tests);
+
+    // Hole detector tests
+    const hole_detector_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/hole_detector_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+            },
+        }),
+    });
+
+    const run_hole_detector_tests = b.addRunArtifact(hole_detector_tests);
+
+    // Hole compiler tests
+    const hole_compiler_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/hole_compiler_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_hole_compiler_tests = b.addRunArtifact(hole_compiler_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -1188,6 +1232,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_cli_integration_tests.step);
     test_step.dependOn(&run_security_edge_case_tests.step);
     test_step.dependOn(&run_ariadne_tests.step);
+    test_step.dependOn(&run_hole_tests.step);
+    test_step.dependOn(&run_hole_detector_tests.step);
+    test_step.dependOn(&run_hole_compiler_tests.step);
 
     // Phase 8a: TypeScript E2E pipeline tests
     const typescript_pipeline_tests = b.addTest(.{

@@ -174,6 +174,12 @@ pub const ConstraintIR = struct {
     /// true if this IR owns grammar strings (from clone), false if borrowed from interner
     owns_grammar_strings: bool = false,
 
+    /// Hole specifications for progressive refinement
+    hole_specs: []const HoleSpec = &.{},
+
+    /// Whether this IR supports iterative refinement
+    supports_refinement: bool = false,
+
     /// Free all allocated memory in this ConstraintIR
     pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
         // Free json_schema if present
@@ -457,6 +463,32 @@ pub const Regex = struct {
     pattern: []const u8,
     flags: []const u8 = "",
     is_static: bool = false, // true if pattern points to static RegexPatternPool constant
+};
+
+/// Specification for filling a hole
+pub const HoleSpec = struct {
+    hole_id: u64,
+    fill_schema: ?JsonSchema = null,
+    fill_grammar: ?Grammar = null,
+    fill_patterns: []const Regex = &.{},
+    fill_constraints: []const FillConstraint = &.{},
+    grammar_ref: ?[]const u8 = null,
+};
+
+pub const FillConstraint = struct {
+    kind: FillConstraintKind,
+    value: []const u8,
+    error_message: ?[]const u8 = null,
+};
+
+pub const FillConstraintKind = enum {
+    must_have_type,
+    must_use_binding,
+    must_not_use_binding,
+    must_satisfy_predicate,
+    must_match_pattern,
+    must_be_pure,
+    must_terminate,
 };
 
 /// Individual token mask rule
