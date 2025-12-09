@@ -382,17 +382,18 @@ Fast enough for interactive use and CI/CD.
 
 ### Q: What languages are supported?
 
-**v0.1.0 (Fully Supported):**
-- TypeScript/JavaScript
-- Python
+**Fully Supported (9 languages):**
+- TypeScript (`typescript`, `ts`)
+- JavaScript (`javascript`, `js`)
+- Python (`python`, `py`)
+- Rust (`rust`, `rs`)
+- Go (`go`)
+- Zig (`zig`)
+- C (`c`)
+- C++ (`cpp`, `c++`)
+- Java (`java`)
 
-**v0.2.0 (Planned):**
-- Rust
-- Go
-- Zig
-- Extended tree-sitter integration for additional languages
-
-Note: We use pure Zig structural parsers in v0.1.0 for compatibility. Tree-sitter integration planned for v0.2.
+All languages have full tree-sitter AST parsing with pattern-based fallback.
 
 ### Q: How accurate is constraint extraction?
 

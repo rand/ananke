@@ -35,7 +35,7 @@ defer ir.deinit(allocator);
 
 ### Supported Languages
 
-`"typescript"`, `"python"`, `"rust"`, `"zig"`, `"go"`
+`"typescript"`, `"javascript"`, `"python"`, `"rust"`, `"go"`, `"zig"`, `"c"`, `"cpp"`, `"java"`
 
 ### Constraint Kinds
 

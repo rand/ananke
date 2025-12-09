@@ -123,11 +123,12 @@ result = await maze.generate(
 
 ### Production Ready
 
-- Clew constraint extraction (TypeScript, Python)
+- Clew constraint extraction (9 languages: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java)
+- Full tree-sitter AST integration with pattern-based fallback
 - Braid constraint compilation (JSON Schema, regex, token masks)
 - Maze orchestration with Modal/vLLM
 - CLI tool with 6 commands
-- 334 tests passing, zero memory leaks
+- 334+ tests passing, zero memory leaks
 
 ### Typed Holes (v0.2.0)
 
@@ -185,10 +186,11 @@ Inspired by:
 - [x] CLI tool - 6 commands functional
 - [x] Security hardening - OWASP Top 10 compliance
 - [x] 301 tests passing, 0 memory leaks
+- [x] Full tree-sitter integration for all 9 languages
+- [x] JavaScript, Rust, Go, Zig, C, C++, Java extractors
+- [x] Semantic hole detection for all languages
 
 ### Planned (v0.2.0)
-- [ ] Full tree-sitter integration for all languages
-- [ ] Rust, Go, Zig extractors
 - [ ] Ariadne DSL type checking
 - [ ] Bidirectional streaming generation
 - [ ] Multi-model orchestration

@@ -886,6 +886,855 @@ pub const zig_patterns = LanguagePatterns{
 };
 
 // ============================================================================
+// JavaScript Patterns
+// ============================================================================
+
+const js_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "async function",
+        .constraint_kind = .semantic,
+        .description = "Async function declaration",
+    },
+    .{
+        .pattern = "function*",
+        .constraint_kind = .syntactic,
+        .description = "Generator function",
+    },
+    .{
+        .pattern = "function",
+        .constraint_kind = .syntactic,
+        .description = "Function declaration",
+    },
+    .{
+        .pattern = "=>",
+        .constraint_kind = .syntactic,
+        .description = "Arrow function",
+    },
+};
+
+const js_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "typeof",
+        .constraint_kind = .type_safety,
+        .description = "Type check",
+    },
+    .{
+        .pattern = "instanceof",
+        .constraint_kind = .type_safety,
+        .description = "Instance check",
+    },
+};
+
+const js_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "async",
+        .constraint_kind = .semantic,
+        .description = "Async keyword",
+    },
+    .{
+        .pattern = "await",
+        .constraint_kind = .semantic,
+        .description = "Await keyword",
+    },
+    .{
+        .pattern = "Promise",
+        .constraint_kind = .semantic,
+        .description = "Promise type",
+    },
+    .{
+        .pattern = ".then(",
+        .constraint_kind = .semantic,
+        .description = "Promise chain",
+    },
+};
+
+const js_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "try {",
+        .constraint_kind = .semantic,
+        .description = "Try block",
+    },
+    .{
+        .pattern = "catch",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "throw",
+        .constraint_kind = .semantic,
+        .description = "Throw statement",
+    },
+    .{
+        .pattern = "finally",
+        .constraint_kind = .semantic,
+        .description = "Finally block",
+    },
+};
+
+const js_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "import {",
+        .constraint_kind = .architectural,
+        .description = "Named import",
+    },
+    .{
+        .pattern = "import * as",
+        .constraint_kind = .architectural,
+        .description = "Namespace import",
+    },
+    .{
+        .pattern = "import ",
+        .constraint_kind = .architectural,
+        .description = "Import statement",
+    },
+    .{
+        .pattern = "export",
+        .constraint_kind = .architectural,
+        .description = "Export statement",
+    },
+    .{
+        .pattern = "require(",
+        .constraint_kind = .architectural,
+        .description = "CommonJS require",
+    },
+    .{
+        .pattern = "module.exports",
+        .constraint_kind = .architectural,
+        .description = "CommonJS export",
+    },
+};
+
+const js_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class declaration",
+    },
+    .{
+        .pattern = "extends",
+        .constraint_kind = .syntactic,
+        .description = "Class inheritance",
+    },
+    .{
+        .pattern = "constructor(",
+        .constraint_kind = .syntactic,
+        .description = "Constructor method",
+    },
+};
+
+const js_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "\"use strict\"",
+        .constraint_kind = .syntactic,
+        .description = "Strict mode",
+    },
+};
+
+const js_memory_patterns = [_]PatternRule{};
+
+pub const javascript_patterns = LanguagePatterns{
+    .function_decl = &js_function_patterns,
+    .type_annotation = &js_type_patterns,
+    .async_pattern = &js_async_patterns,
+    .error_handling = &js_error_patterns,
+    .imports = &js_import_patterns,
+    .class_struct = &js_class_patterns,
+    .metadata = &js_metadata_patterns,
+    .memory_management = &js_memory_patterns,
+};
+
+// ============================================================================
+// C Patterns
+// ============================================================================
+
+const c_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "static ",
+        .constraint_kind = .syntactic,
+        .description = "Static function/variable",
+    },
+    .{
+        .pattern = "extern ",
+        .constraint_kind = .syntactic,
+        .description = "External declaration",
+    },
+    .{
+        .pattern = "inline ",
+        .constraint_kind = .syntactic,
+        .description = "Inline function",
+    },
+};
+
+const c_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "const ",
+        .constraint_kind = .type_safety,
+        .description = "Const qualifier",
+    },
+    .{
+        .pattern = "volatile ",
+        .constraint_kind = .type_safety,
+        .description = "Volatile qualifier",
+    },
+    .{
+        .pattern = "unsigned ",
+        .constraint_kind = .type_safety,
+        .description = "Unsigned type",
+    },
+    .{
+        .pattern = "size_t",
+        .constraint_kind = .type_safety,
+        .description = "Size type",
+    },
+    .{
+        .pattern = "void*",
+        .constraint_kind = .type_safety,
+        .description = "Void pointer",
+    },
+};
+
+const c_async_patterns = [_]PatternRule{};
+
+const c_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "errno",
+        .constraint_kind = .semantic,
+        .description = "Error number",
+    },
+    .{
+        .pattern = "perror(",
+        .constraint_kind = .semantic,
+        .description = "Print error",
+    },
+    .{
+        .pattern = "assert(",
+        .constraint_kind = .semantic,
+        .description = "Assertion",
+    },
+    .{
+        .pattern = "abort(",
+        .constraint_kind = .semantic,
+        .description = "Abort call",
+    },
+    .{
+        .pattern = "exit(",
+        .constraint_kind = .semantic,
+        .description = "Exit call",
+    },
+};
+
+const c_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "#include <",
+        .constraint_kind = .architectural,
+        .description = "System include",
+    },
+    .{
+        .pattern = "#include \"",
+        .constraint_kind = .architectural,
+        .description = "Local include",
+    },
+};
+
+const c_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "struct ",
+        .constraint_kind = .syntactic,
+        .description = "Struct definition",
+    },
+    .{
+        .pattern = "enum ",
+        .constraint_kind = .syntactic,
+        .description = "Enum definition",
+    },
+    .{
+        .pattern = "union ",
+        .constraint_kind = .syntactic,
+        .description = "Union definition",
+    },
+    .{
+        .pattern = "typedef ",
+        .constraint_kind = .syntactic,
+        .description = "Type definition",
+    },
+};
+
+const c_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "#define ",
+        .constraint_kind = .syntactic,
+        .description = "Macro definition",
+    },
+    .{
+        .pattern = "#ifdef",
+        .constraint_kind = .syntactic,
+        .description = "Conditional compilation",
+    },
+    .{
+        .pattern = "#ifndef",
+        .constraint_kind = .syntactic,
+        .description = "Conditional compilation",
+    },
+    .{
+        .pattern = "#pragma",
+        .constraint_kind = .syntactic,
+        .description = "Pragma directive",
+    },
+};
+
+const c_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "malloc(",
+        .constraint_kind = .operational,
+        .description = "Memory allocation",
+    },
+    .{
+        .pattern = "calloc(",
+        .constraint_kind = .operational,
+        .description = "Cleared allocation",
+    },
+    .{
+        .pattern = "realloc(",
+        .constraint_kind = .operational,
+        .description = "Reallocation",
+    },
+    .{
+        .pattern = "free(",
+        .constraint_kind = .operational,
+        .description = "Memory free",
+    },
+    .{
+        .pattern = "memcpy(",
+        .constraint_kind = .operational,
+        .description = "Memory copy",
+    },
+    .{
+        .pattern = "memset(",
+        .constraint_kind = .operational,
+        .description = "Memory set",
+    },
+};
+
+pub const c_patterns = LanguagePatterns{
+    .function_decl = &c_function_patterns,
+    .type_annotation = &c_type_patterns,
+    .async_pattern = &c_async_patterns,
+    .error_handling = &c_error_patterns,
+    .imports = &c_import_patterns,
+    .class_struct = &c_class_patterns,
+    .metadata = &c_metadata_patterns,
+    .memory_management = &c_memory_patterns,
+};
+
+// ============================================================================
+// C++ Patterns
+// ============================================================================
+
+const cpp_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "virtual ",
+        .constraint_kind = .syntactic,
+        .description = "Virtual function",
+    },
+    .{
+        .pattern = "override",
+        .constraint_kind = .syntactic,
+        .description = "Override specifier",
+    },
+    .{
+        .pattern = "constexpr ",
+        .constraint_kind = .syntactic,
+        .description = "Constexpr function",
+    },
+    .{
+        .pattern = "noexcept",
+        .constraint_kind = .syntactic,
+        .description = "Noexcept specifier",
+    },
+    .{
+        .pattern = "template<",
+        .constraint_kind = .syntactic,
+        .description = "Template declaration",
+    },
+};
+
+const cpp_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "const ",
+        .constraint_kind = .type_safety,
+        .description = "Const qualifier",
+    },
+    .{
+        .pattern = "auto ",
+        .constraint_kind = .type_safety,
+        .description = "Auto type deduction",
+    },
+    .{
+        .pattern = "decltype(",
+        .constraint_kind = .type_safety,
+        .description = "Decltype specifier",
+    },
+    .{
+        .pattern = "nullptr",
+        .constraint_kind = .type_safety,
+        .description = "Null pointer",
+    },
+    .{
+        .pattern = "static_cast<",
+        .constraint_kind = .type_safety,
+        .description = "Static cast",
+    },
+    .{
+        .pattern = "dynamic_cast<",
+        .constraint_kind = .type_safety,
+        .description = "Dynamic cast",
+    },
+    .{
+        .pattern = "reinterpret_cast<",
+        .constraint_kind = .type_safety,
+        .description = "Reinterpret cast",
+    },
+};
+
+const cpp_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "std::async(",
+        .constraint_kind = .semantic,
+        .description = "Async call",
+    },
+    .{
+        .pattern = "std::future<",
+        .constraint_kind = .semantic,
+        .description = "Future type",
+    },
+    .{
+        .pattern = "std::promise<",
+        .constraint_kind = .semantic,
+        .description = "Promise type",
+    },
+    .{
+        .pattern = "std::thread",
+        .constraint_kind = .semantic,
+        .description = "Thread type",
+    },
+    .{
+        .pattern = "std::mutex",
+        .constraint_kind = .semantic,
+        .description = "Mutex type",
+    },
+};
+
+const cpp_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "try {",
+        .constraint_kind = .semantic,
+        .description = "Try block",
+    },
+    .{
+        .pattern = "catch (",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "throw ",
+        .constraint_kind = .semantic,
+        .description = "Throw statement",
+    },
+    .{
+        .pattern = "std::exception",
+        .constraint_kind = .semantic,
+        .description = "Standard exception",
+    },
+    .{
+        .pattern = "std::runtime_error",
+        .constraint_kind = .semantic,
+        .description = "Runtime error",
+    },
+    .{
+        .pattern = "std::logic_error",
+        .constraint_kind = .semantic,
+        .description = "Logic error",
+    },
+};
+
+const cpp_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "#include <",
+        .constraint_kind = .architectural,
+        .description = "System include",
+    },
+    .{
+        .pattern = "#include \"",
+        .constraint_kind = .architectural,
+        .description = "Local include",
+    },
+    .{
+        .pattern = "using namespace",
+        .constraint_kind = .architectural,
+        .description = "Using namespace",
+    },
+    .{
+        .pattern = "using ",
+        .constraint_kind = .architectural,
+        .description = "Using declaration",
+    },
+    .{
+        .pattern = "namespace ",
+        .constraint_kind = .architectural,
+        .description = "Namespace definition",
+    },
+};
+
+const cpp_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "struct ",
+        .constraint_kind = .syntactic,
+        .description = "Struct definition",
+    },
+    .{
+        .pattern = "enum class",
+        .constraint_kind = .syntactic,
+        .description = "Scoped enum",
+    },
+    .{
+        .pattern = "public:",
+        .constraint_kind = .syntactic,
+        .description = "Public access",
+    },
+    .{
+        .pattern = "private:",
+        .constraint_kind = .syntactic,
+        .description = "Private access",
+    },
+    .{
+        .pattern = "protected:",
+        .constraint_kind = .syntactic,
+        .description = "Protected access",
+    },
+};
+
+const cpp_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "[[",
+        .constraint_kind = .syntactic,
+        .description = "Attribute",
+    },
+    .{
+        .pattern = "#define ",
+        .constraint_kind = .syntactic,
+        .description = "Macro definition",
+    },
+};
+
+const cpp_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "std::unique_ptr<",
+        .constraint_kind = .operational,
+        .description = "Unique pointer",
+    },
+    .{
+        .pattern = "std::shared_ptr<",
+        .constraint_kind = .operational,
+        .description = "Shared pointer",
+    },
+    .{
+        .pattern = "std::weak_ptr<",
+        .constraint_kind = .operational,
+        .description = "Weak pointer",
+    },
+    .{
+        .pattern = "std::make_unique<",
+        .constraint_kind = .operational,
+        .description = "Make unique",
+    },
+    .{
+        .pattern = "std::make_shared<",
+        .constraint_kind = .operational,
+        .description = "Make shared",
+    },
+    .{
+        .pattern = "new ",
+        .constraint_kind = .operational,
+        .description = "New allocation",
+    },
+    .{
+        .pattern = "delete ",
+        .constraint_kind = .operational,
+        .description = "Delete deallocation",
+    },
+    .{
+        .pattern = "std::move(",
+        .constraint_kind = .operational,
+        .description = "Move semantics",
+    },
+};
+
+pub const cpp_patterns = LanguagePatterns{
+    .function_decl = &cpp_function_patterns,
+    .type_annotation = &cpp_type_patterns,
+    .async_pattern = &cpp_async_patterns,
+    .error_handling = &cpp_error_patterns,
+    .imports = &cpp_import_patterns,
+    .class_struct = &cpp_class_patterns,
+    .metadata = &cpp_metadata_patterns,
+    .memory_management = &cpp_memory_patterns,
+};
+
+// ============================================================================
+// Java Patterns
+// ============================================================================
+
+const java_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "public ",
+        .constraint_kind = .syntactic,
+        .description = "Public access",
+    },
+    .{
+        .pattern = "private ",
+        .constraint_kind = .syntactic,
+        .description = "Private access",
+    },
+    .{
+        .pattern = "protected ",
+        .constraint_kind = .syntactic,
+        .description = "Protected access",
+    },
+    .{
+        .pattern = "static ",
+        .constraint_kind = .syntactic,
+        .description = "Static member",
+    },
+    .{
+        .pattern = "synchronized ",
+        .constraint_kind = .semantic,
+        .description = "Synchronized method",
+    },
+    .{
+        .pattern = "abstract ",
+        .constraint_kind = .syntactic,
+        .description = "Abstract method",
+    },
+    .{
+        .pattern = "final ",
+        .constraint_kind = .syntactic,
+        .description = "Final method/class",
+    },
+};
+
+const java_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "Optional<",
+        .constraint_kind = .type_safety,
+        .description = "Optional type",
+    },
+    .{
+        .pattern = "List<",
+        .constraint_kind = .type_safety,
+        .description = "List type",
+    },
+    .{
+        .pattern = "Map<",
+        .constraint_kind = .type_safety,
+        .description = "Map type",
+    },
+    .{
+        .pattern = "Set<",
+        .constraint_kind = .type_safety,
+        .description = "Set type",
+    },
+    .{
+        .pattern = "@NonNull",
+        .constraint_kind = .type_safety,
+        .description = "NonNull annotation",
+    },
+    .{
+        .pattern = "@Nullable",
+        .constraint_kind = .type_safety,
+        .description = "Nullable annotation",
+    },
+};
+
+const java_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "CompletableFuture<",
+        .constraint_kind = .semantic,
+        .description = "CompletableFuture type",
+    },
+    .{
+        .pattern = "Future<",
+        .constraint_kind = .semantic,
+        .description = "Future type",
+    },
+    .{
+        .pattern = "ExecutorService",
+        .constraint_kind = .semantic,
+        .description = "Executor service",
+    },
+    .{
+        .pattern = "Runnable",
+        .constraint_kind = .semantic,
+        .description = "Runnable interface",
+    },
+    .{
+        .pattern = "Callable<",
+        .constraint_kind = .semantic,
+        .description = "Callable interface",
+    },
+    .{
+        .pattern = "synchronized",
+        .constraint_kind = .semantic,
+        .description = "Synchronized block",
+    },
+};
+
+const java_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "try {",
+        .constraint_kind = .semantic,
+        .description = "Try block",
+    },
+    .{
+        .pattern = "catch (",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "finally {",
+        .constraint_kind = .semantic,
+        .description = "Finally block",
+    },
+    .{
+        .pattern = "throws ",
+        .constraint_kind = .semantic,
+        .description = "Throws declaration",
+    },
+    .{
+        .pattern = "throw new",
+        .constraint_kind = .semantic,
+        .description = "Throw statement",
+    },
+    .{
+        .pattern = "Exception",
+        .constraint_kind = .semantic,
+        .description = "Exception type",
+    },
+};
+
+const java_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "import ",
+        .constraint_kind = .architectural,
+        .description = "Import statement",
+    },
+    .{
+        .pattern = "import static",
+        .constraint_kind = .architectural,
+        .description = "Static import",
+    },
+    .{
+        .pattern = "package ",
+        .constraint_kind = .architectural,
+        .description = "Package declaration",
+    },
+};
+
+const java_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "interface ",
+        .constraint_kind = .syntactic,
+        .description = "Interface definition",
+    },
+    .{
+        .pattern = "enum ",
+        .constraint_kind = .syntactic,
+        .description = "Enum definition",
+    },
+    .{
+        .pattern = "extends ",
+        .constraint_kind = .syntactic,
+        .description = "Class inheritance",
+    },
+    .{
+        .pattern = "implements ",
+        .constraint_kind = .syntactic,
+        .description = "Interface implementation",
+    },
+    .{
+        .pattern = "record ",
+        .constraint_kind = .syntactic,
+        .description = "Record definition",
+    },
+};
+
+const java_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "@Override",
+        .constraint_kind = .syntactic,
+        .description = "Override annotation",
+    },
+    .{
+        .pattern = "@Deprecated",
+        .constraint_kind = .syntactic,
+        .description = "Deprecated annotation",
+    },
+    .{
+        .pattern = "@SuppressWarnings",
+        .constraint_kind = .syntactic,
+        .description = "Suppress warnings",
+    },
+    .{
+        .pattern = "@",
+        .constraint_kind = .syntactic,
+        .description = "Annotation",
+    },
+};
+
+const java_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "new ",
+        .constraint_kind = .operational,
+        .description = "Object allocation",
+    },
+    .{
+        .pattern = "AutoCloseable",
+        .constraint_kind = .operational,
+        .description = "AutoCloseable resource",
+    },
+    .{
+        .pattern = "try (",
+        .constraint_kind = .operational,
+        .description = "Try-with-resources",
+    },
+    .{
+        .pattern = ".close()",
+        .constraint_kind = .operational,
+        .description = "Resource close",
+    },
+};
+
+pub const java_patterns = LanguagePatterns{
+    .function_decl = &java_function_patterns,
+    .type_annotation = &java_type_patterns,
+    .async_pattern = &java_async_patterns,
+    .error_handling = &java_error_patterns,
+    .imports = &java_import_patterns,
+    .class_struct = &java_class_patterns,
+    .metadata = &java_metadata_patterns,
+    .memory_management = &java_memory_patterns,
+};
+
+// ============================================================================
 // Pattern Selection
 // ============================================================================
 
@@ -895,12 +1744,20 @@ pub fn getPatternsForLanguage(language: []const u8) ?LanguagePatterns {
         return typescript_patterns;
     } else if (std.mem.eql(u8, language, "python") or std.mem.eql(u8, language, "py")) {
         return python_patterns;
+    } else if (std.mem.eql(u8, language, "javascript") or std.mem.eql(u8, language, "js")) {
+        return javascript_patterns;
     } else if (std.mem.eql(u8, language, "rust") or std.mem.eql(u8, language, "rs")) {
         return rust_patterns;
     } else if (std.mem.eql(u8, language, "go")) {
         return go_patterns;
     } else if (std.mem.eql(u8, language, "zig")) {
         return zig_patterns;
+    } else if (std.mem.eql(u8, language, "c")) {
+        return c_patterns;
+    } else if (std.mem.eql(u8, language, "cpp") or std.mem.eql(u8, language, "c++")) {
+        return cpp_patterns;
+    } else if (std.mem.eql(u8, language, "java")) {
+        return java_patterns;
     }
     return null;
 }
