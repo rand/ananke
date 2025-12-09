@@ -74,6 +74,12 @@ xxhash-rust = { version = "0.8", features = ["xxh3"] }
 # LRU cache
 lru = "0.12"
 
+# Random number generation (for epsilon-greedy exploration)
+rand = "0.8"
+
+# Platform directories (for telemetry storage)
+dirs = "5.0"
+
 # Python bindings (0.27 - fixes RUSTSEC-2025-0020 PyString::from_object buffer overflow)
 pyo3 = { version = "0.27", features = ["extension-module", "abi3-py311"] }
 pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }

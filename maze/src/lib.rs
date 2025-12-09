@@ -34,12 +34,16 @@
 //! }
 //! ```
 
+pub mod adaptive_selector;
+pub mod diffusion;
 pub mod ffi;
 pub mod modal_client;
-pub mod python;
-pub mod progressive_refinement;
-pub mod diffusion;
+pub mod model_router;
 pub mod model_selector;
+pub mod progressive_refinement;
+pub mod python;
+pub mod strategy_stats;
+pub mod telemetry;
 
 use anyhow::{Context, Result};
 use lru::LruCache;
@@ -49,14 +53,21 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+pub use diffusion::{DiffusionConfig, DiffusionGenerator, DiffusionResult, NoiseSchedule};
 pub use ffi::{ConstraintIR, FillConstraint, GenerationResult, HoleSpec, Intent};
-pub use modal_client::{ModalClient, ModalConfig};
+pub use modal_client::{
+    EnsembleClient, EnsembleConfig, EnsembleMetrics, InferenceRequest, InferenceResponse,
+    ModelMetrics, ModalClient, ModalConfig,
+};
+pub use model_router::{ModelCapability, ModelEndpoint, ModelRouter, RoutingDecision};
+pub use model_selector::{ModelChoice, ModelSelector};
 pub use progressive_refinement::{
     FailureStrategy, HoleState, HoleStatus, ProgressiveRefiner, RefinementConfig,
     RefinementResult,
 };
-pub use diffusion::{DiffusionConfig, DiffusionGenerator, DiffusionResult, NoiseSchedule};
-pub use model_selector::{ModelChoice, ModelSelector};
+pub use adaptive_selector::{AdaptiveConfig, AdaptiveStrategySelector, Strategy, SelectionDecision};
+pub use strategy_stats::{StatsKey, StrategyStats, StrategyStatsStore, StatsSummary};
+pub use telemetry::{FillOutcome, TelemetryStore};
 
 /// Main orchestrator for constrained code generation
 ///
