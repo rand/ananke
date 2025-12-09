@@ -99,9 +99,10 @@ result = await maze.generate(
 
 ## Editor Support
 
-- **[ananke-lsp](https://github.com/rand/ananke-lsp)** - Language Server Protocol implementation
+- **[ananke-vscode](https://github.com/rand/ananke-vscode)** - VS Code / Cursor extension
 - **[ananke-nvim](https://github.com/rand/ananke-nvim)** - Neovim plugin
 - **[ananke-intellij](https://github.com/rand/ananke-intellij)** - IntelliJ plugin
+- **[ananke-lsp](https://github.com/rand/ananke-lsp)** - Language Server Protocol implementation
 
 ## Documentation
 
