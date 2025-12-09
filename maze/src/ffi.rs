@@ -563,6 +563,18 @@ pub struct FillConstraint {
     pub error_message: Option<String>,
 }
 
+impl Default for HoleSpec {
+    fn default() -> Self {
+        Self {
+            hole_id: 0,
+            fill_schema: None,
+            fill_grammar: None,
+            fill_constraints: vec![],
+            grammar_ref: None,
+        }
+    }
+}
+
 impl HoleSpec {
     /// Create a new hole specification
     pub fn new(hole_id: u64) -> Self {

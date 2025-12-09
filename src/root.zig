@@ -36,6 +36,7 @@ pub const ConstraintIR = types.constraint.ConstraintIR;
 pub const ConstraintSet = types.constraint.ConstraintSet;
 pub const ConstraintKind = types.constraint.ConstraintKind;
 pub const ConstraintSource = types.constraint.ConstraintSource;
+pub const ConstraintFingerprint = types.constraint.ConstraintFingerprint;
 pub const EnforcementType = types.constraint.EnforcementType;
 pub const ConstraintPriority = types.constraint.ConstraintPriority;
 

@@ -907,6 +907,21 @@ pub fn build(b: *std.Build) void {
 
     const run_token_mask_tests = b.addRunArtifact(token_mask_tests);
 
+    // Incremental compilation tests for Braid
+    const incremental_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/incremental_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_incremental_tests = b.addRunArtifact(incremental_tests);
+
     // Integration tests for Extract -> Compile pipeline
     const integration_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1187,6 +1202,33 @@ pub fn build(b: *std.Build) void {
 
     const run_hole_detector_tests = b.addRunArtifact(hole_detector_tests);
 
+    // Semantic hole detector tests
+    const semantic_hole_detector_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/clew/semantic_hole_detector_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    semantic_hole_detector_tests.linkSystemLibrary("tree-sitter");
+    semantic_hole_detector_tests.linkLibrary(ts_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(py_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(js_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(rust_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(go_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(zig_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(c_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(cpp_parser_lib);
+    semantic_hole_detector_tests.linkLibrary(java_parser_lib);
+
+    const run_semantic_hole_detector_tests = b.addRunArtifact(semantic_hole_detector_tests);
+
     // Hole compiler tests
     const hole_compiler_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1221,6 +1263,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_regex_tests.step);
     test_step.dependOn(&run_constraint_ops_tests.step);
     test_step.dependOn(&run_token_mask_tests.step);
+    test_step.dependOn(&run_incremental_tests.step);
     test_step.dependOn(&run_integration_tests.step);
     test_step.dependOn(&run_e2e_tests.step);
     test_step.dependOn(&run_new_e2e_tests.step);
@@ -1234,6 +1277,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_ariadne_tests.step);
     test_step.dependOn(&run_hole_tests.step);
     test_step.dependOn(&run_hole_detector_tests.step);
+    test_step.dependOn(&run_semantic_hole_detector_tests.step);
     test_step.dependOn(&run_hole_compiler_tests.step);
 
     // Phase 8a: TypeScript E2E pipeline tests
