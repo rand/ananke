@@ -229,7 +229,7 @@ pub const SemanticHoleDetector = struct {
                     const panic_text = t.getNodeText(panic_node, source);
                     if (std.mem.indexOf(u8, panic_text, "@panic") != null and
                         (std.mem.indexOf(u8, panic_text, "TODO") != null or
-                        std.mem.indexOf(u8, panic_text, "not implemented") != null))
+                            std.mem.indexOf(u8, panic_text, "not implemented") != null))
                     {
                         const location = nodeToLocation(panic_node, "");
                         const context = try self.allocator.dupe(u8, "Panic TODO");
