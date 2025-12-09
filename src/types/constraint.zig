@@ -311,6 +311,61 @@ pub const ConstraintIR = struct {
     }
 };
 
+/// Reference-counted wrapper for ConstraintIR enabling copy-on-write semantics.
+/// This provides O(1) cache hits by avoiding deep clones on every access.
+pub const SharedConstraintIR = struct {
+    ir: ConstraintIR,
+    ref_count: std.atomic.Value(u32),
+    allocator: std.mem.Allocator,
+
+    /// Create a new SharedConstraintIR wrapping the given IR.
+    /// Takes ownership of the IR - caller should not use or free it after this.
+    pub fn create(allocator: std.mem.Allocator, ir: ConstraintIR) !*SharedConstraintIR {
+        const self = try allocator.create(SharedConstraintIR);
+        self.* = .{
+            .ir = ir,
+            .ref_count = std.atomic.Value(u32).init(1),
+            .allocator = allocator,
+        };
+        return self;
+    }
+
+    /// Acquire a reference to this SharedConstraintIR.
+    /// Increments the reference count atomically.
+    pub fn acquire(self: *SharedConstraintIR) *SharedConstraintIR {
+        _ = self.ref_count.fetchAdd(1, .monotonic);
+        return self;
+    }
+
+    /// Release a reference to this SharedConstraintIR.
+    /// When the last reference is released, the IR and wrapper are freed.
+    pub fn release(self: *SharedConstraintIR) void {
+        // release ensures code before release() happens-before the count is decremented
+        if (self.ref_count.fetchSub(1, .release) == 1) {
+            // seeing 1 in the counter means other release()s have happened,
+            // but it doesn't mean uses before each release() are visible.
+            // The load acquires the release-sequence created by previous release()s
+            // to ensure visibility of uses before dropping.
+            _ = self.ref_count.load(.acquire);
+            var ir = self.ir;
+            ir.deinit(self.allocator);
+            self.allocator.destroy(self);
+        }
+    }
+
+    /// Get the current reference count (for debugging/testing).
+    pub fn getRefCount(self: *const SharedConstraintIR) u32 {
+        return self.ref_count.load(.monotonic);
+    }
+
+    /// Create a deep clone with its own reference count of 1.
+    /// Use this when you need to modify the IR independently.
+    pub fn cloneDeep(self: *const SharedConstraintIR) !*SharedConstraintIR {
+        const cloned_ir = try self.ir.clone(self.allocator);
+        return try SharedConstraintIR.create(self.allocator, cloned_ir);
+    }
+};
+
 /// Helper function to clone JsonSchema
 pub fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema {
     var cloned = JsonSchema{

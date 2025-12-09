@@ -67,8 +67,8 @@ impl FillOutcome {
     ) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
 
         Self {
             id: format!("outcome-{}-{}", hole_id, timestamp),

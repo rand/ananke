@@ -214,6 +214,7 @@ impl DiffusionGenerator {
     }
 
     /// Get noise level for a given timestep
+    #[allow(dead_code)]
     fn get_noise_level(&self, timestep: usize) -> f32 {
         let t = timestep as f32 / self.config.num_steps as f32;
 

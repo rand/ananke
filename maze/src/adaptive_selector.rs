@@ -2,7 +2,7 @@
 //!
 //! Learns optimal strategies over time based on fill outcomes.
 
-use crate::strategy_stats::{StatsKey, StrategyStatsStore};
+use crate::strategy_stats::StrategyStatsStore;
 use crate::telemetry::{FillOutcome, TelemetryStore};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -33,19 +33,6 @@ impl Strategy {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "llm_complete" => Some(Self::LlmComplete),
-            "human_required" => Some(Self::HumanRequired),
-            "example_adapt" => Some(Self::ExampleAdapt),
-            "decompose" => Some(Self::Decompose),
-            "skip" => Some(Self::Skip),
-            "template" => Some(Self::Template),
-            "diffusion_refine" => Some(Self::DiffusionRefine),
-            _ => None,
-        }
-    }
-
     /// All strategies that can be auto-selected
     pub fn auto_selectable() -> Vec<Self> {
         vec![
@@ -55,6 +42,23 @@ impl Strategy {
             Self::Template,
             Self::DiffusionRefine,
         ]
+    }
+}
+
+impl std::str::FromStr for Strategy {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "llm_complete" => Ok(Self::LlmComplete),
+            "human_required" => Ok(Self::HumanRequired),
+            "example_adapt" => Ok(Self::ExampleAdapt),
+            "decompose" => Ok(Self::Decompose),
+            "skip" => Ok(Self::Skip),
+            "template" => Ok(Self::Template),
+            "diffusion_refine" => Ok(Self::DiffusionRefine),
+            _ => Err(()),
+        }
     }
 }
 
@@ -153,7 +157,7 @@ impl AdaptiveStrategySelector {
     /// Select strategy for a hole
     pub fn select(&mut self, scale: &str, origin: &str) -> Strategy {
         let decision = self.make_decision(scale, origin);
-        let strategy = Strategy::from_str(&decision.selected_strategy)
+        let strategy = decision.selected_strategy.parse::<Strategy>()
             .unwrap_or(Strategy::LlmComplete);
 
         if self.config.log_decisions {

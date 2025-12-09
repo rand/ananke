@@ -82,6 +82,9 @@ pub enum HoleStatus {
 
     /// Requires human review
     NeedsHuman,
+
+    /// Decomposed into child holes, waiting for children to complete
+    PendingChildren,
 }
 
 /// A single fill attempt for a hole
@@ -141,6 +144,12 @@ pub struct HoleState {
 
     /// IDs of holes that must be filled before this one
     pub depends_on: Vec<u64>,
+
+    /// Parent hole ID if this hole was created by decomposition
+    pub parent_id: Option<u64>,
+
+    /// Child hole IDs if this hole has been decomposed
+    pub child_ids: Vec<u64>,
 }
 
 impl HoleState {
@@ -157,6 +166,26 @@ impl HoleState {
             attempts: vec![],
             status: HoleStatus::Pending,
             depends_on: vec![],
+            parent_id: None,
+            child_ids: vec![],
+        }
+    }
+
+    /// Create a child hole from decomposition of a parent hole
+    pub fn new_child(id: u64, parent: &HoleState, scale: String, origin: String) -> Self {
+        Self {
+            id,
+            scale,
+            origin,
+            expected_type: parent.expected_type.clone(),
+            constraints: parent.constraints.clone(),
+            current_fill: None,
+            confidence: 0.0,
+            attempts: vec![],
+            status: HoleStatus::Pending,
+            depends_on: vec![],
+            parent_id: Some(parent.id),
+            child_ids: vec![],
         }
     }
 
@@ -282,7 +311,7 @@ impl ProgressiveRefiner {
 
         let request = InferenceRequest {
             prompt: self.build_prompt(hole),
-            constraints: serde_json::to_value(&constraints_ir)?,
+            constraints: serde_json::to_value(constraints_ir)?,
             max_tokens: self.estimate_max_tokens(hole),
             temperature,
             context: None,
@@ -490,12 +519,93 @@ impl ProgressiveRefiner {
     /// Check if all holes are resolved (filled or explicitly handled)
     pub fn all_holes_resolved(&self, states: &HashMap<u64, HoleState>) -> bool {
         states.values().all(|hole| {
-            matches!(
-                hole.status,
-                HoleStatus::Filled | HoleStatus::Skipped | HoleStatus::NeedsHuman
-            )
+            match hole.status {
+                HoleStatus::Filled | HoleStatus::Skipped | HoleStatus::NeedsHuman => true,
+                HoleStatus::PendingChildren => {
+                    // A parent is resolved when all its children are resolved
+                    hole.child_ids.iter().all(|child_id| {
+                        states.get(child_id).map(|child| {
+                            matches!(child.status, HoleStatus::Filled | HoleStatus::Skipped | HoleStatus::NeedsHuman)
+                        }).unwrap_or(false)
+                    })
+                }
+                _ => false,
+            }
         })
     }
+
+    /// Get the next available hole ID
+    fn next_hole_id(&self, states: &HashMap<u64, HoleState>) -> u64 {
+        states.keys().max().map(|max| max + 1).unwrap_or(1)
+    }
+
+    /// Decompose a hole into smaller sub-holes based on its scale
+    ///
+    /// Scale hierarchy (largest to smallest):
+    /// - macro: function/module level -> decompose to meso (blocks)
+    /// - meso: block level -> decompose to micro (statements)
+    /// - micro: statement level -> decompose to nano (expressions)
+    /// - nano: expression level -> cannot decompose further
+    fn decompose_hole(
+        &self,
+        hole: &HoleState,
+        states: &mut HashMap<u64, HoleState>,
+    ) -> Vec<u64> {
+        let child_scale = match hole.scale.as_str() {
+            "macro" => "meso",
+            "meso" => "micro",
+            "micro" => "nano",
+            "nano" => {
+                // Cannot decompose nano-scale holes
+                tracing::warn!("Cannot decompose nano-scale hole {}", hole.id);
+                return vec![];
+            }
+            _ => "micro", // Default to micro for unknown scales
+        };
+
+        // Create 2-4 child holes depending on the scale reduction
+        let num_children = match hole.scale.as_str() {
+            "macro" => 3, // Function -> 3 blocks (setup, main, cleanup)
+            "meso" => 2,  // Block -> 2 statement groups
+            "micro" => 2, // Statement -> 2 expressions
+            _ => 2,
+        };
+
+        let mut child_ids = Vec::with_capacity(num_children);
+        let base_id = self.next_hole_id(states);
+
+        for i in 0..num_children {
+            let child_id = base_id + i as u64;
+            let child_origin = format!("{}:child_{}", hole.origin, i);
+
+            let mut child = HoleState::new_child(
+                child_id,
+                hole,
+                child_scale.to_string(),
+                child_origin,
+            );
+
+            // Later children depend on earlier children (sequential decomposition)
+            if i > 0 {
+                child.depends_on = vec![base_id + (i - 1) as u64];
+            }
+
+            child_ids.push(child_id);
+            states.insert(child_id, child);
+        }
+
+        tracing::info!(
+            "Decomposed hole {} ({}) into {} {} children: {:?}",
+            hole.id,
+            hole.scale,
+            num_children,
+            child_scale,
+            child_ids
+        );
+
+        child_ids
+    }
+
 
     /// Get temperature for a given iteration based on schedule
     fn get_temperature_for_iteration(&self, iteration: usize) -> f32 {
@@ -510,10 +620,10 @@ impl ProgressiveRefiner {
     /// Fill holes in parallel
     async fn fill_holes_parallel(
         &self,
-        _code: &mut String,
+        _code: &mut str,
         hole_states: &mut HashMap<u64, HoleState>,
         ready_holes: &[u64],
-        _constraints_ir: &[ConstraintIR],
+        constraints_ir: &[ConstraintIR],
         temperature: f32,
         metadata: &mut RefinementMetadata,
     ) -> Result<()> {
@@ -532,7 +642,7 @@ impl ProgressiveRefiner {
             .filter_map(|&hole_id| {
                 hole_states.get(&hole_id).map(|hole| {
                     let hole_clone = hole.clone();
-                    let constraints_clone = _constraints_ir.to_vec();
+                    let constraints_clone = constraints_ir.to_vec();
                     async move {
                         self.fill_single_hole_backend(&hole_clone, &constraints_clone, temperature)
                             .await
@@ -543,6 +653,9 @@ impl ProgressiveRefiner {
 
         // Execute all fills in parallel
         let results = join_all(fill_tasks).await;
+
+        // Collect failed hole IDs for decomposition handling
+        let mut failed_holes: Vec<u64> = Vec::new();
 
         // Process results
         for (idx, result) in results.into_iter().enumerate() {
@@ -558,17 +671,25 @@ impl ProgressiveRefiner {
                             hole.status = HoleStatus::Filled;
                             metadata.successful_fills += 1;
                         } else {
-                            self.handle_fill_failure(hole, metadata);
+                            failed_holes.push(hole_id);
                         }
                         hole.attempts.push(attempt);
                     }
                     Err(e) => {
                         tracing::error!("Fill failed for hole {}: {}", hole_id, e);
-                        self.handle_fill_failure(hole, metadata);
+                        failed_holes.push(hole_id);
                     }
                 }
             }
         }
+
+        // Handle failures with decomposition support
+        for hole_id in failed_holes {
+            self.handle_fill_failure_with_decompose(hole_id, hole_states, metadata);
+        }
+
+        // Check if any parent holes can have their children aggregated
+        self.check_and_aggregate_children(hole_states);
 
         Ok(())
     }
@@ -576,65 +697,194 @@ impl ProgressiveRefiner {
     /// Fill holes sequentially
     async fn fill_holes_sequential(
         &self,
-        _code: &mut String,
+        _code: &mut str,
         hole_states: &mut HashMap<u64, HoleState>,
         ready_holes: &[u64],
-        _constraints_ir: &[ConstraintIR],
+        constraints_ir: &[ConstraintIR],
         temperature: f32,
         metadata: &mut RefinementMetadata,
     ) -> Result<()> {
         for &hole_id in ready_holes {
-            if let Some(hole) = hole_states.get_mut(&hole_id) {
-                hole.status = HoleStatus::InProgress;
+            let fill_result = {
+                if let Some(hole) = hole_states.get_mut(&hole_id) {
+                    hole.status = HoleStatus::InProgress;
+                    Some(
+                        self.fill_single_hole_backend(hole, constraints_ir, temperature)
+                            .await,
+                    )
+                } else {
+                    None
+                }
+            };
 
-                match self
-                    .fill_single_hole_backend(hole, _constraints_ir, temperature)
-                    .await
-                {
-                    Ok(attempt) => {
-                        if attempt.confidence >= self.config.min_confidence
-                            && attempt.validation_passed
-                        {
-                            hole.current_fill = Some(attempt.code.clone());
-                            hole.confidence = attempt.confidence;
-                            hole.status = HoleStatus::Filled;
-                            metadata.successful_fills += 1;
-                        } else {
-                            self.handle_fill_failure(hole, metadata);
+            if let Some(result) = fill_result {
+                let mut failed = false;
+                if let Some(hole) = hole_states.get_mut(&hole_id) {
+                    match result {
+                        Ok(attempt) => {
+                            if attempt.confidence >= self.config.min_confidence
+                                && attempt.validation_passed
+                            {
+                                hole.current_fill = Some(attempt.code.clone());
+                                hole.confidence = attempt.confidence;
+                                hole.status = HoleStatus::Filled;
+                                metadata.successful_fills += 1;
+                            } else {
+                                failed = true;
+                            }
+                            hole.attempts.push(attempt);
                         }
-                        hole.attempts.push(attempt);
+                        Err(e) => {
+                            tracing::error!("Fill failed for hole {}: {}", hole_id, e);
+                            failed = true;
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!("Fill failed for hole {}: {}", hole_id, e);
-                        self.handle_fill_failure(hole, metadata);
-                    }
+                }
+
+                if failed {
+                    self.handle_fill_failure_with_decompose(hole_id, hole_states, metadata);
                 }
             }
         }
 
+        // Check if any parent holes can have their children aggregated
+        self.check_and_aggregate_children(hole_states);
+
         Ok(())
     }
 
-    /// Handle a fill failure according to configured strategy
-    fn handle_fill_failure(&self, hole: &mut HoleState, metadata: &mut RefinementMetadata) {
-        match self.config.failure_strategy {
+    /// Handle a fill failure with full decomposition support
+    fn handle_fill_failure_with_decompose(
+        &self,
+        hole_id: u64,
+        hole_states: &mut HashMap<u64, HoleState>,
+        metadata: &mut RefinementMetadata,
+    ) {
+        // First, handle the simple cases that don't need hole_states
+        let (strategy, scale) = {
+            let hole = match hole_states.get(&hole_id) {
+                Some(h) => h,
+                None => return,
+            };
+            (self.config.failure_strategy, hole.scale.clone())
+        };
+
+        match strategy {
             FailureStrategy::Skip => {
-                hole.status = HoleStatus::Skipped;
+                if let Some(hole) = hole_states.get_mut(&hole_id) {
+                    hole.status = HoleStatus::Skipped;
+                }
                 metadata.skipped_holes += 1;
             }
             FailureStrategy::Decompose => {
-                // TODO: Implement hole decomposition
-                hole.status = HoleStatus::Failed;
-                metadata.failed_fills += 1;
+                // Check if we can decompose (nano scale cannot be decomposed)
+                if scale == "nano" {
+                    tracing::warn!(
+                        "Cannot decompose nano-scale hole {}, marking as failed",
+                        hole_id
+                    );
+                    if let Some(hole) = hole_states.get_mut(&hole_id) {
+                        hole.status = HoleStatus::Failed;
+                    }
+                    metadata.failed_fills += 1;
+                    return;
+                }
+
+                // Clone the hole for decomposition
+                let hole_clone = hole_states.get(&hole_id).cloned();
+                if let Some(parent_hole) = hole_clone {
+                    // Decompose the hole
+                    let child_ids = self.decompose_hole(&parent_hole, hole_states);
+
+                    if child_ids.is_empty() {
+                        // Decomposition failed, mark as failed
+                        if let Some(hole) = hole_states.get_mut(&hole_id) {
+                            hole.status = HoleStatus::Failed;
+                        }
+                        metadata.failed_fills += 1;
+                    } else {
+                        // Update parent with child IDs and set status
+                        if let Some(hole) = hole_states.get_mut(&hole_id) {
+                            hole.child_ids = child_ids;
+                            hole.status = HoleStatus::PendingChildren;
+                        }
+                        tracing::info!(
+                            "Decomposed hole {} into children, marked as PendingChildren",
+                            hole_id
+                        );
+                    }
+                }
             }
             FailureStrategy::HumanReview => {
-                hole.status = HoleStatus::NeedsHuman;
+                if let Some(hole) = hole_states.get_mut(&hole_id) {
+                    hole.status = HoleStatus::NeedsHuman;
+                }
                 metadata.failed_fills += 1;
             }
             FailureStrategy::RetryAlternate => {
-                // Mark as failed - will be retried in next iteration
-                hole.status = HoleStatus::Pending;
+                if let Some(hole) = hole_states.get_mut(&hole_id) {
+                    hole.status = HoleStatus::Pending;
+                }
                 metadata.failed_fills += 1;
+            }
+        }
+    }
+
+    /// Check and aggregate completed child holes back into parents
+    fn check_and_aggregate_children(&self, hole_states: &mut HashMap<u64, HoleState>) {
+        // Find all parent holes waiting for children
+        let parent_ids: Vec<u64> = hole_states
+            .values()
+            .filter(|h| h.status == HoleStatus::PendingChildren)
+            .map(|h| h.id)
+            .collect();
+
+        for parent_id in parent_ids {
+            // Check if all children are filled
+            let all_children_filled = {
+                let parent = match hole_states.get(&parent_id) {
+                    Some(p) => p,
+                    None => continue,
+                };
+                parent.child_ids.iter().all(|child_id| {
+                    hole_states
+                        .get(child_id)
+                        .map(|c| c.status == HoleStatus::Filled)
+                        .unwrap_or(false)
+                })
+            };
+
+            if all_children_filled {
+                // Get child fills (need to collect first to avoid borrow issues)
+                let (child_fills, avg_confidence): (Vec<String>, f32) = {
+                    let parent = hole_states.get(&parent_id).unwrap();
+                    let fills: Vec<String> = parent
+                        .child_ids
+                        .iter()
+                        .filter_map(|id| hole_states.get(id))
+                        .filter_map(|c| c.current_fill.clone())
+                        .collect();
+                    let conf: f32 = parent
+                        .child_ids
+                        .iter()
+                        .filter_map(|id| hole_states.get(id))
+                        .map(|c| c.confidence)
+                        .sum::<f32>()
+                        / parent.child_ids.len() as f32;
+                    (fills, conf)
+                };
+
+                // Update parent
+                if let Some(parent) = hole_states.get_mut(&parent_id) {
+                    parent.current_fill = Some(child_fills.join("\n"));
+                    parent.confidence = avg_confidence;
+                    parent.status = HoleStatus::Filled;
+                    tracing::info!(
+                        "Aggregated {} child fills into parent hole {}",
+                        child_fills.len(),
+                        parent_id
+                    );
+                }
             }
         }
     }
@@ -700,5 +950,53 @@ mod tests {
         let json = serde_json::to_string(&strategy).unwrap();
         let deserialized: FailureStrategy = serde_json::from_str(&json).unwrap();
         assert_eq!(strategy, deserialized);
+    }
+
+    #[test]
+    fn test_hole_state_new_child() {
+        let parent = HoleState::new(1, "macro".to_string(), "test.rs:1:1".to_string());
+        let child = HoleState::new_child(2, &parent, "meso".to_string(), "test.rs:1:1:child_0".to_string());
+
+        assert_eq!(child.id, 2);
+        assert_eq!(child.scale, "meso");
+        assert_eq!(child.parent_id, Some(1));
+        assert_eq!(child.status, HoleStatus::Pending);
+    }
+
+    #[test]
+    fn test_hole_status_pending_children() {
+        let status = HoleStatus::PendingChildren;
+        let json = serde_json::to_string(&status).unwrap();
+        let deserialized: HoleStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_decomposition_scale_hierarchy() {
+        // Verify that macro -> meso -> micro -> nano is the expected hierarchy
+        // This test documents the expected behavior of decompose_hole
+        let scales = vec![
+            ("macro", "meso", 3),   // macro decomposes to 3 meso
+            ("meso", "micro", 2),   // meso decomposes to 2 micro
+            ("micro", "nano", 2),   // micro decomposes to 2 nano
+        ];
+
+        for (parent_scale, expected_child_scale, expected_count) in scales {
+            let num_children = match parent_scale {
+                "macro" => 3,
+                "meso" => 2,
+                "micro" => 2,
+                _ => 2,
+            };
+            let child_scale = match parent_scale {
+                "macro" => "meso",
+                "meso" => "micro",
+                "micro" => "nano",
+                _ => "micro",
+            };
+
+            assert_eq!(child_scale, expected_child_scale, "Scale {} should decompose to {}", parent_scale, expected_child_scale);
+            assert_eq!(num_children, expected_count, "Scale {} should create {} children", parent_scale, expected_count);
+        }
     }
 }

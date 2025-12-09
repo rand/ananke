@@ -3,8 +3,10 @@
 //! Handles communication with Modal-hosted vLLM + llguidance inference service
 
 use anyhow::{anyhow, Context, Result};
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -152,7 +154,7 @@ impl InferenceResponse {
         let speed_score = 1.0 - (token_speed / 10000.0).min(1.0);
         let constraint_score = 1.0 - (constraint_overhead / 1000.0).min(1.0);
 
-        (speed_score * 0.6 + constraint_score * 0.4).max(0.0).min(1.0)
+        (speed_score * 0.6 + constraint_score * 0.4).clamp(0.0, 1.0)
     }
 }
 
@@ -170,6 +172,34 @@ pub struct GenerationStats {
 
     /// Average constraint check time in microseconds
     pub avg_constraint_check_us: u64,
+}
+
+/// A chunk of streaming generation output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamChunk {
+    /// The token or text chunk
+    pub text: String,
+
+    /// Whether this is the final chunk
+    pub is_final: bool,
+
+    /// Token index in the sequence
+    pub token_index: usize,
+
+    /// Generation timestamp in milliseconds
+    pub timestamp_ms: u64,
+}
+
+/// Type alias for the streaming generation result
+pub type StreamingResult = Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>;
+
+/// Server-Sent Event data from Modal streaming endpoint
+#[derive(Debug, Deserialize)]
+struct SSEData {
+    token: Option<String>,
+    done: Option<bool>,
+    #[allow(dead_code)]
+    error: Option<String>,
 }
 
 impl ModalClient {
@@ -335,10 +365,137 @@ impl ModalClient {
         Ok(models)
     }
 
-    /// Stream generation (for future implementation)
-    pub async fn generate_stream(&self, _request: InferenceRequest) -> Result<()> {
-        // TODO: Implement streaming generation
-        Err(anyhow!("Streaming generation not yet implemented"))
+    /// Stream generation with token-by-token output
+    ///
+    /// Returns a stream of `StreamChunk` items representing each token as it's generated.
+    /// The stream completes when the final token is received (chunk with `is_final = true`).
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut stream = client.generate_stream(request).await?;
+    /// while let Some(chunk) = stream.next().await {
+    ///     match chunk {
+    ///         Ok(c) => print!("{}", c.text),
+    ///         Err(e) => eprintln!("Error: {}", e),
+    ///     }
+    /// }
+    /// ```
+    pub async fn generate_stream(&self, request: InferenceRequest) -> Result<StreamingResult> {
+        // Build request URL for streaming endpoint
+        let url = self
+            .base_url
+            .join("/generate/stream")
+            .context("Failed to build streaming request URL")?;
+
+        // Build request body
+        let body = serde_json::json!({
+            "prompt": request.prompt,
+            "constraints": request.constraints,
+            "max_tokens": request.max_tokens,
+            "temperature": request.temperature,
+            "model": self.config.model,
+            "context": request.context,
+            "stream": true,
+        });
+
+        // Build HTTP request
+        let mut http_request = self
+            .client
+            .post(url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .json(&body);
+
+        // Add API key if present
+        if let Some(ref api_key) = self.config.api_key {
+            http_request = http_request.header("Authorization", format!("Bearer {}", api_key));
+        }
+
+        // Send request and get streaming response
+        tracing::debug!("Starting streaming generation request to Modal");
+        let response = http_request
+            .send()
+            .await
+            .context("Failed to send streaming request to Modal")?;
+
+        // Check response status
+        let status = response.status();
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unable to read error response".to_string());
+            return Err(anyhow!(
+                "Modal streaming inference failed with status {}: {}",
+                status,
+                error_text
+            ));
+        }
+
+        // Get the byte stream
+        let byte_stream = response.bytes_stream();
+        let start_time = std::time::Instant::now();
+
+        // Transform the byte stream into StreamChunk items
+        let stream = byte_stream
+            .enumerate()
+            .map(move |(idx, result)| {
+                match result {
+                    Ok(bytes) => {
+                        // Parse SSE data (newline-delimited JSON)
+                        let text = String::from_utf8_lossy(&bytes);
+
+                        // Handle SSE format: "data: {...}\n\n"
+                        let chunks: Vec<StreamChunk> = text
+                            .lines()
+                            .filter(|line| line.starts_with("data: "))
+                            .filter_map(|line| {
+                                let json_str = line.strip_prefix("data: ")?;
+                                if json_str == "[DONE]" {
+                                    Some(StreamChunk {
+                                        text: String::new(),
+                                        is_final: true,
+                                        token_index: idx,
+                                        timestamp_ms: start_time.elapsed().as_millis() as u64,
+                                    })
+                                } else {
+                                    serde_json::from_str::<SSEData>(json_str).ok().map(|sse| {
+                                        StreamChunk {
+                                            text: sse.token.unwrap_or_default(),
+                                            is_final: sse.done.unwrap_or(false),
+                                            token_index: idx,
+                                            timestamp_ms: start_time.elapsed().as_millis() as u64,
+                                        }
+                                    })
+                                }
+                            })
+                            .collect();
+
+                        // Return first chunk or empty
+                        if let Some(chunk) = chunks.into_iter().next() {
+                            Ok(chunk)
+                        } else {
+                            // If no valid SSE data, return raw text as a chunk
+                            Ok(StreamChunk {
+                                text: text.trim().to_string(),
+                                is_final: false,
+                                token_index: idx,
+                                timestamp_ms: start_time.elapsed().as_millis() as u64,
+                            })
+                        }
+                    }
+                    Err(e) => Err(anyhow!("Stream read error: {}", e)),
+                }
+            })
+            .filter(|result| {
+                // Filter out empty chunks
+                futures::future::ready(match result {
+                    Ok(chunk) => !chunk.text.is_empty() || chunk.is_final,
+                    Err(_) => true,
+                })
+            });
+
+        Ok(Box::pin(stream))
     }
 }
 

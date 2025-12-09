@@ -12,10 +12,20 @@ use std::slice;
 
 /// C-compatible ConstraintIR matching Zig definition
 ///
-/// This struct must match the memory layout of the Zig ConstraintIR type
+/// This struct must match the memory layout of the Zig ConstraintIR type.
+///
+/// # Safety
+///
+/// The `magic` field enables resilience features:
+/// - Double-free detection: magic is zeroed after first free
+/// - Use-after-free detection: magic is set to FFI_FREED sentinel
+/// - Invalid pointer detection: magic won't match FFI_MAGIC
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct ConstraintIRFFI {
+    /// Magic number for validation (FFI_MAGIC=0x414E4B455F464649 for valid allocations)
+    pub magic: u64,
+
     /// JSON schema pointer (nullable)
     pub json_schema: *const c_char,
 
@@ -35,6 +45,12 @@ pub struct ConstraintIRFFI {
     /// Constraint name
     pub name: *const c_char,
 }
+
+/// Magic number for valid FFI allocations (matches Zig FFI_MAGIC)
+pub const FFI_MAGIC: u64 = 0x414E4B455F464649;
+
+/// Sentinel value for freed allocations (matches Zig FFI_FREED)
+pub const FFI_FREED: u64 = 0xDEADDEADDEADDEAD;
 
 /// C-compatible TokenMaskRules
 #[repr(C)]
@@ -185,6 +201,17 @@ impl ConstraintIR {
         }
 
         let ffi_ref = &*ffi;
+
+        // Validate magic number to detect use-after-free and invalid pointers
+        if ffi_ref.magic == FFI_FREED {
+            return Err("Use-after-free detected: ConstraintIR was already freed".to_string());
+        }
+        if ffi_ref.magic != FFI_MAGIC {
+            return Err(format!(
+                "Invalid ConstraintIR pointer: magic number mismatch (expected 0x{:x}, got 0x{:x})",
+                FFI_MAGIC, ffi_ref.magic
+            ));
+        }
 
         // Convert name
         let name = if !ffi_ref.name.is_null() {
@@ -348,6 +375,7 @@ impl ConstraintIR {
             .unwrap_or(ptr::null_mut());
 
         Box::into_raw(Box::new(ConstraintIRFFI {
+            magic: FFI_MAGIC, // Set magic number for validation
             name: name.into_raw(),
             json_schema: json_schema.map(|s| s.into_raw()).unwrap_or(ptr::null_mut()),
             grammar: grammar.map(|g| g.into_raw()).unwrap_or(ptr::null_mut()),
@@ -446,12 +474,31 @@ impl GenerationResult {
 /// Free a ConstraintIR FFI structure
 ///
 /// # Safety
-/// Must be called exactly once on a pointer returned from `to_ffi`
+/// Must be called exactly once on a pointer returned from `to_ffi`.
+///
+/// # Resilience
+/// - Returns early (no-op) for null pointers
+/// - Logs warning and returns for double-free attempts
+/// - Logs warning and returns for invalid pointers
 #[no_mangle]
 pub unsafe extern "C" fn free_constraint_ir_ffi(ptr: *mut ConstraintIRFFI) {
     if ptr.is_null() {
         return;
     }
+
+    // Validate magic before taking ownership
+    let magic = (*ptr).magic;
+    if magic == FFI_FREED {
+        tracing::warn!("free_constraint_ir_ffi: double-free detected (already freed)");
+        return;
+    }
+    if magic != FFI_MAGIC {
+        tracing::warn!("free_constraint_ir_ffi: invalid pointer (magic mismatch: 0x{:x})", magic);
+        return;
+    }
+
+    // Mark as freed before actual deallocation
+    (*ptr).magic = FFI_FREED;
 
     let ffi = Box::from_raw(ptr);
 
@@ -527,7 +574,7 @@ pub unsafe extern "C" fn free_generation_result_ffi(ptr: *mut GenerationResultFF
 // ============================================================================
 
 /// Specification for a typed hole to be filled
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HoleSpec {
     /// Unique identifier for the hole
     pub hole_id: u64,
@@ -563,17 +610,6 @@ pub struct FillConstraint {
     pub error_message: Option<String>,
 }
 
-impl Default for HoleSpec {
-    fn default() -> Self {
-        Self {
-            hole_id: 0,
-            fill_schema: None,
-            fill_grammar: None,
-            fill_constraints: vec![],
-            grammar_ref: None,
-        }
-    }
-}
 
 impl HoleSpec {
     /// Create a new hole specification

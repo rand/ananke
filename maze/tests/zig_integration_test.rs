@@ -3,7 +3,7 @@
 //! Tests the complete integration between Rust Maze and Zig Clew/Braid
 
 use maze::ffi::{
-    ConstraintIR, GenerationResult, Grammar, GrammarRule, Intent, JsonSchema, RegexPattern,
+    ConstraintIR, Grammar, GrammarRule, JsonSchema, RegexPattern,
     TokenMaskRules,
 };
 use std::collections::HashMap;

@@ -57,7 +57,7 @@ pub use diffusion::{DiffusionConfig, DiffusionGenerator, DiffusionResult, NoiseS
 pub use ffi::{ConstraintIR, FillConstraint, GenerationResult, HoleSpec, Intent};
 pub use modal_client::{
     EnsembleClient, EnsembleConfig, EnsembleMetrics, InferenceRequest, InferenceResponse,
-    ModelMetrics, ModalClient, ModalConfig,
+    ModelMetrics, ModalClient, ModalConfig, StreamChunk, StreamingResult,
 };
 pub use model_router::{ModelCapability, ModelEndpoint, ModelRouter, RoutingDecision};
 pub use model_selector::{ModelChoice, ModelSelector};
@@ -486,6 +486,13 @@ impl MazeOrchestrator {
             size: cache.len(),
             limit: cache.cap().get(),
         }
+    }
+
+    /// Check if the Modal inference service is healthy
+    ///
+    /// Returns true if the service is reachable and responding, false otherwise.
+    pub async fn health_check(&self) -> Result<bool> {
+        self.modal_client.health_check().await
     }
 }
 

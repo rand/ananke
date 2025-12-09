@@ -33,6 +33,7 @@ pub const utils = struct {
 pub const Constraint = types.constraint.Constraint;
 pub const ConstraintID = types.constraint.ConstraintID;
 pub const ConstraintIR = types.constraint.ConstraintIR;
+pub const SharedConstraintIR = types.constraint.SharedConstraintIR;
 pub const ConstraintSet = types.constraint.ConstraintSet;
 pub const ConstraintKind = types.constraint.ConstraintKind;
 pub const ConstraintSource = types.constraint.ConstraintSource;

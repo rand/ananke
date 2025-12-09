@@ -7,6 +7,7 @@ const root = @import("ananke");
 const RingQueue = root.utils.RingQueue;
 const Constraint = root.types.constraint.Constraint;
 const ConstraintIR = root.types.constraint.ConstraintIR;
+const SharedConstraintIR = root.types.constraint.SharedConstraintIR;
 const ConstraintSet = root.types.constraint.ConstraintSet;
 const ConstraintKind = root.types.constraint.ConstraintKind;
 const ConstraintSource = root.types.constraint.ConstraintSource;
@@ -169,11 +170,75 @@ pub const Braid = struct {
         // Compile to IR
         const ir = try self.compileToIR(&graph);
 
-        // Store in cache (clone for cache storage)
-        const ir_for_cache = try ir.clone(self.allocator);
-        try self.cache.put(cache_key, ir_for_cache);
+        // Store in cache - cache takes ownership via SharedConstraintIR
+        try self.cache.put(cache_key, ir);
 
-        return ir;
+        // Return a clone for the caller (cache owns the original now)
+        if (self.cache.getShared(cache_key)) |shared| {
+            defer shared.release();
+            return try shared.ir.clone(self.allocator);
+        }
+        unreachable; // We just put it in the cache
+    }
+
+    /// Compile with copy-on-write semantics for O(1) cache hits.
+    /// Returns an acquired SharedConstraintIR reference.
+    /// Caller MUST call release() when done with the returned reference.
+    /// This is the high-performance API - prefer over compile() for repeated access.
+    pub fn compileShared(self: *Braid, constraints: []const Constraint) !*SharedConstraintIR {
+        // Compute cache key
+        const cache_key = try self.computeCacheKey(constraints);
+
+        // Check cache first (fast path) - O(1) atomic increment
+        if (self.cache.getShared(cache_key)) |shared| {
+            return shared;
+        }
+
+        // Cache miss - do full compilation (slow path)
+        var graph = try self.buildDependencyGraph(constraints);
+        defer graph.deinit();
+
+        // Detect and resolve conflicts
+        const conflicts = try self.detectConflicts(&graph);
+        defer self.allocator.free(conflicts);
+
+        if (conflicts.len > 0) {
+            // Use LLM for complex conflict resolution if available
+            if (self.llm_client) |client| {
+                // Convert conflicts to Claude format
+                const conflict_descriptions = try self.convertConflictsForClaude(&graph, conflicts);
+                defer {
+                    for (conflict_descriptions) |desc| {
+                        self.allocator.free(desc.constraint_a_name);
+                        self.allocator.free(desc.constraint_a_desc);
+                        self.allocator.free(desc.constraint_b_name);
+                        self.allocator.free(desc.constraint_b_desc);
+                        self.allocator.free(desc.issue);
+                    }
+                    self.allocator.free(conflict_descriptions);
+                }
+
+                const resolution = try client.suggestResolution(conflict_descriptions);
+                defer self.allocator.free(resolution.actions);
+
+                try self.applyClaudeResolution(&graph, resolution);
+            } else {
+                // Default conflict resolution
+                try self.defaultConflictResolution(&graph, conflicts);
+            }
+        }
+
+        // Optimize constraint evaluation order
+        try self.optimizeGraph(&graph);
+
+        // Compile to IR
+        const ir = try self.compileToIR(&graph);
+
+        // Store in cache - cache takes ownership
+        try self.cache.put(cache_key, ir);
+
+        // Return acquired reference from cache
+        return self.cache.getShared(cache_key).?;
     }
 
     /// Compile with incremental support - only recompiles changed constraints
@@ -1996,17 +2061,18 @@ pub const ConstraintGraph = struct {
     }
 
     pub fn detectCycle(self: *ConstraintGraph) !bool {
-        // Use DFS-based cycle detection
-        var visited = try std.ArrayList(bool).initCapacity(self.allocator, self.nodes.items.len);
-        defer visited.deinit(self.allocator);
-        try visited.appendNTimes(self.allocator, false, self.nodes.items.len);
+        // Use DFS-based cycle detection with BitSet for 8x memory reduction
+        const n = self.nodes.items.len;
+        if (n == 0) return false;
 
-        var rec_stack = try std.ArrayList(bool).initCapacity(self.allocator, self.nodes.items.len);
-        defer rec_stack.deinit(self.allocator);
-        try rec_stack.appendNTimes(self.allocator, false, self.nodes.items.len);
+        var visited = try std.DynamicBitSet.initEmpty(self.allocator, n);
+        defer visited.deinit();
 
-        for (0..self.nodes.items.len) |node| {
-            if (!visited.items[node]) {
+        var rec_stack = try std.DynamicBitSet.initEmpty(self.allocator, n);
+        defer rec_stack.deinit();
+
+        for (0..n) |node| {
+            if (!visited.isSet(node)) {
                 if (try self.hasCycleDFS(node, &visited, &rec_stack)) {
                     return true;
                 }
@@ -2018,26 +2084,26 @@ pub const ConstraintGraph = struct {
     fn hasCycleDFS(
         self: *ConstraintGraph,
         node: usize,
-        visited: *std.ArrayList(bool),
-        rec_stack: *std.ArrayList(bool),
+        visited: *std.DynamicBitSet,
+        rec_stack: *std.DynamicBitSet,
     ) !bool {
-        visited.items[node] = true;
-        rec_stack.items[node] = true;
+        visited.set(node);
+        rec_stack.set(node);
 
         // Visit all neighbors
         for (self.edges.items) |edge| {
             if (edge.from == node) {
-                if (!visited.items[edge.to]) {
+                if (!visited.isSet(edge.to)) {
                     if (try self.hasCycleDFS(edge.to, visited, rec_stack)) {
                         return true;
                     }
-                } else if (rec_stack.items[edge.to]) {
+                } else if (rec_stack.isSet(edge.to)) {
                     return true;
                 }
             }
         }
 
-        rec_stack.items[node] = false;
+        rec_stack.unset(node);
         return false;
     }
 
@@ -2249,13 +2315,14 @@ pub const ConstraintGraph = struct {
     }
 };
 
-/// IR cache with performance tracking
+/// IR cache with performance tracking using copy-on-write semantics.
+/// Cache hits are O(1) atomic reference increments instead of O(n) deep clones.
 const IRCache = struct {
     allocator: std.mem.Allocator,
     cache: std.AutoHashMap(u64, CacheEntry),
 
     const CacheEntry = struct {
-        ir: ConstraintIR,
+        shared_ir: *SharedConstraintIR,
         hit_count: u64 = 0,
     };
 
@@ -2265,35 +2332,51 @@ const IRCache = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator) !IRCache {
+        var cache = std.AutoHashMap(u64, CacheEntry).init(allocator);
+        // Pre-allocate capacity for typical workload to avoid rehashing
+        try cache.ensureTotalCapacity(64);
         return .{
             .allocator = allocator,
-            .cache = std.AutoHashMap(u64, CacheEntry).init(allocator),
+            .cache = cache,
         };
     }
 
     pub fn deinit(self: *IRCache) void {
-        // Free all cached ConstraintIR entries
+        // Release all SharedConstraintIR references
         var iter = self.cache.valueIterator();
         while (iter.next()) |entry| {
-            var ir = entry.ir;
-            ir.deinit(self.allocator);
+            entry.shared_ir.release();
         }
         self.cache.deinit();
     }
 
-    /// Get a cached IR, returning a clone for independent ownership.
+    /// Get a cached IR, returning an acquired SharedConstraintIR reference.
     /// Returns null if not found. Increments hit counter on success.
+    /// Caller must call release() on the returned SharedConstraintIR when done.
+    /// This is O(1) - just an atomic increment, no allocations.
+    pub fn getShared(self: *IRCache, key: u64) ?*SharedConstraintIR {
+        if (self.cache.getPtr(key)) |entry| {
+            entry.hit_count += 1;
+            return entry.shared_ir.acquire();
+        }
+        return null;
+    }
+
+    /// Get a cached IR, returning a deep clone for independent ownership.
+    /// Returns null if not found. Increments hit counter on success.
+    /// This is the legacy API for callers that need to modify the IR.
     pub fn get(self: *IRCache, key: u64) !?ConstraintIR {
         if (self.cache.getPtr(key)) |entry| {
             entry.hit_count += 1;
-            return try entry.ir.clone(self.allocator);
+            return try entry.shared_ir.ir.clone(self.allocator);
         }
         return null;
     }
 
     /// Store an IR in the cache. Takes ownership of the IR.
     pub fn put(self: *IRCache, key: u64, ir: ConstraintIR) !void {
-        const entry = CacheEntry{ .ir = ir, .hit_count = 0 };
+        const shared = try SharedConstraintIR.create(self.allocator, ir);
+        const entry = CacheEntry{ .shared_ir = shared, .hit_count = 0 };
         try self.cache.put(key, entry);
     }
 

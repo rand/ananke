@@ -42,7 +42,7 @@ pub const ResolutionStrategy = enum {
     diffusion_refine,
 };
 
-/// Confidence scoring
+/// Confidence scoring with SIMD-optimized weighted sum computation
 pub const Confidence = struct {
     score: f32,
     type_match: f32 = 1.0,
@@ -54,11 +54,18 @@ pub const Confidence = struct {
         return self.score >= 0.8;
     }
 
+    /// Compute the weighted confidence score using SIMD operations.
+    /// Weights: type_match=0.3, constraint_satisfaction=0.4, context_coherence=0.2, example_similarity=0.1
     pub fn compute(self: *Confidence) void {
-        self.score = (self.type_match * 0.3 +
-            self.constraint_satisfaction * 0.4 +
-            self.context_coherence * 0.2 +
-            self.example_similarity * 0.1);
+        // Use SIMD vector operations for weighted sum
+        const weights: @Vector(4, f32) = .{ 0.3, 0.4, 0.2, 0.1 };
+        const values: @Vector(4, f32) = .{
+            self.type_match,
+            self.constraint_satisfaction,
+            self.context_coherence,
+            self.example_similarity,
+        };
+        self.score = @reduce(.Add, weights * values);
     }
 };
 
@@ -106,26 +113,33 @@ pub const ModelHints = struct {
     prefer_diffusion: bool = false,
 };
 
-/// A typed hole
+/// A typed hole - fields ordered by alignment for cache efficiency
 pub const Hole = struct {
+    // 8-byte aligned (pointers/slices first for cache locality on hot path)
     id: u64,
     name: ?[]const u8 = null,
-    scale: HoleScale,
-    origin: HoleOrigin,
     expected_type: ?[]const u8 = null,
     context_type: ?[]const u8 = null,
+    current_fill: ?[]const u8 = null,
     available_bindings: []const Binding = &.{},
     constraints: []const @import("constraint.zig").Constraint = &.{},
-    resolution_strategy: ResolutionStrategy = .llm_complete,
-    priority: u32 = 50,
-    confidence: Confidence = .{ .score = 0.0 },
     depends_on: []const u64 = &.{},
     dependents: []const u64 = &.{},
-    location: Location,
-    current_fill: ?[]const u8 = null,
     fill_history: []const FillAttempt = &.{},
+
+    // Embedded structs (alignment depends on their largest field)
+    location: Location,
     provenance: Provenance,
+    confidence: Confidence = .{ .score = 0.0 },
     model_hints: ModelHints = .{},
+
+    // 4-byte aligned
+    priority: u32 = 50,
+
+    // 1-byte aligned (enums)
+    scale: HoleScale,
+    origin: HoleOrigin,
+    resolution_strategy: ResolutionStrategy = .llm_complete,
 
     pub fn isResolved(self: *const Hole) bool {
         return self.current_fill != null and self.confidence.isHighConfidence();
