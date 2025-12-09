@@ -30,18 +30,34 @@ pub const hybrid_extractor = @import("hybrid_extractor.zig");
 // Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
 const structural_parsing_enabled = true;
 
+/// Configuration for Clew extraction engine
+pub const Config = struct {
+    enable_semantic_detection: bool = false, // opt-in for semantic hole detection
+};
+
 /// Main Clew extraction engine
 pub const Clew = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
     claude_client: ?*claude_api.ClaudeClient = null,
     cache: ConstraintCache,
+    config: Config,
 
     pub fn init(allocator: std.mem.Allocator) !Clew {
         return .{
             .allocator = allocator,
             .arena = std.heap.ArenaAllocator.init(allocator),
             .cache = try ConstraintCache.init(allocator),
+            .config = .{}, // default config
+        };
+    }
+
+    pub fn initWithConfig(allocator: std.mem.Allocator, config: Config) !Clew {
+        return .{
+            .allocator = allocator,
+            .arena = std.heap.ArenaAllocator.init(allocator),
+            .cache = try ConstraintCache.init(allocator),
+            .config = config,
         };
     }
 
@@ -796,5 +812,6 @@ fn countPatternOccurrences(matches: []const patterns.PatternMatch, keyword: []co
     return count;
 }
 
-// Export hole detector
+// Export hole detectors
 pub const HoleDetector = @import("hole_detector.zig").HoleDetector;
+pub const SemanticHoleDetector = @import("semantic_hole_detector.zig").SemanticHoleDetector;
