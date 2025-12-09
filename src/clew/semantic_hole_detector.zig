@@ -704,7 +704,7 @@ fn getFunctionNodeTypes(language: Language) []const []const u8 {
         // Zig tree-sitter uses "FnProto" for function prototypes/declarations
         .zig => &[_][]const u8{ "FnProto", "TestDecl" },
         .go => &[_][]const u8{ "function_declaration", "method_declaration" },
-        .c => &[_][]const u8{ "function_definition" },
+        .c => &[_][]const u8{"function_definition"},
         .cpp => &[_][]const u8{ "function_definition", "template_declaration" },
         .java => &[_][]const u8{ "method_declaration", "constructor_declaration" },
     };
