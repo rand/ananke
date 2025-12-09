@@ -7,8 +7,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::modal_client::ModalClient;
-use crate::ffi::ConstraintIR;
+use crate::ffi::{ConstraintIR, HoleSpec};
+use crate::modal_client::{EnsembleClient, InferenceRequest, ModalClient};
 
 /// Configuration for progressive refinement
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,21 +237,136 @@ impl Default for RefinementMetadata {
     }
 }
 
+/// Client backend for inference
+pub enum InferenceBackend {
+    /// Single modal client
+    Single(ModalClient),
+    /// Ensemble of multiple models
+    Ensemble(EnsembleClient),
+}
+
 /// Progressive refiner for typed holes
 pub struct ProgressiveRefiner {
-    /// Modal client for inference
-    modal_client: ModalClient,
+    /// Inference backend (single or ensemble)
+    backend: InferenceBackend,
 
     /// Configuration
     config: RefinementConfig,
 }
 
 impl ProgressiveRefiner {
-    /// Create a new progressive refiner
+    /// Create a new progressive refiner with single modal client
     pub fn new(modal_client: ModalClient, config: RefinementConfig) -> Self {
         Self {
-            modal_client,
+            backend: InferenceBackend::Single(modal_client),
             config,
+        }
+    }
+
+    /// Create a new progressive refiner with ensemble client
+    pub fn with_ensemble(ensemble_client: EnsembleClient, config: RefinementConfig) -> Self {
+        Self {
+            backend: InferenceBackend::Ensemble(ensemble_client),
+            config,
+        }
+    }
+
+    /// Fill a single hole using the configured backend
+    async fn fill_single_hole_backend(
+        &self,
+        hole: &HoleState,
+        constraints_ir: &[ConstraintIR],
+        temperature: f32,
+    ) -> Result<FillAttempt> {
+        let hole_spec = self.build_hole_spec(hole)?;
+
+        let request = InferenceRequest {
+            prompt: self.build_prompt(hole),
+            constraints: serde_json::to_value(&constraints_ir)?,
+            max_tokens: self.estimate_max_tokens(hole),
+            temperature,
+            context: None,
+        };
+
+        match &self.backend {
+            InferenceBackend::Single(client) => {
+                let response = client.generate_constrained(request).await?;
+                let confidence = response.confidence();
+
+                Ok(FillAttempt {
+                    code: response.generated_text,
+                    confidence,
+                    temperature,
+                    model: response.model,
+                    timestamp: chrono::Utc::now().timestamp(),
+                    validation_passed: true,
+                    error: None,
+                })
+            }
+            InferenceBackend::Ensemble(ensemble) => {
+                let response = ensemble
+                    .generate_routed(request, &hole_spec, constraints_ir)
+                    .await?;
+                let confidence = response.confidence();
+
+                Ok(FillAttempt {
+                    code: response.generated_text,
+                    confidence,
+                    temperature,
+                    model: response.model,
+                    timestamp: chrono::Utc::now().timestamp(),
+                    validation_passed: true,
+                    error: None,
+                })
+            }
+        }
+    }
+
+    /// Build hole spec from hole state
+    fn build_hole_spec(&self, hole: &HoleState) -> Result<HoleSpec> {
+        // Build hole spec from the hole state
+        let mut spec = HoleSpec::new(hole.id);
+
+        // Add constraints from the hole state
+        for constraint_str in &hole.constraints {
+            let constraint = crate::ffi::FillConstraint::new(
+                "generic".to_string(),
+                constraint_str.clone(),
+            );
+            spec.fill_constraints.push(constraint);
+        }
+
+        Ok(spec)
+    }
+
+    /// Build prompt from hole state
+    fn build_prompt(&self, hole: &HoleState) -> String {
+        let mut prompt = format!("Fill the following {} hole:\n", hole.scale);
+        prompt.push_str(&format!("Origin: {}\n", hole.origin));
+
+        if let Some(ref expected_type) = hole.expected_type {
+            prompt.push_str(&format!("Expected type: {}\n", expected_type));
+        }
+
+        if !hole.constraints.is_empty() {
+            prompt.push_str("Constraints:\n");
+            for constraint in &hole.constraints {
+                prompt.push_str(&format!("- {}\n", constraint));
+            }
+        }
+
+        prompt
+    }
+
+    /// Estimate max tokens for a hole
+    fn estimate_max_tokens(&self, hole: &HoleState) -> usize {
+        // Simple heuristic based on hole scale
+        match hole.scale.as_str() {
+            "nano" => 64,
+            "micro" => 256,
+            "meso" => 512,
+            "macro" => 1024,
+            _ => 256,
         }
     }
 
@@ -417,9 +532,10 @@ impl ProgressiveRefiner {
             .filter_map(|&hole_id| {
                 hole_states.get(&hole_id).map(|hole| {
                     let hole_clone = hole.clone();
+                    let constraints_clone = _constraints_ir.to_vec();
                     async move {
-                        // Stub: In real implementation, call inference service
-                        self.fill_single_hole(&hole_clone, temperature).await
+                        self.fill_single_hole_backend(&hole_clone, &constraints_clone, temperature)
+                            .await
                     }
                 })
             })
@@ -471,7 +587,10 @@ impl ProgressiveRefiner {
             if let Some(hole) = hole_states.get_mut(&hole_id) {
                 hole.status = HoleStatus::InProgress;
 
-                match self.fill_single_hole(hole, temperature).await {
+                match self
+                    .fill_single_hole_backend(hole, _constraints_ir, temperature)
+                    .await
+                {
                     Ok(attempt) => {
                         if attempt.confidence >= self.config.min_confidence
                             && attempt.validation_passed
@@ -494,34 +613,6 @@ impl ProgressiveRefiner {
         }
 
         Ok(())
-    }
-
-    /// Fill a single hole (stub implementation)
-    async fn fill_single_hole(
-        &self,
-        hole: &HoleState,
-        temperature: f32,
-    ) -> Result<FillAttempt> {
-        // Stub implementation - in production would call modal_client
-        tracing::debug!(
-            "Filling hole {} at scale {} with temperature {}",
-            hole.id,
-            hole.scale,
-            temperature
-        );
-
-        // Simulate inference call
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-
-        Ok(FillAttempt {
-            code: format!("/* Filled hole {} */", hole.id),
-            confidence: 0.85,
-            temperature,
-            model: "stub-model".to_string(),
-            timestamp: chrono::Utc::now().timestamp(),
-            validation_passed: true,
-            error: None,
-        })
     }
 
     /// Handle a fill failure according to configured strategy

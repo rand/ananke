@@ -196,7 +196,7 @@ impl ModelSelector {
     /// Estimate complexity of a hole based on its specification
     ///
     /// Returns a score from 0.0 (simple) to 1.0 (very complex)
-    fn estimate_complexity(&self, hole_spec: &HoleSpec) -> f32 {
+    pub fn estimate_complexity(&self, hole_spec: &HoleSpec) -> f32 {
         let mut complexity = 0.0;
         let mut factors = 0;
 
