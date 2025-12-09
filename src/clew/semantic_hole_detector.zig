@@ -244,7 +244,103 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
             },
-            else => {},
+            .go => {
+                // Look for panic("not implemented") or panic("TODO")
+                const call_exprs = try t.findByType(root, "call_expression");
+                defer self.allocator.free(call_exprs);
+
+                for (call_exprs) |call_node| {
+                    const call_text = t.getNodeText(call_node, source);
+                    if (std.mem.indexOf(u8, call_text, "panic(") != null and
+                        (std.mem.indexOf(u8, call_text, "TODO") != null or
+                            std.mem.indexOf(u8, call_text, "not implemented") != null))
+                    {
+                        const location = nodeToLocation(call_node, "");
+                        const context = try self.allocator.dupe(u8, "Panic unimplemented");
+
+                        try holes.append(self.allocator, .{
+                            .kind = .unimplemented_method,
+                            .location = location,
+                            .expected_type = null,
+                            .context = context,
+                            .confidence = 0.95,
+                        });
+                    }
+                }
+            },
+            .c, .cpp => {
+                // Look for abort(), assert(false), throw std::logic_error
+                const call_exprs = try t.findByType(root, "call_expression");
+                defer self.allocator.free(call_exprs);
+
+                for (call_exprs) |call_node| {
+                    const call_text = t.getNodeText(call_node, source);
+                    if (std.mem.indexOf(u8, call_text, "abort()") != null or
+                        std.mem.indexOf(u8, call_text, "assert(false)") != null or
+                        std.mem.indexOf(u8, call_text, "assert(0)") != null)
+                    {
+                        const location = nodeToLocation(call_node, "");
+                        const context = try self.allocator.dupe(u8, "Abort/assert unimplemented");
+
+                        try holes.append(self.allocator, .{
+                            .kind = .unimplemented_method,
+                            .location = location,
+                            .expected_type = null,
+                            .context = context,
+                            .confidence = 0.90,
+                        });
+                    }
+                }
+
+                // C++ specific: throw statements
+                if (language == .cpp) {
+                    const throw_stmts = try t.findByType(root, "throw_statement");
+                    defer self.allocator.free(throw_stmts);
+
+                    for (throw_stmts) |throw_node| {
+                        const throw_text = t.getNodeText(throw_node, source);
+                        if (std.mem.indexOf(u8, throw_text, "logic_error") != null or
+                            std.mem.indexOf(u8, throw_text, "runtime_error") != null or
+                            std.mem.indexOf(u8, throw_text, "Not implemented") != null)
+                        {
+                            const location = nodeToLocation(throw_node, "");
+                            const context = try self.allocator.dupe(u8, "Throws unimplemented error");
+
+                            try holes.append(self.allocator, .{
+                                .kind = .unimplemented_method,
+                                .location = location,
+                                .expected_type = null,
+                                .context = context,
+                                .confidence = 0.90,
+                            });
+                        }
+                    }
+                }
+            },
+            .java => {
+                // Look for throw new UnsupportedOperationException or RuntimeException
+                const throw_stmts = try t.findByType(root, "throw_statement");
+                defer self.allocator.free(throw_stmts);
+
+                for (throw_stmts) |throw_node| {
+                    const throw_text = t.getNodeText(throw_node, source);
+                    if (std.mem.indexOf(u8, throw_text, "UnsupportedOperationException") != null or
+                        std.mem.indexOf(u8, throw_text, "RuntimeException") != null or
+                        std.mem.indexOf(u8, throw_text, "TODO") != null)
+                    {
+                        const location = nodeToLocation(throw_node, "");
+                        const context = try self.allocator.dupe(u8, "Throws unimplemented exception");
+
+                        try holes.append(self.allocator, .{
+                            .kind = .unimplemented_method,
+                            .location = location,
+                            .expected_type = null,
+                            .context = context,
+                            .confidence = 0.95,
+                        });
+                    }
+                }
+            },
         }
 
         return try holes.toOwnedSlice(self.allocator);
@@ -362,7 +458,50 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
             },
-            else => {},
+            .go => {
+                // Go switch statements
+                const switch_stmts = try t.findByType(root, "expression_switch_statement");
+                defer self.allocator.free(switch_stmts);
+
+                for (switch_stmts) |switch_node| {
+                    const switch_text = t.getNodeText(switch_node, source);
+                    // Check for default case
+                    if (std.mem.indexOf(u8, switch_text, "default:") == null) {
+                        const location = nodeToLocation(switch_node, "");
+                        const context = try self.allocator.dupe(u8, "Switch without default case");
+
+                        try holes.append(self.allocator, .{
+                            .kind = .incomplete_match,
+                            .location = location,
+                            .expected_type = null,
+                            .context = context,
+                            .confidence = 0.65,
+                        });
+                    }
+                }
+            },
+            .c, .cpp, .java => {
+                // C/C++/Java switch statements
+                const switch_stmts = try t.findByType(root, "switch_statement");
+                defer self.allocator.free(switch_stmts);
+
+                for (switch_stmts) |switch_node| {
+                    const switch_text = t.getNodeText(switch_node, source);
+                    // Check for default case
+                    if (std.mem.indexOf(u8, switch_text, "default:") == null) {
+                        const location = nodeToLocation(switch_node, "");
+                        const context = try self.allocator.dupe(u8, "Switch without default case");
+
+                        try holes.append(self.allocator, .{
+                            .kind = .incomplete_match,
+                            .location = location,
+                            .expected_type = null,
+                            .context = context,
+                            .confidence = 0.65,
+                        });
+                    }
+                }
+            },
         }
 
         return try holes.toOwnedSlice(self.allocator);
@@ -516,7 +655,40 @@ pub const SemanticHoleDetector = struct {
                 }
                 return trimmed.len == 0 or std.mem.eql(u8, trimmed, "unreachable");
             },
-            else => return false,
+            .go => {
+                // Check for empty block or panic
+                if (std.mem.startsWith(u8, trimmed, "{")) {
+                    trimmed = std.mem.trim(u8, trimmed[1..], &std.ascii.whitespace);
+                    if (std.mem.endsWith(u8, trimmed, "}")) {
+                        trimmed = std.mem.trim(u8, trimmed[0 .. trimmed.len - 1], &std.ascii.whitespace);
+                    }
+                }
+                return trimmed.len == 0 or
+                    std.mem.indexOf(u8, trimmed, "panic(") != null;
+            },
+            .c, .cpp => {
+                // Check for empty block or abort/assert
+                if (std.mem.startsWith(u8, trimmed, "{")) {
+                    trimmed = std.mem.trim(u8, trimmed[1..], &std.ascii.whitespace);
+                    if (std.mem.endsWith(u8, trimmed, "}")) {
+                        trimmed = std.mem.trim(u8, trimmed[0 .. trimmed.len - 1], &std.ascii.whitespace);
+                    }
+                }
+                return trimmed.len == 0 or
+                    std.mem.indexOf(u8, trimmed, "abort()") != null or
+                    std.mem.indexOf(u8, trimmed, "assert(false)") != null;
+            },
+            .java => {
+                // Check for empty block or throw
+                if (std.mem.startsWith(u8, trimmed, "{")) {
+                    trimmed = std.mem.trim(u8, trimmed[1..], &std.ascii.whitespace);
+                    if (std.mem.endsWith(u8, trimmed, "}")) {
+                        trimmed = std.mem.trim(u8, trimmed[0 .. trimmed.len - 1], &std.ascii.whitespace);
+                    }
+                }
+                return trimmed.len == 0 or
+                    std.mem.indexOf(u8, trimmed, "UnsupportedOperationException") != null;
+            },
         }
     }
 };
@@ -532,7 +704,9 @@ fn getFunctionNodeTypes(language: Language) []const []const u8 {
         // Zig tree-sitter uses "FnProto" for function prototypes/declarations
         .zig => &[_][]const u8{ "FnProto", "TestDecl" },
         .go => &[_][]const u8{ "function_declaration", "method_declaration" },
-        else => &[_][]const u8{},
+        .c => &[_][]const u8{ "function_definition" },
+        .cpp => &[_][]const u8{ "function_definition", "template_declaration" },
+        .java => &[_][]const u8{ "method_declaration", "constructor_declaration" },
     };
 }
 

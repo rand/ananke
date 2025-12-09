@@ -28,6 +28,11 @@ pub const HoleDetector = struct {
         typescript,
         zig,
         rust,
+        javascript,
+        go,
+        c,
+        cpp,
+        java,
     };
 
     /// Explicit hole markers by language
@@ -64,6 +69,49 @@ pub const HoleDetector = struct {
         "todo!()",
         "unimplemented!()",
         "panic!(\"TODO\")",
+        "// TODO",
+        "// FIXME",
+    };
+
+    const javascript_markers = [_][]const u8{
+        "// TODO",
+        "// FIXME",
+        "throw new Error('TODO')",
+        "throw new Error('Not implemented')",
+        "throw new Error(\"TODO\")",
+        "throw new Error(\"Not implemented\")",
+    };
+
+    const go_markers = [_][]const u8{
+        "panic(\"not implemented\")",
+        "panic(\"TODO\")",
+        "panic(\"todo\")",
+        "// TODO",
+        "// FIXME",
+    };
+
+    const c_markers = [_][]const u8{
+        "/* TODO */",
+        "// TODO",
+        "// FIXME",
+        "assert(false)",
+        "assert(0)",
+        "abort()",
+    };
+
+    const cpp_markers = [_][]const u8{
+        "/* TODO */",
+        "// TODO",
+        "// FIXME",
+        "throw std::logic_error(\"Not implemented\")",
+        "throw std::runtime_error(\"TODO\")",
+        "assert(false)",
+    };
+
+    const java_markers = [_][]const u8{
+        "throw new UnsupportedOperationException()",
+        "throw new UnsupportedOperationException(\"TODO\")",
+        "throw new RuntimeException(\"TODO\")",
         "// TODO",
         "// FIXME",
     };
@@ -112,6 +160,11 @@ pub const HoleDetector = struct {
             .typescript => .typescript,
             .zig => .zig,
             .rust => .rust,
+            .javascript => .javascript,
+            .go => .go,
+            .c => .c,
+            .cpp => .cpp,
+            .java => .java,
         };
 
         // Initialize tree-sitter parser
@@ -203,6 +256,11 @@ pub const HoleDetector = struct {
             .typescript => &typescript_markers,
             .zig => &zig_markers,
             .rust => &rust_markers,
+            .javascript => &javascript_markers,
+            .go => &go_markers,
+            .c => &c_markers,
+            .cpp => &cpp_markers,
+            .java => &java_markers,
         };
 
         var line_num: u32 = 1;

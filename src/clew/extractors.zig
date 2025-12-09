@@ -4,6 +4,13 @@ const std = @import("std");
 pub const base = @import("extractors/base.zig");
 pub const typescript = @import("extractors/typescript.zig");
 pub const python = @import("extractors/python.zig");
+pub const javascript = @import("extractors/javascript.zig");
+pub const rust = @import("extractors/rust.zig");
+pub const go = @import("extractors/go.zig");
+pub const zig_lang = @import("extractors/zig_lang.zig");
+pub const c = @import("extractors/c.zig");
+pub const cpp = @import("extractors/cpp.zig");
+pub const java = @import("extractors/java.zig");
 
 const HybridExtractor = @import("hybrid_extractor.zig").HybridExtractor;
 const ExtractionStrategy = @import("hybrid_extractor.zig").ExtractionStrategy;
@@ -20,10 +27,16 @@ pub fn extract(
         std.mem.eql(u8, language, "ts") or
         std.mem.eql(u8, language, "python") or
         std.mem.eql(u8, language, "py") or
+        std.mem.eql(u8, language, "javascript") or
+        std.mem.eql(u8, language, "js") or
         std.mem.eql(u8, language, "rust") or
         std.mem.eql(u8, language, "rs") or
         std.mem.eql(u8, language, "go") or
-        std.mem.eql(u8, language, "zig");
+        std.mem.eql(u8, language, "zig") or
+        std.mem.eql(u8, language, "c") or
+        std.mem.eql(u8, language, "cpp") or
+        std.mem.eql(u8, language, "c++") or
+        std.mem.eql(u8, language, "java");
 
     if (use_hybrid) {
         return try extractHybrid(allocator, constraint_allocator, source, language);
@@ -54,6 +67,12 @@ fn extractHybrid(
         "typescript"
     else if (std.mem.eql(u8, language, "py"))
         "python"
+    else if (std.mem.eql(u8, language, "js"))
+        "javascript"
+    else if (std.mem.eql(u8, language, "rs"))
+        "rust"
+    else if (std.mem.eql(u8, language, "c++"))
+        "cpp"
     else
         language;
 
@@ -77,11 +96,25 @@ fn extractHybrid(
         try all_constraints.append(constraint_allocator, new_constraint);
     }
 
-    // 2. Extract pattern-based constraints using existing extractors
+    // 2. Extract pattern-based constraints using language-specific extractors
     var structure = if (std.mem.eql(u8, language, "typescript") or std.mem.eql(u8, language, "ts"))
         try typescript.parse(allocator, source)
     else if (std.mem.eql(u8, language, "python") or std.mem.eql(u8, language, "py"))
         try python.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "javascript") or std.mem.eql(u8, language, "js"))
+        try javascript.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "rust") or std.mem.eql(u8, language, "rs"))
+        try rust.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "go"))
+        try go.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "zig"))
+        try zig_lang.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "c"))
+        try c.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "cpp") or std.mem.eql(u8, language, "c++"))
+        try cpp.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "java"))
+        try java.parse(allocator, source)
     else
         base.SyntaxStructure.init(allocator);
 
