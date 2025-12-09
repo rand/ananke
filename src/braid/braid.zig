@@ -78,6 +78,16 @@ pub const IncrementalState = struct {
             ir_copy.deinit(self.allocator);
         }
     }
+
+    /// Set the last full IR, freeing any previous value first
+    pub fn setLastFullIR(self: *IncrementalState, new_ir: ConstraintIR) void {
+        // Free old IR if present
+        if (self.last_full_ir) |*old_ir| {
+            var old_copy = old_ir.*;
+            old_copy.deinit(self.allocator);
+        }
+        self.last_full_ir = new_ir;
+    }
 };
 
 /// Main Braid compilation engine
@@ -206,7 +216,7 @@ pub const Braid = struct {
             if (affected_ratio > 0.8) {
                 // Too many affected - do full recompile
                 const ir = try self.compile(constraints);
-                state.last_full_ir = try ir.clone(self.allocator);
+                state.setLastFullIR(try ir.clone(self.allocator));
 
                 // Update all fingerprints
                 try self.updateAllFingerprints(state, &graph);
@@ -219,7 +229,7 @@ pub const Braid = struct {
         if (!needs_partial or affected.len == 0) {
             // Full recompile needed
             const ir = try self.compile(constraints);
-            state.last_full_ir = try ir.clone(self.allocator);
+            state.setLastFullIR(try ir.clone(self.allocator));
 
             // Update all fingerprints
             try self.updateAllFingerprints(state, &graph);
@@ -235,7 +245,7 @@ pub const Braid = struct {
         }
 
         const merged = try self.mergeIR(state.last_full_ir.?, partial_ir, affected);
-        state.last_full_ir = try merged.clone(self.allocator);
+        state.setLastFullIR(try merged.clone(self.allocator));
 
         // Update fingerprints for affected constraints only
         try self.updateAffectedFingerprints(state, &graph, affected);
@@ -250,12 +260,12 @@ pub const Braid = struct {
         indices: []const usize,
     ) !ConstraintIR {
         // Extract constraints for the given indices
-        var subconstraints = std.ArrayList(Constraint).init(self.allocator);
-        defer subconstraints.deinit();
+        var subconstraints = std.ArrayList(Constraint){};
+        defer subconstraints.deinit(self.allocator);
 
         for (indices) |idx| {
             if (idx < graph.nodes.items.len) {
-                try subconstraints.append(graph.nodes.items[idx].constraint);
+                try subconstraints.append(self.allocator, graph.nodes.items[idx].constraint);
             }
         }
 
@@ -326,12 +336,12 @@ pub const Braid = struct {
 
         // Merge regex patterns (append unique patterns)
         if (partial.regex_patterns.len > 0) {
-            var all_patterns = std.ArrayList(root.types.constraint.Regex).init(self.allocator);
-            defer all_patterns.deinit();
+            var all_patterns = std.ArrayList(root.types.constraint.Regex){};
+            defer all_patterns.deinit(self.allocator);
 
             // Add existing patterns
             for (merged.regex_patterns) |pattern| {
-                try all_patterns.append(pattern);
+                try all_patterns.append(self.allocator, pattern);
             }
 
             // Add new patterns if not duplicate
@@ -345,9 +355,9 @@ pub const Braid = struct {
                 }
                 if (!is_duplicate) {
                     if (new_pattern.is_static) {
-                        try all_patterns.append(new_pattern);
+                        try all_patterns.append(self.allocator, new_pattern);
                     } else {
-                        try all_patterns.append(.{
+                        try all_patterns.append(self.allocator, .{
                             .pattern = try self.allocator.dupe(u8, new_pattern.pattern),
                             .flags = try self.allocator.dupe(u8, new_pattern.flags),
                             .is_static = false,
@@ -369,7 +379,7 @@ pub const Braid = struct {
                 self.allocator.free(merged.regex_patterns);
             }
 
-            merged.regex_patterns = try all_patterns.toOwnedSlice();
+            merged.regex_patterns = try all_patterns.toOwnedSlice(self.allocator);
         }
 
         // Use higher priority
@@ -2196,7 +2206,7 @@ pub const ConstraintGraph = struct {
         }
 
         // BFS to find all dependents (nodes that depend on changed nodes)
-        var queue = std.ArrayList(usize).init(self.allocator);
+        var queue = std.ArrayList(usize){};
         defer queue.deinit(self.allocator);
 
         var keys_iter = affected.keyIterator();
@@ -2217,7 +2227,7 @@ pub const ConstraintGraph = struct {
         }
 
         // Convert to owned slice
-        var result = std.ArrayList(usize).init(self.allocator);
+        var result = std.ArrayList(usize){};
         defer result.deinit(self.allocator);
 
         var result_iter = affected.keyIterator();

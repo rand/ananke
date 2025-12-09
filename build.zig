@@ -1187,18 +1187,30 @@ pub fn build(b: *std.Build) void {
 
     const run_hole_tests = b.addRunArtifact(hole_tests);
 
-    // Hole detector tests
+    // Hole detector tests (requires tree-sitter links due to semantic detection integration)
     const hole_detector_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("test/clew/hole_detector_test.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "ananke", .module = ananke_mod },
                 .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
             },
         }),
     });
+    hole_detector_tests.linkSystemLibrary("tree-sitter");
+    hole_detector_tests.linkLibrary(ts_parser_lib);
+    hole_detector_tests.linkLibrary(py_parser_lib);
+    hole_detector_tests.linkLibrary(js_parser_lib);
+    hole_detector_tests.linkLibrary(rust_parser_lib);
+    hole_detector_tests.linkLibrary(go_parser_lib);
+    hole_detector_tests.linkLibrary(zig_parser_lib);
+    hole_detector_tests.linkLibrary(c_parser_lib);
+    hole_detector_tests.linkLibrary(cpp_parser_lib);
+    hole_detector_tests.linkLibrary(java_parser_lib);
 
     const run_hole_detector_tests = b.addRunArtifact(hole_detector_tests);
 

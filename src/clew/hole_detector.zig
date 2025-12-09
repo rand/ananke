@@ -8,9 +8,20 @@ const HoleSet = root.types.hole.HoleSet;
 const Location = root.types.hole.Location;
 const Provenance = root.types.hole.Provenance;
 
+// Import tree-sitter and semantic detection
+const tree_sitter = @import("tree_sitter");
+const SemanticHoleDetector = @import("semantic_hole_detector.zig").SemanticHoleDetector;
+
+/// Configuration for hole detection
+pub const HoleDetectorConfig = struct {
+    /// Enable AST-based semantic hole detection
+    enable_semantic_detection: bool = false,
+};
+
 pub const HoleDetector = struct {
     allocator: std.mem.Allocator,
     language: Language,
+    config: HoleDetectorConfig,
 
     pub const Language = enum {
         python,
@@ -61,6 +72,15 @@ pub const HoleDetector = struct {
         return .{
             .allocator = allocator,
             .language = language,
+            .config = .{},
+        };
+    }
+
+    pub fn initWithConfig(allocator: std.mem.Allocator, language: Language, config: HoleDetectorConfig) HoleDetector {
+        return .{
+            .allocator = allocator,
+            .language = language,
+            .config = config,
         };
     }
 
@@ -68,10 +88,108 @@ pub const HoleDetector = struct {
     pub fn detectHoles(self: *HoleDetector, source: []const u8, file_path: []const u8) !HoleSet {
         var holes = HoleSet.init(self.allocator);
 
-        // Detect explicit markers
+        // Detect explicit markers (always enabled)
         try self.detectExplicitHoles(source, file_path, &holes);
 
+        // Detect semantic holes if enabled
+        if (self.config.enable_semantic_detection) {
+            try self.detectSemanticHoles(source, file_path, &holes);
+        }
+
         return holes;
+    }
+
+    /// Detect semantic holes using tree-sitter AST analysis
+    fn detectSemanticHoles(
+        self: *HoleDetector,
+        source: []const u8,
+        file_path: []const u8,
+        holes: *HoleSet,
+    ) !void {
+        // Map HoleDetector.Language to tree-sitter Language
+        const ts_lang: tree_sitter.Language = switch (self.language) {
+            .python => .python,
+            .typescript => .typescript,
+            .zig => .zig,
+            .rust => .rust,
+        };
+
+        // Initialize tree-sitter parser
+        var parser = tree_sitter.TreeSitterParser.init(self.allocator, ts_lang) catch |err| {
+            std.log.debug("Tree-sitter parser init failed: {}, skipping semantic detection", .{err});
+            return;
+        };
+        defer parser.deinit();
+
+        // Parse the source
+        var tree = parser.parse(source) catch |err| {
+            std.log.debug("Tree-sitter parse failed: {}, skipping semantic detection", .{err});
+            return;
+        };
+        defer tree.deinit();
+
+        const root_node = tree.rootNode();
+
+        // Run semantic hole detection
+        var semantic_detector = SemanticHoleDetector.init(self.allocator);
+        const semantic_holes = try semantic_detector.detectAll(root_node, source, ts_lang);
+        defer {
+            for (semantic_holes) |*sh| {
+                var mut_sh = sh.*;
+                mut_sh.deinit(self.allocator);
+            }
+            self.allocator.free(semantic_holes);
+        }
+
+        // Convert semantic holes to typed holes
+        for (semantic_holes) |semantic_hole| {
+            const scale = semanticKindToScale(semantic_hole.kind);
+            const origin = semanticKindToOrigin(semantic_hole.kind);
+
+            const hole = Hole{
+                .id = generateHoleId(file_path, semantic_hole.location.start_line, semantic_hole.location.start_column),
+                .scale = scale,
+                .origin = origin,
+                .location = .{
+                    .file_path = file_path,
+                    .start_line = semantic_hole.location.start_line,
+                    .start_column = semantic_hole.location.start_column,
+                    .end_line = semantic_hole.location.end_line,
+                    .end_column = semantic_hole.location.end_column,
+                },
+                .provenance = .{
+                    .created_at = std.time.timestamp(),
+                    .created_by = "clew_semantic",
+                    .source_artifact = file_path,
+                },
+                .confidence = .{ .score = semantic_hole.confidence },
+            };
+            try holes.add(hole);
+        }
+    }
+
+    /// Convert SemanticHoleKind to HoleScale
+    fn semanticKindToScale(kind: SemanticHoleDetector.SemanticHoleKind) HoleScale {
+        return switch (kind) {
+            .empty_function_body => .function,
+            .unimplemented_method => .function,
+            .incomplete_match => .block,
+            .missing_type_annotation => .expression,
+            .missing_await => .expression,
+            .unhandled_error => .statement,
+        };
+    }
+
+    /// Convert SemanticHoleKind to HoleOrigin
+    fn semanticKindToOrigin(kind: SemanticHoleDetector.SemanticHoleKind) HoleOrigin {
+        return switch (kind) {
+            .empty_function_body => .structural,
+            .unimplemented_method => .structural,
+            .incomplete_match => .structural,
+            .missing_type_annotation => .type_inference_failure,
+            .missing_await => .structural,
+            .unhandled_error => .structural,
+        };
     }
 
     fn detectExplicitHoles(
