@@ -312,7 +312,7 @@ pub const ConstraintIR = struct {
 };
 
 /// Helper function to clone JsonSchema
-fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema {
+pub fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema {
     var cloned = JsonSchema{
         .type = try allocator.dupe(u8, schema.type),
         .additional_properties = schema.additional_properties,
@@ -343,7 +343,7 @@ fn cloneJsonSchema(allocator: std.mem.Allocator, schema: JsonSchema) !JsonSchema
 }
 
 /// Helper function to clone a JSON value
-fn cloneJsonValue(allocator: std.mem.Allocator, value: std.json.Value) !std.json.Value {
+pub fn cloneJsonValue(allocator: std.mem.Allocator, value: std.json.Value) !std.json.Value {
     return switch (value) {
         .null => .null,
         .bool => |b| .{ .bool = b },
@@ -397,7 +397,7 @@ fn freeJsonValue(allocator: std.mem.Allocator, value: std.json.Value) void {
 }
 
 /// Helper function to clone Grammar
-fn cloneGrammar(allocator: std.mem.Allocator, grammar: Grammar) !Grammar {
+pub fn cloneGrammar(allocator: std.mem.Allocator, grammar: Grammar) !Grammar {
     const rules = try allocator.alloc(GrammarRule, grammar.rules.len);
 
     for (grammar.rules, 0..) |rule, i| {
@@ -532,6 +532,51 @@ pub const TokenMaskRules = struct {
                 }
             }
         }
+    }
+};
+
+/// Fingerprint for tracking constraint changes in incremental compilation
+pub const ConstraintFingerprint = struct {
+    /// Content hash of the constraint
+    hash: u64,
+    /// When the constraint was first created
+    created_at: i64,
+    /// When the constraint was last modified
+    modified_at: i64,
+
+    /// Compute a fingerprint from a constraint's content
+    pub fn compute(constraint: *const Constraint) ConstraintFingerprint {
+        var hasher = std.hash.Wyhash.init(0);
+
+        // Hash all relevant fields that affect compilation
+        hasher.update(constraint.name);
+        hasher.update(constraint.description);
+
+        const kind_bytes = std.mem.asBytes(&@intFromEnum(constraint.kind));
+        hasher.update(kind_bytes);
+
+        const source_bytes = std.mem.asBytes(&@intFromEnum(constraint.source));
+        hasher.update(source_bytes);
+
+        const enforcement_bytes = std.mem.asBytes(&@intFromEnum(constraint.enforcement));
+        hasher.update(enforcement_bytes);
+
+        const priority_bytes = std.mem.asBytes(&constraint.priority.toNumeric());
+        hasher.update(priority_bytes);
+
+        const severity_bytes = std.mem.asBytes(&@intFromEnum(constraint.severity));
+        hasher.update(severity_bytes);
+
+        return .{
+            .hash = hasher.final(),
+            .created_at = constraint.created_at,
+            .modified_at = std.time.timestamp(),
+        };
+    }
+
+    /// Check if this fingerprint differs from another
+    pub fn hasChanged(self: ConstraintFingerprint, other: ConstraintFingerprint) bool {
+        return self.hash != other.hash;
     }
 };
 
