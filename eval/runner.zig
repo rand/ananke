@@ -121,11 +121,18 @@ pub const EvaluationRunner = struct {
             }
 
             // Determine winner based on quality comparison
+            // CORRECTNESS-FIRST: Use correctness winner when tests actually ran
             if (result.comparison) |comp| {
-                const winner_tag = @tagName(comp.winner.overall);
+                const tests_ran = result.constrained_tests.total_tests > 0 or
+                    result.baseline_tests.total_tests > 0;
+                const winner_to_use = if (tests_ran)
+                    comp.winner.correctness // Test results are definitive
+                else
+                    comp.winner.overall; // Fallback to pattern matching when no tests
+                const winner_tag = @tagName(winner_to_use);
                 if (std.mem.eql(u8, winner_tag, "constrained")) {
                     stats.constrained_wins += 1;
-                } else if (std.mem.eql(u8, winner_tag, "baseline")) {
+                } else if (std.mem.eql(u8, winner_tag, "unconstrained")) {
                     stats.baseline_wins += 1;
                 } else {
                     stats.ties += 1;

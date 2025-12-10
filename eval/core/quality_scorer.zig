@@ -14,7 +14,12 @@ const Allocator = std.mem.Allocator;
 /// Complete quality score for a piece of generated code
 pub const QualityScore = struct {
     /// Overall composite score (weighted average of component scores)
+    /// New formula: 0.60 * correctness + 0.40 * quality
     overall: f32,
+
+    /// Correctness score based on test results (0-100)
+    /// This is the PRIMARY metric - code that doesn't work is worthless
+    correctness: CorrectnessScore,
 
     /// How well the code adheres to specified constraints
     constraint_adherence: ConstraintAdherenceScore,
@@ -35,6 +40,18 @@ pub const QualityScore = struct {
         const writer = buf.writer(allocator);
         try writer.writeAll("{");
         try writer.print("\"overall\":{d:.2},", .{self.overall});
+
+        // Correctness (PRIMARY metric)
+        try writer.writeAll("\"correctness\":{");
+        try writer.print("\"score\":{d:.2},", .{self.correctness.score});
+        try writer.print("\"test_pass_rate\":{d:.2},", .{self.correctness.test_pass_rate});
+        try writer.print("\"compiles\":{},", .{self.correctness.compiles});
+        try writer.print("\"valid_ast\":{},", .{self.correctness.valid_ast});
+        try writer.print("\"exports_present\":{},", .{self.correctness.exports_present});
+        try writer.print("\"total_tests\":{d},", .{self.correctness.total_tests});
+        try writer.print("\"passed_tests\":{d},", .{self.correctness.passed_tests});
+        try writer.print("\"failed_tests\":{d}", .{self.correctness.failed_tests});
+        try writer.writeAll("},");
 
         // Constraint adherence
         try writer.writeAll("\"constraint_adherence\":{");
@@ -159,10 +176,88 @@ pub const DangerousPatterns = struct {
     hardcoded_secrets: bool,
 };
 
+/// Correctness score based on test results
+/// This is the PRIMARY metric - code that doesn't work is worthless
+pub const CorrectnessScore = struct {
+    /// Overall correctness score (0-100)
+    /// Formula: 0.40 * test_pass_rate + 0.20 * compiles + 0.10 * valid_ast + 0.30 * exports_present
+    score: f32,
+
+    /// Test pass rate (0-100): (passed_tests / total_tests) * 100
+    test_pass_rate: f32,
+
+    /// Whether the code compiles/parses without errors
+    compiles: bool,
+
+    /// Whether the code has valid AST structure
+    valid_ast: bool,
+
+    /// Whether required exports are present
+    exports_present: bool,
+
+    /// Raw test metrics
+    total_tests: u32,
+    passed_tests: u32,
+    failed_tests: u32,
+
+    /// Create from test results
+    pub fn fromTestResults(total: u32, passed: u32, failed: u32, compiles_ok: bool, has_exports: bool) CorrectnessScore {
+        const test_pass_rate: f32 = if (total > 0)
+            @as(f32, @floatFromInt(passed)) / @as(f32, @floatFromInt(total)) * 100.0
+        else
+            0.0; // No tests = 0% pass rate (not 100%)
+
+        // compiles: 100 if true, 0 if false
+        const compiles_score: f32 = if (compiles_ok) 100.0 else 0.0;
+
+        // valid_ast: assume true if compiles (simplified)
+        const valid_ast = compiles_ok;
+        const ast_score: f32 = if (valid_ast) 100.0 else 0.0;
+
+        // exports_present: 100 if true, 0 if false
+        const exports_score: f32 = if (has_exports) 100.0 else 0.0;
+
+        // Weighted average: test_pass_rate is most important
+        // CORRECTNESS-FIRST: 60% test pass rate, 20% compiles, 10% ast, 10% exports
+        const overall = test_pass_rate * 0.60 +
+            compiles_score * 0.20 +
+            ast_score * 0.10 +
+            exports_score * 0.10;
+
+        return CorrectnessScore{
+            .score = overall,
+            .test_pass_rate = test_pass_rate,
+            .compiles = compiles_ok,
+            .valid_ast = valid_ast,
+            .exports_present = has_exports,
+            .total_tests = total,
+            .passed_tests = passed,
+            .failed_tests = failed,
+        };
+    }
+
+    /// Create a placeholder score when test results aren't available
+    pub fn placeholder() CorrectnessScore {
+        return CorrectnessScore{
+            .score = 0.0,
+            .test_pass_rate = 0.0,
+            .compiles = false,
+            .valid_ast = false,
+            .exports_present = false,
+            .total_tests = 0,
+            .passed_tests = 0,
+            .failed_tests = 0,
+        };
+    }
+};
+
 /// Comparative analysis between constrained and unconstrained generation
 pub const ComparativeAnalysis = struct {
     /// Delta in overall quality (positive = constrained better)
     overall_delta: f32,
+
+    /// Delta in correctness (PRIMARY - test pass rate)
+    correctness_delta: f32,
 
     /// Delta in constraint adherence
     constraint_adherence_delta: f32,
@@ -186,12 +281,14 @@ pub const ComparativeAnalysis = struct {
         const writer = buf.writer(allocator);
         try writer.writeAll("{");
         try writer.print("\"overall_delta\":{d:.2},", .{self.overall_delta});
+        try writer.print("\"correctness_delta\":{d:.2},", .{self.correctness_delta});
         try writer.print("\"constraint_adherence_delta\":{d:.2},", .{self.constraint_adherence_delta});
         try writer.print("\"pattern_conformity_delta\":{d:.2},", .{self.pattern_conformity_delta});
         try writer.print("\"code_quality_delta\":{d:.2},", .{self.code_quality_delta});
         try writer.print("\"security_delta\":{d:.2},", .{self.security_delta});
         try writer.writeAll("\"winner\":{");
         try writer.print("\"overall\":\"{s}\",", .{@tagName(self.winner.overall)});
+        try writer.print("\"correctness\":\"{s}\",", .{@tagName(self.winner.correctness)});
         try writer.print("\"constraint_adherence\":\"{s}\",", .{@tagName(self.winner.constraint_adherence)});
         try writer.print("\"pattern_conformity\":\"{s}\",", .{@tagName(self.winner.pattern_conformity)});
         try writer.print("\"code_quality\":\"{s}\",", .{@tagName(self.winner.code_quality)});
@@ -206,6 +303,7 @@ pub const ComparativeAnalysis = struct {
 /// Which approach won for each metric
 pub const WinnerAnalysis = struct {
     overall: Winner,
+    correctness: Winner,
     constraint_adherence: Winner,
     pattern_conformity: Winner,
     code_quality: Winner,
@@ -242,50 +340,135 @@ pub const QualityScorer = struct {
         };
     }
 
-    /// Score a piece of generated code against constraints
+    /// Score a piece of generated code against constraints (without test results)
+    /// Returns score with placeholder correctness (for backwards compatibility)
     pub fn score(
         self: *QualityScorer,
         code: []const u8,
         constraint_json: ?[]const u8,
     ) QualityScore {
+        return self.scoreWithTests(code, constraint_json, 0, 0, 0, false);
+    }
+
+    /// Score with full test results - CORRECTNESS-FIRST SCORING
+    /// Formula: overall = 0.60 * correctness + 0.40 * quality_metrics
+    /// Where quality_metrics = average(constraint_adherence, pattern_conformity, code_quality, security)
+    pub fn scoreWithTests(
+        self: *QualityScorer,
+        code: []const u8,
+        constraint_json: ?[]const u8,
+        total_tests: u32,
+        passed_tests: u32,
+        failed_tests: u32,
+        compiles: bool,
+    ) QualityScore {
         const constraint_adherence = self.scoreConstraintAdherence(code, constraint_json);
         const pattern_conformity = self.scorePatternConformity(code);
-        const code_quality = self.scoreCodeQuality(code);
+        const code_quality_score = self.scoreCodeQuality(code);
         const security = self.scoreSecurity(code);
 
-        // Weighted average for overall score
-        const overall = constraint_adherence.score * 0.30 +
-            pattern_conformity.score * 0.20 +
-            code_quality.score * 0.25 +
-            security.score * 0.25;
+        // Detect if exports are present (for correctness scoring)
+        const has_exports = std.mem.indexOf(u8, code, "export ") != null or
+            std.mem.indexOf(u8, code, "module.exports") != null or
+            std.mem.indexOf(u8, code, "def ") != null or // Python function
+            std.mem.indexOf(u8, code, "pub fn ") != null; // Zig public function
+
+        // Calculate correctness score from test results
+        const correctness = CorrectnessScore.fromTestResults(
+            total_tests,
+            passed_tests,
+            failed_tests,
+            compiles,
+            has_exports,
+        );
+
+        // Quality metrics average (secondary importance)
+        const quality_score = (constraint_adherence.score +
+            pattern_conformity.score +
+            code_quality_score.score +
+            security.score) / 4.0;
+
+        // CORRECTNESS-FIRST: 60% correctness + 40% quality
+        const overall = correctness.score * 0.60 + quality_score * 0.40;
 
         return QualityScore{
             .overall = overall,
+            .correctness = correctness,
             .constraint_adherence = constraint_adherence,
             .pattern_conformity = pattern_conformity,
-            .code_quality = code_quality,
+            .code_quality = code_quality_score,
             .security = security,
         };
     }
 
-    /// Compare constrained vs unconstrained generation
+    /// Compare constrained vs unconstrained generation (without test results)
     pub fn compare(
         self: *QualityScorer,
         constrained_code: []const u8,
         unconstrained_code: []const u8,
         constraint_json: ?[]const u8,
     ) struct { constrained: QualityScore, unconstrained: QualityScore, comparison: ComparativeAnalysis } {
-        const constrained_score = self.score(constrained_code, constraint_json);
-        const unconstrained_score = self.score(unconstrained_code, null);
+        return self.compareWithTests(
+            constrained_code,
+            unconstrained_code,
+            constraint_json,
+            // Constrained test results (placeholder)
+            0,
+            0,
+            0,
+            false,
+            // Unconstrained test results (placeholder)
+            0,
+            0,
+            0,
+            false,
+        );
+    }
+
+    /// Compare with full test results - CORRECTNESS-FIRST COMPARISON
+    pub fn compareWithTests(
+        self: *QualityScorer,
+        constrained_code: []const u8,
+        unconstrained_code: []const u8,
+        constraint_json: ?[]const u8,
+        // Constrained test results
+        constrained_total: u32,
+        constrained_passed: u32,
+        constrained_failed: u32,
+        constrained_compiles: bool,
+        // Unconstrained test results
+        unconstrained_total: u32,
+        unconstrained_passed: u32,
+        unconstrained_failed: u32,
+        unconstrained_compiles: bool,
+    ) struct { constrained: QualityScore, unconstrained: QualityScore, comparison: ComparativeAnalysis } {
+        const constrained_score = self.scoreWithTests(
+            constrained_code,
+            constraint_json,
+            constrained_total,
+            constrained_passed,
+            constrained_failed,
+            constrained_compiles,
+        );
+        const unconstrained_score = self.scoreWithTests(
+            unconstrained_code,
+            null, // No constraints for baseline
+            unconstrained_total,
+            unconstrained_passed,
+            unconstrained_failed,
+            unconstrained_compiles,
+        );
 
         const comparison = ComparativeAnalysis{
             .overall_delta = constrained_score.overall - unconstrained_score.overall,
+            .correctness_delta = constrained_score.correctness.score - unconstrained_score.correctness.score,
             .constraint_adherence_delta = constrained_score.constraint_adherence.score - unconstrained_score.constraint_adherence.score,
             .pattern_conformity_delta = constrained_score.pattern_conformity.score - unconstrained_score.pattern_conformity.score,
             .code_quality_delta = constrained_score.code_quality.score - unconstrained_score.code_quality.score,
             .security_delta = constrained_score.security.score - unconstrained_score.security.score,
             .winner = .{
                 .overall = determineWinner(constrained_score.overall, unconstrained_score.overall),
+                .correctness = determineWinner(constrained_score.correctness.score, unconstrained_score.correctness.score),
                 .constraint_adherence = determineWinner(constrained_score.constraint_adherence.score, unconstrained_score.constraint_adherence.score),
                 .pattern_conformity = determineWinner(constrained_score.pattern_conformity.score, unconstrained_score.pattern_conformity.score),
                 .code_quality = determineWinner(constrained_score.code_quality.score, unconstrained_score.code_quality.score),
@@ -316,9 +499,10 @@ pub const QualityScorer = struct {
         _ = self;
 
         if (constraint_json == null) {
-            // No constraints provided - return neutral score
+            // No constraints provided - return equal baseline to avoid bias
+            // (Constrained side gets 75-100, so baseline should start at 75)
             return ConstraintAdherenceScore{
-                .score = 50.0,
+                .score = 75.0,
                 .signature_match = false,
                 .type_match = false,
                 .naming_match = false,
