@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload build artifacts
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ananke-${{ runner.os }}-${{ matrix.zig-version }}
           path: |
@@ -224,7 +224,7 @@ jobs:
   #         version: '0.15.2'
   #     - run: brew install tree-sitter
   #     - run: zig build -Doptimize=ReleaseSafe
-  #     - uses: actions/upload-artifact@v4
+  #     - uses: actions/upload-artifact@v6
   #       with:
   #         name: ananke-x86_64-macos
   #         path: zig-out/bin/*
