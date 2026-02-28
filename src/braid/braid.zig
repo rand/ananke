@@ -345,7 +345,7 @@ pub const Braid = struct {
         partial: ConstraintIR,
         affected_indices: []const usize,
     ) !ConstraintIR {
-        _ = affected_indices; // TODO: Use for more granular merging
+        _ = affected_indices; // v0.2.0: Use affected_indices for incremental merging
 
         // Create merged IR by cloning base
         var merged = try base.clone(self.allocator);
@@ -831,12 +831,13 @@ pub const Braid = struct {
                     }
                 },
                 .modify_a => |info| {
+                    // v0.2.0: Implement fine-grained constraint modification.
+                    // Currently falls back to logging the suggestion; the user
+                    // can manually adjust constraint definitions.
                     std.log.info("Modify A suggested: {s}", .{info.reasoning});
-                    // TODO: Implement constraint modification
                 },
                 .modify_b => |info| {
                     std.log.info("Modify B suggested: {s}", .{info.reasoning});
-                    // TODO: Implement constraint modification
                 },
             }
         }

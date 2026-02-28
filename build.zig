@@ -18,7 +18,7 @@ pub fn build(b: *std.Build) void {
     // Build options for mechanical sympathy optimizations
     // Note: LTO is disabled for tree-sitter parser libraries to prevent symbol stripping
     const cpu_native = b.option(bool, "cpu-native", "Enable native CPU features (-march=native)") orelse false;
-    // TODO: Apply strip_symbols to executables (requires updating exe configuration)
+    // v0.2.0: Apply strip_symbols to executables (requires updating exe configuration)
     // const strip_symbols = b.option(bool, "strip", "Strip debug symbols from release builds") orelse (optimize == .ReleaseSmall);
 
     // Build option to enable WASM-specific features
@@ -1256,6 +1256,20 @@ pub fn build(b: *std.Build) void {
 
     const run_hole_compiler_tests = b.addRunArtifact(hole_compiler_tests);
 
+    // Property-based fuzz tests
+    const fuzz_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/property/fuzz_tests.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+            },
+        }),
+    });
+
+    const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -1291,6 +1305,11 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_hole_detector_tests.step);
     test_step.dependOn(&run_semantic_hole_detector_tests.step);
     test_step.dependOn(&run_hole_compiler_tests.step);
+    test_step.dependOn(&run_fuzz_tests.step);
+
+    // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
+    const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");
+    fuzz_test_step.dependOn(&run_fuzz_tests.step);
 
     // Phase 8a: TypeScript E2E pipeline tests
     const typescript_pipeline_tests = b.addTest(.{

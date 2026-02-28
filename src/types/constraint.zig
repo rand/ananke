@@ -152,6 +152,17 @@ pub const Constraint = struct {
     pub fn getPriorityValue(self: *const Constraint) u32 {
         return self.priority.toNumeric();
     }
+
+    /// Compute a content-based unique ID from the constraint's name, description, and kind.
+    /// This produces a deterministic hash so the same constraint always gets the same ID.
+    pub fn computeId(self: *const Constraint) ConstraintID {
+        var hasher = std.hash.Wyhash.init(0);
+        hasher.update(self.name);
+        hasher.update(self.description);
+        const kind_bytes = std.mem.asBytes(&@intFromEnum(self.kind));
+        hasher.update(kind_bytes);
+        return hasher.final();
+    }
 };
 
 /// Compiled constraint representation for efficient validation
@@ -251,14 +262,6 @@ pub const ConstraintIR = struct {
                 allocator.free(tokens);
             }
         }
-    }
-
-    /// Serialize to format compatible with llguidance
-    pub fn serialize(self: ConstraintIR, allocator: std.mem.Allocator) ![]u8 {
-        // TODO: Implement serialization to llguidance format
-        _ = allocator;
-        _ = self;
-        return error.NotImplemented;
     }
 
     /// Create a deep clone of this ConstraintIR with independent ownership.
@@ -657,31 +660,37 @@ pub const ConstraintSet = struct {
         self.constraints.deinit(self.allocator);
     }
 
-    pub fn add(self: *ConstraintSet, constraint: Constraint) !void {
+    pub fn add(self: *ConstraintSet, c: Constraint) !void {
+        var constraint = c;
+        // Auto-assign a content-based ID if none was explicitly set
+        if (constraint.id == 0) {
+            constraint.id = constraint.computeId();
+        }
         try self.constraints.append(self.allocator, constraint);
     }
 
     /// Clone this ConstraintSet, creating a deep copy with independent ownership.
-    /// Caller owns the returned ConstraintSet and must call deinit() on it.
+    /// All string fields (name, description, origin_file) are duplicated so the
+    /// clone is fully independent of the original's allocator.
     pub fn clone(self: *const ConstraintSet, allocator: std.mem.Allocator) !ConstraintSet {
-        // Deep copy the name to avoid dangling pointer
+        // Deep copy the set name
         const owned_name = try allocator.dupe(u8, self.name);
         errdefer allocator.free(owned_name);
 
         var cloned = ConstraintSet.init(allocator, owned_name);
 
-        // Deep copy all constraints
+        // Deep copy all constraints including their string fields
         for (self.constraints.items) |constraint| {
-            try cloned.constraints.append(allocator, constraint);
+            var c = constraint;
+            c.name = try allocator.dupe(u8, constraint.name);
+            c.description = try allocator.dupe(u8, constraint.description);
+            if (constraint.origin_file) |file| {
+                c.origin_file = try allocator.dupe(u8, file);
+            }
+            try cloned.constraints.append(allocator, c);
         }
 
         return cloned;
     }
 
-    pub fn compile(self: ConstraintSet, allocator: std.mem.Allocator) !ConstraintIR {
-        // TODO: Implement constraint compilation
-        _ = allocator;
-        _ = self;
-        return error.NotImplemented;
-    }
 };

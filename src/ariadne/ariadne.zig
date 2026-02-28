@@ -72,7 +72,7 @@ pub const AriadneCompiler = struct {
 
     fn expandMacrosDefault(self: *AriadneCompiler, ast: AST) !AST {
         _ = self;
-        // TODO: Implement default macro expansion
+        // Macro expansion is a v0.2.0 feature - pass through for now
         return ast;
     }
 
@@ -1304,12 +1304,12 @@ pub const LLMClient = struct {
 
     pub fn expandMacros(self: LLMClient, ast: AST) !AST {
         _ = self;
-        // TODO: Use LLM to expand complex macros
+        // v0.2.0: Use LLM to expand complex macros
         return ast;
     }
 };
 
-/// Language Server Protocol support (future)
+/// Language Server Protocol support (v0.3.0)
 pub const AriadneLSP = struct {
-    // TODO: Implement LSP for IDE integration
+    // Planned: LSP for IDE integration (completion, diagnostics, hover)
 };
