@@ -385,6 +385,7 @@ pub fn build(b: *std.Build) void {
     });
     cli_generate_mod.addImport("ananke", ananke_mod);
     cli_generate_mod.addImport("cli_args", cli_args_mod);
+    cli_generate_mod.addImport("cli_output", cli_output_mod);
     cli_generate_mod.addImport("cli_config", cli_config_mod);
     cli_generate_mod.addImport("cli_error", cli_error_mod);
 
@@ -1389,6 +1390,33 @@ pub fn build(b: *std.Build) void {
     e2e_test_step.dependOn(&run_phase2_constraint_quality_tests.step);
     e2e_test_step.dependOn(&run_typescript_pipeline_tests.step);
     e2e_test_step.dependOn(&run_python_pipeline_tests.step);
+
+    // ConstraintSpec conformance tests (CLaSH round-trip validation)
+    const conformance_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/integration/constraint_spec_conformance_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+            },
+        }),
+    });
+    conformance_tests.linkSystemLibrary("tree-sitter");
+    conformance_tests.linkLibrary(ts_parser_lib);
+    conformance_tests.linkLibrary(py_parser_lib);
+    conformance_tests.linkLibrary(js_parser_lib);
+    conformance_tests.linkLibrary(rust_parser_lib);
+    conformance_tests.linkLibrary(go_parser_lib);
+    conformance_tests.linkLibrary(zig_parser_lib);
+    conformance_tests.linkLibrary(c_parser_lib);
+    conformance_tests.linkLibrary(cpp_parser_lib);
+    conformance_tests.linkLibrary(java_parser_lib);
+
+    const run_conformance_tests = b.addRunArtifact(conformance_tests);
+    const conformance_test_step = b.step("test-conformance", "Run ConstraintSpec conformance tests");
+    conformance_test_step.dependOn(&run_conformance_tests.step);
+    e2e_test_step.dependOn(&run_conformance_tests.step);
 
     // Phase 2 E2E test step (can be run separately)
     const phase2_test_step = b.step("test-phase2", "Run Phase 2 E2E integration tests");

@@ -144,8 +144,10 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         }
     }
 
-    // Load constraints if specified
+    // Load constraints — from explicit file or auto-extracted from context
+    const ananke_mod = @import("ananke");
     var constraint_ir: ?[]const u8 = null;
+    var auto_extracted_ir: bool = false;
     if (constraints_file) |path| {
         const constraints_json = std.fs.cwd().readFileAlloc(allocator, path, 10 * 1024 * 1024) catch |err| {
             cli_error.printFileError(err, path);
@@ -154,13 +156,16 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         constraint_ir = constraints_json;
 
         if (verbose) {
-            cli_error.printInfo("Constraints loaded successfully", .{});
+            cli_error.printInfo("Constraints loaded from: {s}", .{path});
         }
+    } else if (context_file != null) {
+        // One-shot pipeline: auto-extract constraints from context file
+        constraint_ir = autoExtractConstraintIR(allocator, context_file.?, language, verbose);
+        if (constraint_ir != null) auto_extracted_ir = true;
     }
     defer if (constraint_ir) |ir| allocator.free(ir);
 
     // Extract rich context from source file for sglang's multi-domain decoding
-    const ananke_mod = @import("ananke");
     var rich_context: ?ananke_mod.types.constraint.RichContext = null;
     if (backend == .sglang and context_file != null) {
         rich_context = extractRichContextFromFile(allocator, context_file.?, language, verbose);
@@ -676,6 +681,47 @@ fn handleConnectionError(err: anyerror, endpoint_url: []const u8) InferenceError
 }
 
 /// Extract rich context from a source file. Returns null on any error.
+/// Auto-extract constraint IR from a context file (one-shot pipeline).
+/// Runs extract → compile and serializes the IR as JSON.
+fn autoExtractConstraintIR(
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    language: []const u8,
+    verbose: bool,
+) ?[]const u8 {
+    const ananke_mod = @import("ananke");
+    const output_mod = @import("cli_output");
+
+    const source = std.fs.cwd().readFileAlloc(allocator, path, 10 * 1024 * 1024) catch |err| {
+        cli_error.printFileError(err, path);
+        return null;
+    };
+    defer allocator.free(source);
+
+    var engine = ananke_mod.Ananke.init(allocator) catch return null;
+    defer engine.deinit();
+
+    var constraint_set = engine.extract(source, language) catch return null;
+    defer constraint_set.deinit();
+
+    if (verbose) {
+        cli_error.printInfo("Auto-extracted {d} constraints from: {s}", .{ constraint_set.constraints.items.len, path });
+    }
+
+    if (constraint_set.constraints.items.len == 0) return null;
+
+    var ir = engine.compile(constraint_set.constraints.items) catch return null;
+    defer ir.deinit(allocator);
+
+    const ir_json = output_mod.formatIRJson(allocator, ir) catch return null;
+
+    if (verbose) {
+        cli_error.printInfo("Compiled constraint IR (priority={d})", .{ir.priority});
+    }
+
+    return ir_json;
+}
+
 fn extractRichContextFromFile(
     allocator: std.mem.Allocator,
     path: []const u8,

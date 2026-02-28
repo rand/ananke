@@ -139,7 +139,8 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         try file.writeAll(spec_json);
         cli_error.printSuccess("ConstraintSpec written to {s}", .{path});
     } else {
-        std.debug.print("{s}", .{spec_json});
+        const stdout_file = std.fs.File.stdout();
+        try stdout_file.writeAll(spec_json);
     }
 }
 

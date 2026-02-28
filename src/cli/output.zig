@@ -259,7 +259,9 @@ pub fn formatIRJson(
     // Regex patterns
     try writer.writeAll("  \"regex_patterns\": [\n");
     for (ir.regex_patterns, 0..) |regex, i| {
-        try writer.print("    {{\"pattern\": \"{s}\"}}", .{regex.pattern});
+        try writer.writeAll("    {\"pattern\": \"");
+        try writeJsonEscaped(writer, regex.pattern);
+        try writer.writeAll("\"}");
         if (i < ir.regex_patterns.len - 1) {
             try writer.writeAll(",");
         }
