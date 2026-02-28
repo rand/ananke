@@ -109,7 +109,7 @@ constraint typed_error_handling {
         signature: {
             functions: {
                 -- All async functions should return Result<T, E>
-                "async *": fn(...) -> Result<T, Error>
+                "async *": "(...) -> Result<T, Error>"
             }
         },
         strictness: .Lax,

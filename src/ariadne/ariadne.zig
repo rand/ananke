@@ -668,7 +668,13 @@ pub const Parser = struct {
     }
 
     fn parseProperty(self: *Parser) !Property {
-        const key = try self.expectIdentifier();
+        // Allow either identifiers or quoted strings as property keys
+        const key = if (self.check(.string)) blk: {
+            const str = self.current_token.lexeme;
+            try self.advance();
+            // Remove quotes from string key
+            break :blk str[1 .. str.len - 1];
+        } else try self.expectIdentifier();
         try self.consume(.colon, "Expected ':' after property name");
         const value = try self.parseValue();
 
