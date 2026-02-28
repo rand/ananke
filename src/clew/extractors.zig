@@ -15,6 +15,35 @@ pub const java = @import("extractors/java.zig");
 const HybridExtractor = @import("hybrid_extractor.zig").HybridExtractor;
 const ExtractionStrategy = @import("hybrid_extractor.zig").ExtractionStrategy;
 
+/// Extract SyntaxStructure from source code for rich context serialization.
+/// Caller owns the returned structure and must call deinit().
+pub fn extractSyntaxStructure(
+    allocator: std.mem.Allocator,
+    source: []const u8,
+    language: []const u8,
+) !base.SyntaxStructure {
+    if (std.mem.eql(u8, language, "typescript") or std.mem.eql(u8, language, "ts"))
+        return try typescript.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "python") or std.mem.eql(u8, language, "py"))
+        return try python.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "javascript") or std.mem.eql(u8, language, "js"))
+        return try javascript.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "rust") or std.mem.eql(u8, language, "rs"))
+        return try rust.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "go"))
+        return try go.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "zig"))
+        return try zig_lang.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "c"))
+        return try c.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "cpp") or std.mem.eql(u8, language, "c++"))
+        return try cpp.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "java"))
+        return try java.parse(allocator, source)
+    else
+        return base.SyntaxStructure.init(allocator);
+}
+
 /// Extract structural constraints from source code using hybrid AST+pattern approach
 pub fn extract(
     allocator: std.mem.Allocator,

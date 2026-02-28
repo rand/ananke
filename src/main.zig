@@ -11,6 +11,7 @@ const cli_error = @import("cli/error");
 const extract = @import("cli/commands/extract");
 const compile = @import("cli/commands/compile");
 const generate = @import("cli/commands/generate");
+const export_spec = @import("cli/commands/export_spec");
 const validate = @import("cli/commands/validate");
 const init = @import("cli/commands/init");
 const version = @import("cli/commands/version");
@@ -89,6 +90,8 @@ fn runCommand(
         try compile.run(allocator, parsed_args, config);
     } else if (std.mem.eql(u8, command, "generate")) {
         try generate.run(allocator, parsed_args, config);
+    } else if (std.mem.eql(u8, command, "export-spec")) {
+        try export_spec.run(allocator, parsed_args, config);
     } else if (std.mem.eql(u8, command, "validate")) {
         try validate.run(allocator, parsed_args, config);
     } else if (std.mem.eql(u8, command, "init")) {

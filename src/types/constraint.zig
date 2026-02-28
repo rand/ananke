@@ -165,6 +165,44 @@ pub const Constraint = struct {
     }
 };
 
+/// Rich context data for multi-domain constrained decoding.
+/// Contains pre-serialized JSON matching the sglang ConstraintSpec.from_dict() format.
+/// These fields seed the Type, Import, ControlFlow, and Semantic domains.
+pub const RichContext = struct {
+    /// JSON array of {name, params: [{name, type}], return_type, is_async}
+    function_signatures_json: ?[]const u8 = null,
+    /// JSON array of {name, kind, fields: [{name, type}]}
+    type_bindings_json: ?[]const u8 = null,
+    /// JSON array of {name, methods: [{name, params, return_type}], fields: [{name, type}]}
+    class_definitions_json: ?[]const u8 = null,
+    /// JSON array of {module, items: [str], is_wildcard}
+    imports_json: ?[]const u8 = null,
+
+    pub fn deinit(self: *RichContext, allocator: std.mem.Allocator) void {
+        if (self.function_signatures_json) |s| allocator.free(s);
+        if (self.type_bindings_json) |s| allocator.free(s);
+        if (self.class_definitions_json) |s| allocator.free(s);
+        if (self.imports_json) |s| allocator.free(s);
+    }
+
+    pub fn clone(self: *const RichContext, allocator: std.mem.Allocator) !RichContext {
+        return .{
+            .function_signatures_json = if (self.function_signatures_json) |s| try allocator.dupe(u8, s) else null,
+            .type_bindings_json = if (self.type_bindings_json) |s| try allocator.dupe(u8, s) else null,
+            .class_definitions_json = if (self.class_definitions_json) |s| try allocator.dupe(u8, s) else null,
+            .imports_json = if (self.imports_json) |s| try allocator.dupe(u8, s) else null,
+        };
+    }
+
+    /// Returns true if any context field is populated
+    pub fn hasData(self: *const RichContext) bool {
+        return self.function_signatures_json != null or
+            self.type_bindings_json != null or
+            self.class_definitions_json != null or
+            self.imports_json != null;
+    }
+};
+
 /// Compiled constraint representation for efficient validation
 pub const ConstraintIR = struct {
     /// JSON Schema for structured constraints
@@ -190,6 +228,9 @@ pub const ConstraintIR = struct {
 
     /// Whether this IR supports iterative refinement
     supports_refinement: bool = false,
+
+    /// Rich context for multi-domain constrained decoding (sglang)
+    rich_context: ?RichContext = null,
 
     /// Free all allocated memory in this ConstraintIR
     pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
@@ -262,6 +303,12 @@ pub const ConstraintIR = struct {
                 allocator.free(tokens);
             }
         }
+
+        // Free rich context if present
+        if (self.rich_context) |*rc| {
+            var ctx = rc.*;
+            ctx.deinit(allocator);
+        }
     }
 
     /// Create a deep clone of this ConstraintIR with independent ownership.
@@ -308,6 +355,11 @@ pub const ConstraintIR = struct {
         // Clone token_masks if present
         if (self.token_masks) |masks| {
             cloned.token_masks = try cloneTokenMasks(allocator, masks);
+        }
+
+        // Clone rich_context if present
+        if (self.rich_context) |*rc| {
+            cloned.rich_context = try rc.clone(allocator);
         }
 
         return cloned;

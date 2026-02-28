@@ -269,9 +269,30 @@ pub fn formatIRJson(
 
     // Token masks
     if (ir.token_masks) |_| {
-        try writer.writeAll("  \"token_masks\": {}\n");
+        try writer.writeAll("  \"token_masks\": {},\n");
     } else {
-        try writer.writeAll("  \"token_masks\": null\n");
+        try writer.writeAll("  \"token_masks\": null,\n");
+    }
+
+    // Rich context for multi-domain constrained decoding
+    if (ir.rich_context) |rc| {
+        try writer.writeAll("  \"rich_context\": {\n");
+        if (rc.function_signatures_json) |fs| {
+            try writer.print("    \"function_signatures\": {s},\n", .{fs});
+        }
+        if (rc.type_bindings_json) |tb| {
+            try writer.print("    \"type_bindings\": {s},\n", .{tb});
+        }
+        if (rc.class_definitions_json) |cd| {
+            try writer.print("    \"class_definitions\": {s},\n", .{cd});
+        }
+        if (rc.imports_json) |im| {
+            try writer.print("    \"imports\": {s},\n", .{im});
+        }
+        try writer.writeAll("    \"_populated\": true\n");
+        try writer.writeAll("  }\n");
+    } else {
+        try writer.writeAll("  \"rich_context\": null\n");
     }
 
     try writer.writeAll("}\n");

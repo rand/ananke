@@ -82,6 +82,15 @@ pub const Ananke = struct {
         return try self.clew_engine.extractFromCode(source, language);
     }
 
+    /// Extract rich context from source code for multi-domain constrained decoding.
+    pub fn extractRichContext(
+        self: *Ananke,
+        source: []const u8,
+        language: []const u8,
+    ) !types.constraint.RichContext {
+        return try self.clew_engine.extractRichContext(source, language);
+    }
+
     /// Compile constraints to IR
     pub fn compile(
         self: *Ananke,

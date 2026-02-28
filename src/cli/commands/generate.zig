@@ -31,6 +31,7 @@ pub const usage =
     \\Options:
     \\  --backend <name>        Backend: "sglang" or "modal" (default: auto-detect)
     \\  --constraints, -c <file> Load constraints from file
+    \\  --context <file>        Source file for rich context (types, imports, signatures)
     \\  --language <lang>       Target language (default: from config)
     \\  --output, -o <file>     Write generated code to file instead of stdout
     \\  --max-tokens <n>        Maximum tokens to generate (default: 4096)
@@ -42,6 +43,7 @@ pub const usage =
     \\
     \\Examples:
     \\  ananke generate "create auth handler" -c rules.json --backend sglang
+    \\  ananke generate "add validation" --context src/models/user.py --backend sglang
     \\  ananke generate "implement binary search" --language rust
     \\  ananke generate "add tests" --backend modal --endpoint https://custom.modal.run
     \\
@@ -65,6 +67,7 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     };
 
     const constraints_file = parsed_args.getFlag("constraints") orelse parsed_args.getFlag("c");
+    const context_file = parsed_args.getFlag("context");
     const language = parsed_args.getFlagOr("language", config.default_language);
     const output_file = parsed_args.getFlag("output") orelse parsed_args.getFlag("o");
     const max_tokens = try parsed_args.getFlagInt("max-tokens", u32) orelse config.max_tokens;
@@ -156,6 +159,14 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     }
     defer if (constraint_ir) |ir| allocator.free(ir);
 
+    // Extract rich context from source file for sglang's multi-domain decoding
+    const ananke_mod = @import("ananke");
+    var rich_context: ?ananke_mod.types.constraint.RichContext = null;
+    if (backend == .sglang and context_file != null) {
+        rich_context = extractRichContextFromFile(allocator, context_file.?, language, verbose);
+    }
+    defer if (rich_context) |*rc| rc.deinit(allocator);
+
     // Call the appropriate backend
     const generated_code = switch (backend) {
         .sglang => try callSglangInference(
@@ -164,6 +175,7 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
             prompt,
             language,
             constraint_ir,
+            if (rich_context) |*rc| rc else null,
             max_tokens,
             temperature,
             model_name,
@@ -204,6 +216,7 @@ fn callSglangInference(
     prompt: []const u8,
     language: []const u8,
     constraint_ir: ?[]const u8,
+    rich_context: ?*const @import("ananke").types.constraint.RichContext,
     max_tokens: u32,
     temperature: f32,
     model_name: ?[]const u8,
@@ -281,6 +294,30 @@ fn callSglangInference(
                     }
                 }
             }
+        }
+    }
+
+    // Rich context fields — seed TypeDomain, ImportDomain, etc.
+    if (rich_context) |rc| {
+        if (rc.function_signatures_json) |fs| {
+            try writer.print(",\"function_signatures\":{s}", .{fs});
+        }
+        if (rc.type_bindings_json) |tb| {
+            try writer.print(",\"type_bindings\":{s}", .{tb});
+        }
+        if (rc.class_definitions_json) |cd| {
+            try writer.print(",\"class_definitions\":{s}", .{cd});
+        }
+        if (rc.imports_json) |im| {
+            try writer.print(",\"imports\":{s}", .{im});
+        }
+        if (verbose) {
+            cli_error.printInfo("Rich context attached: functions={}, types={}, classes={}, imports={}", .{
+                rc.function_signatures_json != null,
+                rc.type_bindings_json != null,
+                rc.class_definitions_json != null,
+                rc.imports_json != null,
+            });
         }
     }
 
@@ -628,6 +665,37 @@ fn handleConnectionError(err: anyerror, endpoint_url: []const u8) InferenceError
             return InferenceError.NetworkError;
         },
     }
+}
+
+/// Extract rich context from a source file. Returns null on any error.
+fn extractRichContextFromFile(
+    allocator: std.mem.Allocator,
+    path: []const u8,
+    language: []const u8,
+    verbose: bool,
+) ?@import("ananke").types.constraint.RichContext {
+    const ananke_mod = @import("ananke");
+
+    const source = std.fs.cwd().readFileAlloc(allocator, path, 10 * 1024 * 1024) catch |err| {
+        cli_error.printFileError(err, path);
+        return null;
+    };
+    defer allocator.free(source);
+
+    var clew = ananke_mod.clew.Clew.init(allocator) catch {
+        return null;
+    };
+    defer clew.deinit();
+
+    const ctx = clew.extractRichContext(source, language) catch {
+        return null;
+    };
+
+    if (verbose and ctx.hasData()) {
+        cli_error.printInfo("Extracted rich context from: {s}", .{path});
+    }
+
+    return ctx;
 }
 
 /// Escape a string for JSON encoding

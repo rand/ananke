@@ -7,6 +7,7 @@ const root = @import("ananke");
 const Constraint = root.types.constraint.Constraint;
 const ConstraintKind = root.types.constraint.ConstraintKind;
 const ConstraintSet = root.types.constraint.ConstraintSet;
+const RichContext = root.types.constraint.RichContext;
 const Severity = root.types.constraint.Severity;
 
 // Import Claude API client
@@ -137,6 +138,30 @@ pub const Clew = struct {
         try self.cache.put(cache_key, constraint_set);
 
         return constraint_set;
+    }
+
+    /// Extract rich context from source code for multi-domain constrained decoding.
+    /// Returns a RichContext with serialized function signatures, type bindings,
+    /// class definitions, and imports matching the sglang ConstraintSpec format.
+    pub fn extractRichContext(
+        self: *Clew,
+        source: []const u8,
+        language: []const u8,
+    ) !RichContext {
+        var structure = extractors.extractSyntaxStructure(
+            self.allocator,
+            source,
+            language,
+        ) catch |err| {
+            std.log.warn("Syntax structure extraction failed: {}, returning empty context", .{err});
+            return RichContext{};
+        };
+        defer structure.deinit();
+
+        return structure.toRichContext(self.allocator) catch |err| {
+            std.log.warn("Rich context serialization failed: {}, returning empty context", .{err});
+            return RichContext{};
+        };
     }
 
     /// Extract constraints from test files

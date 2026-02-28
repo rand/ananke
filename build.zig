@@ -383,9 +383,21 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/cli/commands/generate.zig"),
         .target = target,
     });
+    cli_generate_mod.addImport("ananke", ananke_mod);
     cli_generate_mod.addImport("cli_args", cli_args_mod);
     cli_generate_mod.addImport("cli_config", cli_config_mod);
     cli_generate_mod.addImport("cli_error", cli_error_mod);
+
+    const cli_export_spec_mod = b.addModule("cli_export_spec", .{
+        .root_source_file = b.path("src/cli/commands/export_spec.zig"),
+        .target = target,
+    });
+    cli_export_spec_mod.addImport("ananke", ananke_mod);
+    cli_export_spec_mod.addImport("cli_args", cli_args_mod);
+    cli_export_spec_mod.addImport("cli_output", cli_output_mod);
+    cli_export_spec_mod.addImport("cli_config", cli_config_mod);
+    cli_export_spec_mod.addImport("cli_error", cli_error_mod);
+    cli_export_spec_mod.addImport("path_validator", path_validator_mod);
 
     const cli_validate_mod = b.addModule("cli_validate", .{
         .root_source_file = b.path("src/cli/commands/validate.zig"),
@@ -425,6 +437,7 @@ pub fn build(b: *std.Build) void {
     cli_help_mod.addImport("cli/commands/extract", cli_extract_mod);
     cli_help_mod.addImport("cli/commands/compile", cli_compile_mod);
     cli_help_mod.addImport("cli/commands/generate", cli_generate_mod);
+    cli_help_mod.addImport("cli/commands/export_spec", cli_export_spec_mod);
     cli_help_mod.addImport("cli/commands/validate", cli_validate_mod);
     cli_help_mod.addImport("cli/commands/init", cli_init_mod);
     cli_help_mod.addImport("cli/commands/version", cli_version_mod);
@@ -541,6 +554,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "cli/commands/extract", .module = cli_extract_mod },
                 .{ .name = "cli/commands/compile", .module = cli_compile_mod },
                 .{ .name = "cli/commands/generate", .module = cli_generate_mod },
+                .{ .name = "cli/commands/export_spec", .module = cli_export_spec_mod },
                 .{ .name = "cli/commands/validate", .module = cli_validate_mod },
                 .{ .name = "cli/commands/init", .module = cli_init_mod },
                 .{ .name = "cli/commands/version", .module = cli_version_mod },
