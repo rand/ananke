@@ -17,6 +17,7 @@ fn test_constraint_ir_ffi_roundtrip_simple() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -48,6 +49,7 @@ fn test_constraint_ir_ffi_with_regex() {
         ],
         token_masks: None,
         priority: 2,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -89,6 +91,7 @@ fn test_constraint_ir_ffi_with_json_schema() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -126,6 +129,7 @@ fn test_constraint_ir_ffi_with_grammar() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -153,6 +157,7 @@ fn test_constraint_ir_ffi_with_token_masks() {
             forbidden_tokens: Some(vec![100, 101, 102]),
         }),
         priority: 3,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -191,6 +196,7 @@ fn test_constraint_ir_ffi_complex() {
             forbidden_tokens: None,
         }),
         priority: 5,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -312,6 +318,7 @@ fn test_multiple_constraints_array() {
             regex_patterns: vec![],
             token_masks: None,
             priority: 1,
+            rich_context: None,
         },
         ConstraintIR {
             name: "constraint2".to_string(),
@@ -320,6 +327,7 @@ fn test_multiple_constraints_array() {
             regex_patterns: vec![],
             token_masks: None,
             priority: 2,
+            rich_context: None,
         },
         ConstraintIR {
             name: "constraint3".to_string(),
@@ -328,6 +336,7 @@ fn test_multiple_constraints_array() {
             regex_patterns: vec![],
             token_masks: None,
             priority: 3,
+            rich_context: None,
         },
     ];
 
@@ -361,6 +370,7 @@ fn test_constraint_ir_serialization() {
         }],
         token_masks: None,
         priority: 1,
+            rich_context: None,
     };
 
     // Test JSON serialization

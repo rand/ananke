@@ -90,6 +90,12 @@ pub struct ConstraintIR {
     /// Priority for conflict resolution
     #[serde(default)]
     pub priority: u32,
+
+    /// Rich context for multi-domain constrained decoding (CLaSH domains)
+    /// Contains pre-serialized JSON for function_signatures, type_bindings,
+    /// class_definitions, imports, control_flow, semantic_constraints
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rich_context: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -314,6 +320,7 @@ impl ConstraintIR {
             regex_patterns,
             token_masks,
             priority: ffi_ref.priority,
+            rich_context: None, // Rich context is passed via JSON, not FFI
         })
     }
 
@@ -681,6 +688,7 @@ mod tests {
             }],
             token_masks: None,
             priority: 1,
+            rich_context: None,
         };
 
         let ffi = constraint.to_ffi();

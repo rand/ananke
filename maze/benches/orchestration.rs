@@ -19,6 +19,7 @@ fn create_test_constraint(name: &str) -> ConstraintIR {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
+        rich_context: None,
     }
 }
 

@@ -137,6 +137,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             }],
             token_masks: None,
             priority: 1,
+            rich_context: None,
         },
         // Constraint 2: Security - forbid dangerous operations
         ConstraintIR {
@@ -153,6 +154,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
                 ]),
             }),
             priority: 2,
+            rich_context: None,
         },
         // Constraint 3: Code style - require documentation
         ConstraintIR {
@@ -165,6 +167,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             }],
             token_masks: None,
             priority: 0,
+            rich_context: None,
         },
         // Constraint 4: Async handling
         ConstraintIR {
@@ -177,6 +180,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             }],
             token_masks: None,
             priority: 1,
+            rich_context: None,
         },
     ]
 }

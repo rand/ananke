@@ -238,6 +238,7 @@ mod tests {
                 forbidden_tokens: None,
             }),
             priority: 0,
+            rich_context: None,
         }];
 
         let routing = router.route(&spec, &constraints);
@@ -306,6 +307,7 @@ mod tests {
                 forbidden_tokens: None,
             }),
             priority: 0,
+            rich_context: None,
         }];
 
         let routing = router.route(&spec, &constraints);

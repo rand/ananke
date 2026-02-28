@@ -177,12 +177,19 @@ pub const RichContext = struct {
     class_definitions_json: ?[]const u8 = null,
     /// JSON array of {module, items: [str], is_wildcard}
     imports_json: ?[]const u8 = null,
+    /// JSON object with control flow patterns: {is_async, has_generators, error_handling_style,
+    /// loop_patterns, try_catch_depth, has_recursion}
+    control_flow_json: ?[]const u8 = null,
+    /// JSON array of semantic constraints: [{kind, expression, source}]
+    semantic_constraints_json: ?[]const u8 = null,
 
     pub fn deinit(self: *RichContext, allocator: std.mem.Allocator) void {
         if (self.function_signatures_json) |s| allocator.free(s);
         if (self.type_bindings_json) |s| allocator.free(s);
         if (self.class_definitions_json) |s| allocator.free(s);
         if (self.imports_json) |s| allocator.free(s);
+        if (self.control_flow_json) |s| allocator.free(s);
+        if (self.semantic_constraints_json) |s| allocator.free(s);
     }
 
     pub fn clone(self: *const RichContext, allocator: std.mem.Allocator) !RichContext {
@@ -191,6 +198,8 @@ pub const RichContext = struct {
             .type_bindings_json = if (self.type_bindings_json) |s| try allocator.dupe(u8, s) else null,
             .class_definitions_json = if (self.class_definitions_json) |s| try allocator.dupe(u8, s) else null,
             .imports_json = if (self.imports_json) |s| try allocator.dupe(u8, s) else null,
+            .control_flow_json = if (self.control_flow_json) |s| try allocator.dupe(u8, s) else null,
+            .semantic_constraints_json = if (self.semantic_constraints_json) |s| try allocator.dupe(u8, s) else null,
         };
     }
 
@@ -199,7 +208,9 @@ pub const RichContext = struct {
         return self.function_signatures_json != null or
             self.type_bindings_json != null or
             self.class_definitions_json != null or
-            self.imports_json != null;
+            self.imports_json != null or
+            self.control_flow_json != null or
+            self.semantic_constraints_json != null;
     }
 };
 

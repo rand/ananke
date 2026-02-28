@@ -25,6 +25,7 @@ pub fn simple_constraint(name: &str, priority: u32) -> ConstraintIR {
         regex_patterns: vec![],
         token_masks: None,
         priority,
+        rich_context: None,
     }
 }
 
@@ -40,6 +41,7 @@ pub fn regex_constraint(name: &str, pattern: &str, priority: u32) -> ConstraintI
         }],
         token_masks: None,
         priority,
+        rich_context: None,
     }
 }
 
@@ -62,6 +64,7 @@ pub fn json_schema_constraint(
         regex_patterns: vec![],
         token_masks: None,
         priority,
+        rich_context: None,
     }
 }
 
@@ -82,6 +85,7 @@ pub fn grammar_constraint(
         regex_patterns: vec![],
         token_masks: None,
         priority,
+        rich_context: None,
     }
 }
 
@@ -102,6 +106,7 @@ pub fn token_mask_constraint(
             forbidden_tokens: forbidden,
         }),
         priority,
+        rich_context: None,
     }
 }
 

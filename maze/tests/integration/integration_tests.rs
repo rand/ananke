@@ -205,6 +205,7 @@ async fn test_ffi_boundary_data_integrity() {
         }],
         token_masks: None,
         priority: 2,
+            rich_context: None,
     };
 
     // Convert to FFI and back

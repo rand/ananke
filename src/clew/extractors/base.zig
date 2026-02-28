@@ -160,6 +160,14 @@ pub const SyntaxStructure = struct {
             ctx.imports_json = try serializeImports(allocator, self.imports.items);
         }
 
+        // Derive control flow context from function declarations
+        if (self.functions.items.len > 0) {
+            ctx.control_flow_json = try serializeControlFlow(allocator, self.functions.items, self.types.items);
+        }
+
+        // Derive semantic constraints from type signatures (morphism: Types → Semantics)
+        ctx.semantic_constraints_json = try deriveSemanticConstraints(allocator, self.functions.items, self.types.items);
+
         return ctx;
     }
 
@@ -447,6 +455,146 @@ fn serializeClassDefinitions(allocator: std.mem.Allocator, types: []const TypeDe
         try s.endObject();
     }
     try s.endArray();
+    return try buf.toOwnedSlice();
+}
+
+/// Derive control flow context from function declarations.
+/// This is a soft-tier constraint (ControlFlow domain in CLaSH).
+fn serializeControlFlow(
+    allocator: std.mem.Allocator,
+    functions: []const FunctionDecl,
+    types: []const TypeDecl,
+) ![]const u8 {
+    var buf: std.io.Writer.Allocating = .init(allocator);
+    defer buf.deinit();
+    var s: std.json.Stringify = .{ .writer = &buf.writer };
+
+    var async_count: u32 = 0;
+    var error_handling_count: u32 = 0;
+
+    for (functions) |func| {
+        if (func.is_async) async_count += 1;
+        if (func.has_error_handling) error_handling_count += 1;
+    }
+
+    try s.beginObject();
+    try s.objectField("async_function_count");
+    try s.write(async_count);
+    try s.objectField("error_handling_count");
+    try s.write(error_handling_count);
+    try s.objectField("total_functions");
+    try s.write(@as(u32, @intCast(functions.len)));
+
+    // Detect error handling style from type signatures
+    // Morphism: Types → ControlFlow
+    var has_result_types = false;
+    var has_option_types = false;
+    for (functions) |func| {
+        if (func.return_type) |rt| {
+            if (std.mem.indexOf(u8, rt, "Result") != null or
+                std.mem.indexOf(u8, rt, "!") != null)
+                has_result_types = true;
+            if (std.mem.indexOf(u8, rt, "Option") != null or
+                std.mem.indexOf(u8, rt, "?") != null)
+                has_option_types = true;
+        }
+    }
+    for (types) |td| {
+        if (std.mem.indexOf(u8, td.name, "Error") != null or
+            std.mem.indexOf(u8, td.name, "Result") != null)
+            has_result_types = true;
+    }
+
+    try s.objectField("has_result_types");
+    try s.write(has_result_types);
+    try s.objectField("has_option_types");
+    try s.write(has_option_types);
+
+    // Infer error handling style
+    try s.objectField("error_handling_style");
+    if (has_result_types and error_handling_count > 0) {
+        try s.write("result_based");
+    } else if (error_handling_count > 0) {
+        try s.write("exception_based");
+    } else {
+        try s.write("none");
+    }
+
+    try s.endObject();
+    return try buf.toOwnedSlice();
+}
+
+/// Derive semantic constraints from type signatures and declarations.
+/// This implements cross-domain morphisms:
+///   Types → Semantics: Result<T,E> ⟹ expect error handling
+///   Types → Semantics: fn sort(v: &mut Vec<T>) where T: Ord ⟹ expect ordering
+fn deriveSemanticConstraints(
+    allocator: std.mem.Allocator,
+    functions: []const FunctionDecl,
+    types: []const TypeDecl,
+) !?[]const u8 {
+    var buf: std.io.Writer.Allocating = .init(allocator);
+    defer buf.deinit();
+    var s: std.json.Stringify = .{ .writer = &buf.writer };
+
+    var has_constraints = false;
+    try s.beginArray();
+
+    // Derive from function signatures (morphism: Types → Semantics)
+    for (functions) |func| {
+        if (func.return_type) |rt| {
+            // Result types imply error handling obligation
+            if (std.mem.indexOf(u8, rt, "Result") != null or
+                std.mem.indexOf(u8, rt, "!") != null)
+            {
+                try s.beginObject();
+                try s.objectField("kind");
+                try s.write("error_handling_required");
+                try s.objectField("function");
+                try s.write(func.name);
+                try s.objectField("return_type");
+                try s.write(rt);
+                try s.objectField("tier");
+                try s.write("soft");
+                try s.endObject();
+                has_constraints = true;
+            }
+            // Mutable reference params imply side effects
+        }
+
+        // Async functions imply await usage
+        if (func.is_async) {
+            try s.beginObject();
+            try s.objectField("kind");
+            try s.write("async_pattern");
+            try s.objectField("function");
+            try s.write(func.name);
+            try s.objectField("tier");
+            try s.write("soft");
+            try s.endObject();
+            has_constraints = true;
+        }
+    }
+
+    // Derive from type definitions
+    for (types) |td| {
+        // Error types imply they should be used in error handling
+        if (std.mem.indexOf(u8, td.name, "Error") != null) {
+            try s.beginObject();
+            try s.objectField("kind");
+            try s.write("error_type_defined");
+            try s.objectField("type_name");
+            try s.write(td.name);
+            try s.objectField("tier");
+            try s.write("soft");
+            try s.endObject();
+            has_constraints = true;
+        }
+    }
+
+    try s.endArray();
+
+    if (!has_constraints) return null;
     return try buf.toOwnedSlice();
 }
 

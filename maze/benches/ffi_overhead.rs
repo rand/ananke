@@ -37,6 +37,7 @@ fn create_test_constraint(id: usize) -> ConstraintIR {
             forbidden_tokens: None,
         }),
         priority: 1,
+        rich_context: None,
     }
 }
 

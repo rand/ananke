@@ -26,6 +26,7 @@ fn create_constraint_variant(id: usize) -> ConstraintIR {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
+        rich_context: None,
     }
 }
 

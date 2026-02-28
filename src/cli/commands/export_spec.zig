@@ -118,6 +118,14 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         try writer.writeAll(",\n  \"imports\": ");
         try writer.writeAll(im);
     }
+    if (rich_context.control_flow_json) |cf| {
+        try writer.writeAll(",\n  \"control_flow\": ");
+        try writer.writeAll(cf);
+    }
+    if (rich_context.semantic_constraints_json) |sc| {
+        try writer.writeAll(",\n  \"semantic_constraints\": ");
+        try writer.writeAll(sc);
+    }
 
     try writer.writeAll("\n}\n");
 

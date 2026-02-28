@@ -126,6 +126,7 @@ async fn main() -> anyhow::Result<()> {
             forbidden_tokens: Some(vec![/* unsafe tokens */]),
         }),
         priority: 0,
+        rich_context: None,
     }];
 
     let routing = ensemble.router().route(&security_hole, &security_constraints);

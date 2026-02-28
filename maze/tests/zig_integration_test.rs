@@ -61,6 +61,7 @@ fn test_zig_ffi_constraint_ir_conversion() {
             forbidden_tokens: Some(vec![666, 999, 1337]),
         }),
         priority: 42,
+            rich_context: None,
     };
 
     // Convert to FFI representation and back
@@ -133,6 +134,7 @@ fn test_ffi_memory_ownership() {
             }],
             token_masks: None,
             priority: 1,
+            rich_context: None,
         },
         ConstraintIR {
             name: "constraint_2".to_string(),
@@ -144,6 +146,7 @@ fn test_ffi_memory_ownership() {
             }],
             token_masks: None,
             priority: 2,
+            rich_context: None,
         },
         ConstraintIR {
             name: "constraint_3".to_string(),
@@ -164,6 +167,7 @@ fn test_ffi_memory_ownership() {
                 forbidden_tokens: None,
             }),
             priority: 3,
+            rich_context: None,
         },
     ];
 
@@ -225,6 +229,7 @@ fn test_ffi_edge_cases() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 0,
+            rich_context: None,
     };
 
     let ffi = minimal.to_ffi();
@@ -253,6 +258,7 @@ fn test_ffi_edge_cases() {
         }],
         token_masks: None,
         priority: 999,
+            rich_context: None,
     };
 
     let ffi = large.to_ffi();
@@ -309,6 +315,7 @@ fn test_ffi_complex_grammar() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 10,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -348,6 +355,7 @@ fn test_ffi_token_masks_edge_cases() {
             forbidden_tokens: None,
         }),
         priority: 1,
+            rich_context: None,
     };
 
     let ffi = allowed_only.to_ffi();
@@ -370,6 +378,7 @@ fn test_ffi_token_masks_edge_cases() {
             forbidden_tokens: Some(vec![99, 100, 101]),
         }),
         priority: 1,
+            rich_context: None,
     };
 
     let ffi = forbidden_only.to_ffi();
@@ -392,6 +401,7 @@ fn test_ffi_token_masks_edge_cases() {
             forbidden_tokens: Some(vec![]),
         }),
         priority: 1,
+            rich_context: None,
     };
 
     let ffi = empty_masks.to_ffi();
@@ -447,6 +457,7 @@ fn test_ffi_json_schema_complex() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 5,
+            rich_context: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -495,6 +506,7 @@ fn test_ffi_roundtrip_stress() {
                 None
             },
             priority: i as u32,
+            rich_context: None,
         };
 
         let ffi = constraint.to_ffi();

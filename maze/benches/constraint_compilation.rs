@@ -110,6 +110,7 @@ fn bench_constraint_ir_serialization(c: &mut Criterion) {
                 regex_patterns: vec![],
                 token_masks: None,
                 priority: 1,
+                rich_context: None,
             },
             "medium" => ConstraintIR {
                 name: "medium".to_string(),
@@ -121,6 +122,7 @@ fn bench_constraint_ir_serialization(c: &mut Criterion) {
                 }],
                 token_masks: None,
                 priority: 1,
+                rich_context: None,
             },
             "large" => ConstraintIR {
                 name: "complex".to_string(),
@@ -141,6 +143,7 @@ fn bench_constraint_ir_serialization(c: &mut Criterion) {
                     forbidden_tokens: Some(vec![999, 1000, 1001]),
                 }),
                 priority: 1,
+                rich_context: None,
             },
             _ => unreachable!(),
         };
@@ -177,6 +180,7 @@ fn bench_llguidance_conversion(c: &mut Criterion) {
                 regex_patterns: vec![],
                 token_masks: None,
                 priority: 1,
+                rich_context: None,
             }],
             "medium" => (0..5)
                 .map(|i| ConstraintIR {
@@ -186,6 +190,7 @@ fn bench_llguidance_conversion(c: &mut Criterion) {
                     regex_patterns: vec![],
                     token_masks: None,
                     priority: 1,
+                    rich_context: None,
                 })
                 .collect(),
             "large" => (0..10)
@@ -199,6 +204,7 @@ fn bench_llguidance_conversion(c: &mut Criterion) {
                     }],
                     token_masks: None,
                     priority: 1,
+                    rich_context: None,
                 })
                 .collect(),
             _ => unreachable!(),

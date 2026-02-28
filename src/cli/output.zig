@@ -289,6 +289,12 @@ pub fn formatIRJson(
         if (rc.imports_json) |im| {
             try writer.print("    \"imports\": {s},\n", .{im});
         }
+        if (rc.control_flow_json) |cf| {
+            try writer.print("    \"control_flow\": {s},\n", .{cf});
+        }
+        if (rc.semantic_constraints_json) |sc| {
+            try writer.print("    \"semantic_constraints\": {s},\n", .{sc});
+        }
         try writer.writeAll("    \"_populated\": true\n");
         try writer.writeAll("  }\n");
     } else {

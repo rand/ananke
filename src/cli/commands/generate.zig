@@ -297,8 +297,9 @@ fn callSglangInference(
         }
     }
 
-    // Rich context fields — seed TypeDomain, ImportDomain, etc.
+    // Rich context fields — seed all 5 CLaSH domains
     if (rich_context) |rc| {
+        // Hard tier: Types, Imports
         if (rc.function_signatures_json) |fs| {
             try writer.print(",\"function_signatures\":{s}", .{fs});
         }
@@ -310,6 +311,13 @@ fn callSglangInference(
         }
         if (rc.imports_json) |im| {
             try writer.print(",\"imports\":{s}", .{im});
+        }
+        // Soft tier: ControlFlow, Semantics
+        if (rc.control_flow_json) |cf| {
+            try writer.print(",\"control_flow\":{s}", .{cf});
+        }
+        if (rc.semantic_constraints_json) |sc| {
+            try writer.print(",\"semantic_constraints\":{s}", .{sc});
         }
         if (verbose) {
             cli_error.printInfo("Rich context attached: functions={}, types={}, classes={}, imports={}", .{
