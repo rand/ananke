@@ -10,6 +10,10 @@ pub const Config = struct {
     modal_endpoint: ?[]const u8 = null,
     modal_api_key: OptionalSecureString = .{ .inner = null },
 
+    // sglang configuration
+    sglang_endpoint: ?[]const u8 = null,
+    sglang_endpoint_owned: bool = false,
+
     // Claude API configuration
     claude_api_key: OptionalSecureString = .{ .inner = null },
     claude_endpoint: ?[]const u8 = null,
@@ -42,6 +46,11 @@ pub const Config = struct {
     pub fn deinit(self: *Config) void {
         if (self.modal_endpoint) |endpoint| {
             self.allocator.free(endpoint);
+        }
+        if (self.sglang_endpoint_owned) {
+            if (self.sglang_endpoint) |endpoint| {
+                self.allocator.free(endpoint);
+            }
         }
         // Secure strings automatically zero memory on deinit
         self.modal_api_key.deinit();
@@ -138,6 +147,16 @@ pub const Config = struct {
             self.claude_endpoint = endpoint;
         } else |_| {}
 
+        if (std.process.getEnvVarOwned(self.allocator, "ANANKE_SGLANG_ENDPOINT")) |endpoint| {
+            if (self.sglang_endpoint_owned) {
+                if (self.sglang_endpoint) |old| {
+                    self.allocator.free(old);
+                }
+            }
+            self.sglang_endpoint = endpoint;
+            self.sglang_endpoint_owned = true;
+        } else |_| {}
+
         if (std.process.getEnvVarOwned(self.allocator, "ANANKE_LANGUAGE")) |lang| {
             if (self.default_language_owned) {
                 self.allocator.free(self.default_language);
@@ -200,6 +219,16 @@ pub const Config = struct {
                     self.claude_model = value;
                 } else if (std.mem.eql(u8, key, "enabled")) {
                     self.use_claude = std.mem.eql(u8, value, "true");
+                }
+            } else if (std.mem.eql(u8, sec, "sglang")) {
+                if (std.mem.eql(u8, key, "endpoint")) {
+                    if (self.sglang_endpoint_owned) {
+                        if (self.sglang_endpoint) |old| {
+                            self.allocator.free(old);
+                        }
+                    }
+                    self.sglang_endpoint = try self.allocator.dupe(u8, value);
+                    self.sglang_endpoint_owned = true;
                 }
             } else if (std.mem.eql(u8, sec, "defaults")) {
                 if (std.mem.eql(u8, key, "language")) {
@@ -367,6 +396,23 @@ test "config parse Claude section" {
     try testing.expectEqualStrings("https://test.anthropic.com/v1/messages", config.claude_endpoint.?);
     try testing.expectEqualStrings("claude-haiku-3-5-20241022", config.claude_model);
     try testing.expectEqual(true, config.use_claude);
+}
+
+test "config parse sglang section" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var config = Config.init(allocator);
+    defer config.deinit();
+
+    const toml =
+        \\[sglang]
+        \\endpoint = "http://localhost:30000/v1/chat/completions"
+    ;
+
+    try config.parseToml(toml);
+
+    try testing.expectEqualStrings("http://localhost:30000/v1/chat/completions", config.sglang_endpoint.?);
 }
 
 test "config Claude API key auto-enables use_claude" {

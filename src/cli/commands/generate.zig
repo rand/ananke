@@ -15,32 +15,41 @@ const InferenceError = error{
     NetworkError,
 };
 
+const Backend = enum {
+    modal,
+    sglang,
+};
+
 pub const usage =
     \\Usage: ananke generate <prompt> [options]
     \\
-    \\Generate code with constraints using Modal inference service.
-    \\Requires Maze orchestrator to be deployed on Modal.
+    \\Generate code with constraints using an inference backend.
     \\
     \\Arguments:
     \\  <prompt>                Natural language prompt describing what to generate
     \\
     \\Options:
+    \\  --backend <name>        Backend: "sglang" or "modal" (default: auto-detect)
     \\  --constraints, -c <file> Load constraints from file
     \\  --language <lang>       Target language (default: from config)
     \\  --output, -o <file>     Write generated code to file instead of stdout
     \\  --max-tokens <n>        Maximum tokens to generate (default: 4096)
     \\  --temperature <f>       Sampling temperature 0.0-1.0 (default: 0.7)
-    \\  --endpoint <url>        Override Modal endpoint URL
+    \\  --model <name>          Model name for sglang backend
+    \\  --endpoint <url>        Override endpoint URL
     \\  --verbose, -v           Verbose output
     \\  --help, -h              Show this help message
     \\
     \\Examples:
-    \\  ananke generate "create auth handler" -c rules.json -o auth.ts
+    \\  ananke generate "create auth handler" -c rules.json --backend sglang
     \\  ananke generate "implement binary search" --language rust
-    \\  ananke generate "add tests" --endpoint https://custom.modal.run
+    \\  ananke generate "add tests" --backend modal --endpoint https://custom.modal.run
     \\
-    \\Note: This command requires the Maze inference service to be deployed.
-    \\      See docs/DEPLOYMENT.md for setup instructions.
+    \\Backends:
+    \\  sglang   Connects to sglang server with --grammar-backend ananke.
+    \\           Sends constraint_spec for multi-domain constrained decoding.
+    \\  modal    Connects to Modal-deployed Maze inference endpoint.
+    \\           Uses constraint_ir for syntax-only constrained generation.
 ;
 
 pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: config_mod.Config) !void {
@@ -61,36 +70,72 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     const max_tokens = try parsed_args.getFlagInt("max-tokens", u32) orelse config.max_tokens;
     const temperature = try parsed_args.getFlagFloat("temperature", f32) orelse config.temperature;
     const verbose = parsed_args.hasFlag("verbose") or parsed_args.hasFlag("v");
+    const model_name = parsed_args.getFlag("model");
 
-    // Get endpoint URL - command line overrides config
+    // Determine backend
+    const backend = blk: {
+        if (parsed_args.getFlag("backend")) |name| {
+            if (std.mem.eql(u8, name, "sglang")) break :blk Backend.sglang;
+            if (std.mem.eql(u8, name, "modal")) break :blk Backend.modal;
+            cli_error.printError("Unknown backend: \"{s}\". Use \"sglang\" or \"modal\".", .{name});
+            return error.InvalidBackend;
+        }
+        // Auto-detect: prefer sglang if configured, fall back to modal
+        if (config.sglang_endpoint != null) break :blk Backend.sglang;
+        if (config.modal_endpoint != null) break :blk Backend.modal;
+        break :blk Backend.modal;
+    };
+
+    // Resolve endpoint URL
     const endpoint_override = parsed_args.getFlag("endpoint");
     const endpoint_url = blk: {
         if (endpoint_override) |url| break :blk url;
-        if (config.modal_endpoint) |url| break :blk url;
-
-        // No endpoint configured - provide helpful error
-        cli_error.printError(
-            \\Modal endpoint not configured. Please either:
-            \\  1. Add to .ananke.toml:
-            \\     [modal]
-            \\     endpoint = "https://your-username--ananke-inference-generate-api.modal.run"
-            \\
-            \\  2. Set environment variable:
-            \\     export ANANKE_MODAL_ENDPOINT="https://..."
-            \\
-            \\  3. Pass --endpoint flag:
-            \\     ananke generate "..." --endpoint "https://..."
-            \\
-            \\See docs/MODAL_SETUP.md for deployment instructions.
-        , .{});
-        return error.NoModalEndpoint;
+        switch (backend) {
+            .sglang => {
+                if (config.sglang_endpoint) |url| break :blk url;
+                cli_error.printError(
+                    \\sglang endpoint not configured. Please either:
+                    \\  1. Add to .ananke.toml:
+                    \\     [sglang]
+                    \\     endpoint = "http://localhost:30000/v1/chat/completions"
+                    \\
+                    \\  2. Set environment variable:
+                    \\     export ANANKE_SGLANG_ENDPOINT="http://localhost:30000/v1/chat/completions"
+                    \\
+                    \\  3. Pass --endpoint flag:
+                    \\     ananke generate "..." --backend sglang --endpoint "http://..."
+                , .{});
+                return error.NoSglangEndpoint;
+            },
+            .modal => {
+                if (config.modal_endpoint) |url| break :blk url;
+                cli_error.printError(
+                    \\Modal endpoint not configured. Please either:
+                    \\  1. Add to .ananke.toml:
+                    \\     [modal]
+                    \\     endpoint = "https://your-username--ananke-inference-generate-api.modal.run"
+                    \\
+                    \\  2. Set environment variable:
+                    \\     export ANANKE_MODAL_ENDPOINT="https://..."
+                    \\
+                    \\  3. Pass --endpoint flag:
+                    \\     ananke generate "..." --endpoint "https://..."
+                , .{});
+                return error.NoModalEndpoint;
+            },
+        }
     };
 
     if (verbose) {
+        const backend_name = switch (backend) {
+            .sglang => "sglang",
+            .modal => "modal",
+        };
         cli_error.printInfo("Generating code for: \"{s}\"", .{prompt});
+        cli_error.printInfo("Backend: {s}", .{backend_name});
         cli_error.printInfo("Language: {s}", .{language});
         cli_error.printInfo("Parameters: max_tokens={d}, temperature={d:.2}", .{ max_tokens, temperature });
-        cli_error.printInfo("Modal endpoint: {s}", .{endpoint_url});
+        cli_error.printInfo("Endpoint: {s}", .{endpoint_url});
         if (constraints_file) |path| {
             cli_error.printInfo("Loading constraints from: {s}", .{path});
         }
@@ -111,16 +156,29 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     }
     defer if (constraint_ir) |ir| allocator.free(ir);
 
-    // Call Modal inference endpoint
-    const generated_code = try callModalInference(
-        allocator,
-        endpoint_url,
-        prompt,
-        constraint_ir,
-        max_tokens,
-        temperature,
-        verbose,
-    );
+    // Call the appropriate backend
+    const generated_code = switch (backend) {
+        .sglang => try callSglangInference(
+            allocator,
+            endpoint_url,
+            prompt,
+            language,
+            constraint_ir,
+            max_tokens,
+            temperature,
+            model_name,
+            verbose,
+        ),
+        .modal => try callModalInference(
+            allocator,
+            endpoint_url,
+            prompt,
+            constraint_ir,
+            max_tokens,
+            temperature,
+            verbose,
+        ),
+    };
     defer allocator.free(generated_code);
 
     // Write output
@@ -135,6 +193,240 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     } else {
         std.debug.print("{s}", .{generated_code});
     }
+}
+
+/// Call sglang inference endpoint with OpenAI-compatible API + constraint_spec extension.
+/// sglang with --grammar-backend ananke dispatches constraint_spec to AnankeBackend
+/// for multi-domain constrained decoding.
+fn callSglangInference(
+    allocator: std.mem.Allocator,
+    endpoint_url: []const u8,
+    prompt: []const u8,
+    language: []const u8,
+    constraint_ir: ?[]const u8,
+    max_tokens: u32,
+    temperature: f32,
+    model_name: ?[]const u8,
+    verbose: bool,
+) ![]const u8 {
+    const uri = std.Uri.parse(endpoint_url) catch {
+        cli_error.printError("Invalid endpoint URL: {s}", .{endpoint_url});
+        return InferenceError.InvalidUrl;
+    };
+
+    if (verbose) {
+        cli_error.printInfo("Connecting to sglang endpoint...", .{});
+    }
+
+    var client = std.http.Client{ .allocator = allocator };
+    defer client.deinit();
+
+    // Build OpenAI-compatible request with constraint_spec extension
+    var json_body = std.ArrayList(u8){};
+    const writer = json_body.writer(allocator);
+
+    const escaped_prompt = try escapeJsonString(allocator, prompt);
+    defer if (escaped_prompt.ptr != prompt.ptr) allocator.free(escaped_prompt);
+
+    const escaped_language = try escapeJsonString(allocator, language);
+    defer if (escaped_language.ptr != language.ptr) allocator.free(escaped_language);
+
+    try writer.writeAll("{");
+
+    // Model field
+    if (model_name) |m| {
+        const escaped_model = try escapeJsonString(allocator, m);
+        defer if (escaped_model.ptr != m.ptr) allocator.free(escaped_model);
+        try writer.print("\"model\":\"{s}\",", .{escaped_model});
+    } else {
+        try writer.writeAll("\"model\":\"default\",");
+    }
+
+    // Messages in OpenAI chat format
+    try writer.print("\"messages\":[{{\"role\":\"user\",\"content\":\"{s}\"}}],", .{escaped_prompt});
+
+    // Generation parameters
+    try writer.print("\"max_tokens\":{d},", .{max_tokens});
+    try writer.print("\"temperature\":{d:.2},", .{temperature});
+
+    // constraint_spec extension — this is what AnankeBackend dispatches on
+    try writer.writeAll("\"constraint_spec\":{");
+    try writer.print("\"language\":\"{s}\"", .{escaped_language});
+
+    // If we have compiled constraint IR, extract json_schema for the syntax domain
+    if (constraint_ir) |ir| {
+        // Parse the IR to extract json_schema if present
+        var parsed_ir = std.json.parseFromSlice(std.json.Value, allocator, ir, .{}) catch null;
+        defer if (parsed_ir) |*p| p.deinit();
+
+        if (parsed_ir) |p| {
+            if (p.value == .object) {
+                if (p.value.object.get("json_schema")) |schema| {
+                    if (schema == .string) {
+                        const escaped_schema = try escapeJsonString(allocator, schema.string);
+                        defer if (escaped_schema.ptr != schema.string.ptr) allocator.free(escaped_schema);
+                        try writer.print(",\"json_schema\":\"{s}\"", .{escaped_schema});
+                    } else if (schema == .object or schema == .array) {
+                        // Schema is already a JSON object/array — serialize inline
+                        const schema_str = try std.json.Stringify.valueAlloc(allocator, schema, .{});
+                        defer allocator.free(schema_str);
+                        try writer.print(",\"json_schema\":{s}", .{schema_str});
+                    }
+                }
+                if (p.value.object.get("grammar")) |grammar| {
+                    if (grammar == .string) {
+                        const escaped_grammar = try escapeJsonString(allocator, grammar.string);
+                        defer if (escaped_grammar.ptr != grammar.string.ptr) allocator.free(escaped_grammar);
+                        try writer.print(",\"ebnf\":\"{s}\"", .{escaped_grammar});
+                    }
+                }
+            }
+        }
+    }
+
+    try writer.writeAll("}"); // close constraint_spec
+    try writer.writeAll("}"); // close request
+
+    const request_body = try json_body.toOwnedSlice(allocator);
+    defer allocator.free(request_body);
+
+    if (verbose) {
+        cli_error.printInfo("Request size: {d} bytes", .{request_body.len});
+    }
+
+    var req = client.request(.POST, uri, .{
+        .extra_headers = &.{
+            .{ .name = "Content-Type", .value = "application/json" },
+            .{ .name = "Accept", .value = "application/json" },
+        },
+    }) catch |err| {
+        return handleConnectionError(err, endpoint_url);
+    };
+    defer req.deinit();
+
+    req.transfer_encoding = .{ .content_length = request_body.len };
+
+    var body_writer = try req.sendBodyUnflushed(&.{});
+    try body_writer.writer.writeAll(request_body);
+    try body_writer.end();
+    try req.connection.?.flush();
+
+    var redirect_buffer: [2048]u8 = undefined;
+    var response = req.receiveHead(&redirect_buffer) catch |err| {
+        if (err == error.HttpConnectionClosedWithoutResponse) {
+            cli_error.printError("sglang request timed out", .{});
+            return InferenceError.Timeout;
+        }
+        return handleConnectionError(err, endpoint_url);
+    };
+
+    const status = response.head.status;
+    if (verbose) {
+        cli_error.printInfo("Response status: {d}", .{@intFromEnum(status)});
+    }
+
+    var body_list = std.ArrayList(u8){};
+    errdefer body_list.deinit(allocator);
+
+    const reader = response.reader(&.{});
+    try reader.appendRemainingUnlimited(allocator, &body_list);
+
+    const response_body = try body_list.toOwnedSlice(allocator);
+    defer allocator.free(response_body);
+
+    switch (status) {
+        .ok => {
+            return try parseSglangResponse(allocator, response_body, verbose);
+        },
+        .bad_request => {
+            cli_error.printError("sglang bad request: {s}", .{response_body});
+            return InferenceError.InvalidResponse;
+        },
+        .too_many_requests => {
+            cli_error.printError("sglang rate limited, try again later", .{});
+            return InferenceError.RateLimited;
+        },
+        .internal_server_error, .bad_gateway, .service_unavailable => {
+            cli_error.printError("sglang service error: {s}", .{response_body});
+            return InferenceError.ServiceError;
+        },
+        else => {
+            cli_error.printError("sglang unexpected response (status {d}): {s}", .{ @intFromEnum(status), response_body });
+            return InferenceError.InvalidResponse;
+        },
+    }
+}
+
+/// Parse OpenAI-compatible chat completion response from sglang
+fn parseSglangResponse(
+    allocator: std.mem.Allocator,
+    response_body: []const u8,
+    verbose: bool,
+) ![]const u8 {
+    var parsed = std.json.parseFromSlice(
+        std.json.Value,
+        allocator,
+        response_body,
+        .{},
+    ) catch {
+        cli_error.printError("Invalid JSON response from sglang", .{});
+        return InferenceError.InvalidResponse;
+    };
+    defer parsed.deinit();
+
+    const root = parsed.value.object;
+
+    // OpenAI format: choices[0].message.content
+    const choices = root.get("choices") orelse {
+        cli_error.printError("Missing 'choices' in sglang response", .{});
+        return InferenceError.InvalidResponse;
+    };
+
+    if (choices != .array or choices.array.items.len == 0) {
+        cli_error.printError("Empty 'choices' in sglang response", .{});
+        return InferenceError.InvalidResponse;
+    }
+
+    const first_choice = choices.array.items[0];
+    if (first_choice != .object) {
+        cli_error.printError("Invalid choice format in sglang response", .{});
+        return InferenceError.InvalidResponse;
+    }
+
+    const message = first_choice.object.get("message") orelse {
+        cli_error.printError("Missing 'message' in sglang response choice", .{});
+        return InferenceError.InvalidResponse;
+    };
+
+    if (message != .object) {
+        cli_error.printError("Invalid 'message' format in sglang response", .{});
+        return InferenceError.InvalidResponse;
+    }
+
+    const content = message.object.get("content") orelse {
+        cli_error.printError("Missing 'content' in sglang response message", .{});
+        return InferenceError.InvalidResponse;
+    };
+
+    if (content != .string) {
+        cli_error.printError("'content' is not a string in sglang response", .{});
+        return InferenceError.InvalidResponse;
+    }
+
+    // Show usage stats if verbose
+    if (verbose) {
+        if (root.get("usage")) |usage_val| {
+            if (usage_val == .object) {
+                if (usage_val.object.get("completion_tokens")) |tokens| {
+                    if (tokens == .integer) {
+                        cli_error.printInfo("Completion tokens: {d}", .{tokens.integer});
+                    }
+                }
+            }
+        }
+    }
+
+    return allocator.dupe(u8, content.string);
 }
 
 /// Call Modal inference endpoint to generate code
@@ -211,7 +503,7 @@ fn callModalInference(
     try req.connection.?.flush();
 
     // Receive response head
-    var redirect_buffer: [0]u8 = undefined;
+    var redirect_buffer: [2048]u8 = undefined;
     var response = req.receiveHead(&redirect_buffer) catch |err| {
         if (err == error.HttpConnectionClosedWithoutResponse) {
             cli_error.printError("Inference request timed out after 60s", .{});
