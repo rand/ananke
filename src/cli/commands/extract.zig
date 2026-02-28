@@ -206,7 +206,9 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         try file.writeAll(output_text);
         cli_error.printSuccess("Output written to {s}", .{path});
     } else {
-        std.debug.print("\n{s}", .{output_text});
+        // Write formatted output to stdout (not stderr) so it can be piped
+        const stdout_file = std.fs.File.stdout();
+        try stdout_file.writeAll(output_text);
     }
 }
 

@@ -1,32 +1,47 @@
 {
-  "rules": [
+  "name": "example_constraints",
+  "constraints": [
     {
-      "type": "type_safety",
-      "enabled": true,
-      "priority": "high",
-      "description": "Ensure type-safe code generation"
+      "kind": "type_safety",
+      "severity": "error",
+      "name": "avoid_any_type",
+      "description": "Avoid using 'any' type - prefer specific types for type safety",
+      "confidence": 1.0
     },
     {
-      "type": "error_handling",
-      "enabled": true,
-      "priority": "medium",
-      "description": "Include proper error handling in generated code"
+      "kind": "syntactic",
+      "severity": "info",
+      "name": "has_functions",
+      "description": "Code should contain function definitions",
+      "confidence": 0.9
     },
     {
-      "type": "documentation",
-      "enabled": true,
-      "priority": "low",
-      "description": "Add documentation comments to generated functions"
+      "kind": "semantic",
+      "severity": "warning",
+      "name": "error_handling",
+      "description": "Functions should include proper error handling (try/catch or Result types)",
+      "confidence": 0.85
+    },
+    {
+      "kind": "type_safety",
+      "severity": "info",
+      "name": "typed_functions",
+      "description": "Functions should have explicit return type annotations",
+      "confidence": 0.9
+    },
+    {
+      "kind": "security",
+      "severity": "error",
+      "name": "input_validation",
+      "description": "User inputs must be validated before processing",
+      "confidence": 1.0
+    },
+    {
+      "kind": "architectural",
+      "severity": "warning",
+      "name": "module_exports",
+      "description": "Modules should have clear export boundaries",
+      "confidence": 0.8
     }
-  ],
-  "language_specific": {
-    "typescript": {
-      "strict": true,
-      "useOptionalChaining": true
-    },
-    "rust": {
-      "use_result": true,
-      "prefer_match": true
-    }
-  }
+  ]
 }

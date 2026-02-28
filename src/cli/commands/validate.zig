@@ -98,6 +98,15 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         }
     }
 
+    // Ananke instance must live as long as constraint_set, since extracted
+    // constraint strings are allocated in Clew's arena which is freed on deinit.
+    var ananke_instance: ?ananke.Ananke = null;
+    defer {
+        if (ananke_instance) |*inst| {
+            inst.deinit();
+        }
+    }
+
     if (constraints_file) |path| {
         if (verbose) {
             cli_error.printInfo("Loading constraints from: {s}", .{path});
@@ -136,11 +145,10 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
             cli_error.printInfo("No constraints file specified, extracting from code", .{});
         }
 
-        var ananke_instance = try ananke.Ananke.init(allocator);
-        defer ananke_instance.deinit();
+        ananke_instance = try ananke.Ananke.init(allocator);
 
         const language = detectLanguage(file_path);
-        constraint_set = try ananke_instance.extract(source, language);
+        constraint_set = try ananke_instance.?.extract(source, language);
     }
 
     const cs = constraint_set.?;

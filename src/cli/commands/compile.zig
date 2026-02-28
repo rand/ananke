@@ -132,10 +132,11 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
 
     // Compile constraints to IR
     var spinner = output.Spinner.init("Compiling constraints to IR...");
-    const ir = ananke_instance.compile(constraint_set.constraints.items) catch |err| {
+    var ir = ananke_instance.compile(constraint_set.constraints.items) catch |err| {
         error_help.printCompilationError("IR generation", @errorName(err));
         return err;
     };
+    defer ir.deinit(allocator);
     spinner.finish("Compilation complete");
 
     // Serialize IR
