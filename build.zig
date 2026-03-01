@@ -242,16 +242,15 @@ pub fn build(b: *std.Build) void {
         .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
+    // All tree-sitter parser libraries as a tuple for DRY linkage
+    const parser_libs = .{
+        ts_parser_lib,  py_parser_lib,    js_parser_lib,
+        rust_parser_lib, go_parser_lib,   zig_parser_lib,
+        c_parser_lib,   cpp_parser_lib,   java_parser_lib,
+    };
+
     // Install all tree-sitter parser libraries so they can be used by examples and other dependents
-    b.installArtifact(ts_parser_lib);
-    b.installArtifact(py_parser_lib);
-    b.installArtifact(js_parser_lib);
-    b.installArtifact(rust_parser_lib);
-    b.installArtifact(go_parser_lib);
-    b.installArtifact(zig_parser_lib);
-    b.installArtifact(c_parser_lib);
-    b.installArtifact(cpp_parser_lib);
-    b.installArtifact(java_parser_lib);
+    inline for (parser_libs) |pl| b.installArtifact(pl);
 
     // Core Ananke modules
     // Note: We need to create modules first, then add imports after
@@ -460,22 +459,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     lib.linkSystemLibrary("tree-sitter");
-    lib.linkLibrary(ts_parser_lib);
-    lib.linkLibrary(py_parser_lib);
-    lib.linkLibrary(js_parser_lib);
-    lib.linkLibrary(rust_parser_lib);
-    lib.linkLibrary(go_parser_lib);
-    lib.linkLibrary(zig_parser_lib);
-    lib.linkLibrary(c_parser_lib);
-    lib.linkLibrary(cpp_parser_lib);
-    lib.linkLibrary(java_parser_lib);
-    lib.linkLibrary(js_parser_lib);
-    lib.linkLibrary(rust_parser_lib);
-    lib.linkLibrary(go_parser_lib);
-    lib.linkLibrary(zig_parser_lib);
-    lib.linkLibrary(c_parser_lib);
-    lib.linkLibrary(cpp_parser_lib);
-    lib.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| lib.linkLibrary(pl);
     b.installArtifact(lib);
 
     // Build dynamic/shared library for FFI integration with Node.js (VSCode extension)
@@ -495,15 +479,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     shared_lib.linkSystemLibrary("tree-sitter");
-    shared_lib.linkLibrary(ts_parser_lib);
-    shared_lib.linkLibrary(py_parser_lib);
-    shared_lib.linkLibrary(js_parser_lib);
-    shared_lib.linkLibrary(rust_parser_lib);
-    shared_lib.linkLibrary(go_parser_lib);
-    shared_lib.linkLibrary(zig_parser_lib);
-    shared_lib.linkLibrary(c_parser_lib);
-    shared_lib.linkLibrary(cpp_parser_lib);
-    shared_lib.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| shared_lib.linkLibrary(pl);
     b.installArtifact(shared_lib);
 
     // Build step for VSCode extension shared library
@@ -566,15 +542,7 @@ pub fn build(b: *std.Build) void {
 
     // Link tree-sitter libraries
     exe.linkSystemLibrary("tree-sitter");
-    exe.linkLibrary(ts_parser_lib);
-    exe.linkLibrary(py_parser_lib);
-    exe.linkLibrary(js_parser_lib);
-    exe.linkLibrary(rust_parser_lib);
-    exe.linkLibrary(go_parser_lib);
-    exe.linkLibrary(zig_parser_lib);
-    exe.linkLibrary(c_parser_lib);
-    exe.linkLibrary(cpp_parser_lib);
-    exe.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| exe.linkLibrary(pl);
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -668,15 +636,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     clew_tests.linkSystemLibrary("tree-sitter");
-    clew_tests.linkLibrary(ts_parser_lib);
-    clew_tests.linkLibrary(py_parser_lib);
-    clew_tests.linkLibrary(js_parser_lib);
-    clew_tests.linkLibrary(rust_parser_lib);
-    clew_tests.linkLibrary(go_parser_lib);
-    clew_tests.linkLibrary(zig_parser_lib);
-    clew_tests.linkLibrary(c_parser_lib);
-    clew_tests.linkLibrary(cpp_parser_lib);
-    clew_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| clew_tests.linkLibrary(pl);
 
     const run_clew_tests = b.addRunArtifact(clew_tests);
 
@@ -693,15 +653,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     cache_tests.linkSystemLibrary("tree-sitter");
-    cache_tests.linkLibrary(ts_parser_lib);
-    cache_tests.linkLibrary(py_parser_lib);
-    cache_tests.linkLibrary(js_parser_lib);
-    cache_tests.linkLibrary(rust_parser_lib);
-    cache_tests.linkLibrary(go_parser_lib);
-    cache_tests.linkLibrary(zig_parser_lib);
-    cache_tests.linkLibrary(c_parser_lib);
-    cache_tests.linkLibrary(cpp_parser_lib);
-    cache_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| cache_tests.linkLibrary(pl);
 
     const run_cache_tests = b.addRunArtifact(cache_tests);
 
@@ -718,15 +670,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     pattern_tests.linkSystemLibrary("tree-sitter");
-    pattern_tests.linkLibrary(ts_parser_lib);
-    pattern_tests.linkLibrary(py_parser_lib);
-    pattern_tests.linkLibrary(js_parser_lib);
-    pattern_tests.linkLibrary(rust_parser_lib);
-    pattern_tests.linkLibrary(go_parser_lib);
-    pattern_tests.linkLibrary(zig_parser_lib);
-    pattern_tests.linkLibrary(c_parser_lib);
-    pattern_tests.linkLibrary(cpp_parser_lib);
-    pattern_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| pattern_tests.linkLibrary(pl);
 
     const run_pattern_tests = b.addRunArtifact(pattern_tests);
 
@@ -743,15 +687,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     tree_sitter_tests.linkSystemLibrary("tree-sitter");
-    tree_sitter_tests.linkLibrary(ts_parser_lib);
-    tree_sitter_tests.linkLibrary(py_parser_lib);
-    tree_sitter_tests.linkLibrary(js_parser_lib);
-    tree_sitter_tests.linkLibrary(rust_parser_lib);
-    tree_sitter_tests.linkLibrary(go_parser_lib);
-    tree_sitter_tests.linkLibrary(zig_parser_lib);
-    tree_sitter_tests.linkLibrary(c_parser_lib);
-    tree_sitter_tests.linkLibrary(cpp_parser_lib);
-    tree_sitter_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| tree_sitter_tests.linkLibrary(pl);
 
     const run_tree_sitter_tests = b.addRunArtifact(tree_sitter_tests);
 
@@ -770,15 +706,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     hybrid_extractor_tests.linkSystemLibrary("tree-sitter");
-    hybrid_extractor_tests.linkLibrary(ts_parser_lib);
-    hybrid_extractor_tests.linkLibrary(py_parser_lib);
-    hybrid_extractor_tests.linkLibrary(js_parser_lib);
-    hybrid_extractor_tests.linkLibrary(rust_parser_lib);
-    hybrid_extractor_tests.linkLibrary(go_parser_lib);
-    hybrid_extractor_tests.linkLibrary(zig_parser_lib);
-    hybrid_extractor_tests.linkLibrary(c_parser_lib);
-    hybrid_extractor_tests.linkLibrary(cpp_parser_lib);
-    hybrid_extractor_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| hybrid_extractor_tests.linkLibrary(pl);
 
     const run_hybrid_extractor_tests = b.addRunArtifact(hybrid_extractor_tests);
 
@@ -795,15 +723,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     traversal_tests.linkSystemLibrary("tree-sitter");
-    traversal_tests.linkLibrary(ts_parser_lib);
-    traversal_tests.linkLibrary(py_parser_lib);
-    traversal_tests.linkLibrary(js_parser_lib);
-    traversal_tests.linkLibrary(rust_parser_lib);
-    traversal_tests.linkLibrary(go_parser_lib);
-    traversal_tests.linkLibrary(zig_parser_lib);
-    traversal_tests.linkLibrary(c_parser_lib);
-    traversal_tests.linkLibrary(cpp_parser_lib);
-    traversal_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| traversal_tests.linkLibrary(pl);
 
     const run_traversal_tests = b.addRunArtifact(traversal_tests);
 
@@ -820,15 +740,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     rust_go_zig_tests.linkSystemLibrary("tree-sitter");
-    rust_go_zig_tests.linkLibrary(ts_parser_lib);
-    rust_go_zig_tests.linkLibrary(py_parser_lib);
-    rust_go_zig_tests.linkLibrary(js_parser_lib);
-    rust_go_zig_tests.linkLibrary(rust_parser_lib);
-    rust_go_zig_tests.linkLibrary(go_parser_lib);
-    rust_go_zig_tests.linkLibrary(zig_parser_lib);
-    rust_go_zig_tests.linkLibrary(c_parser_lib);
-    rust_go_zig_tests.linkLibrary(cpp_parser_lib);
-    rust_go_zig_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| rust_go_zig_tests.linkLibrary(pl);
 
     const run_rust_go_zig_tests = b.addRunArtifact(rust_go_zig_tests);
 
@@ -951,15 +863,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     integration_tests.linkSystemLibrary("tree-sitter");
-    integration_tests.linkLibrary(ts_parser_lib);
-    integration_tests.linkLibrary(py_parser_lib);
-    integration_tests.linkLibrary(js_parser_lib);
-    integration_tests.linkLibrary(rust_parser_lib);
-    integration_tests.linkLibrary(go_parser_lib);
-    integration_tests.linkLibrary(zig_parser_lib);
-    integration_tests.linkLibrary(c_parser_lib);
-    integration_tests.linkLibrary(cpp_parser_lib);
-    integration_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| integration_tests.linkLibrary(pl);
 
     const run_integration_tests = b.addRunArtifact(integration_tests);
 
@@ -977,15 +881,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     e2e_tests.linkSystemLibrary("tree-sitter");
-    e2e_tests.linkLibrary(ts_parser_lib);
-    e2e_tests.linkLibrary(py_parser_lib);
-    e2e_tests.linkLibrary(js_parser_lib);
-    e2e_tests.linkLibrary(rust_parser_lib);
-    e2e_tests.linkLibrary(go_parser_lib);
-    e2e_tests.linkLibrary(zig_parser_lib);
-    e2e_tests.linkLibrary(c_parser_lib);
-    e2e_tests.linkLibrary(cpp_parser_lib);
-    e2e_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| e2e_tests.linkLibrary(pl);
 
     const run_e2e_tests = b.addRunArtifact(e2e_tests);
 
@@ -1003,15 +899,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     new_e2e_tests.linkSystemLibrary("tree-sitter");
-    new_e2e_tests.linkLibrary(ts_parser_lib);
-    new_e2e_tests.linkLibrary(py_parser_lib);
-    new_e2e_tests.linkLibrary(js_parser_lib);
-    new_e2e_tests.linkLibrary(rust_parser_lib);
-    new_e2e_tests.linkLibrary(go_parser_lib);
-    new_e2e_tests.linkLibrary(zig_parser_lib);
-    new_e2e_tests.linkLibrary(c_parser_lib);
-    new_e2e_tests.linkLibrary(cpp_parser_lib);
-    new_e2e_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| new_e2e_tests.linkLibrary(pl);
 
     const run_new_e2e_tests = b.addRunArtifact(new_e2e_tests);
 
@@ -1030,15 +918,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_full_pipeline_tests.linkSystemLibrary("tree-sitter");
-    phase2_full_pipeline_tests.linkLibrary(ts_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(py_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(js_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(rust_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(go_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(zig_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(c_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(cpp_parser_lib);
-    phase2_full_pipeline_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| phase2_full_pipeline_tests.linkLibrary(pl);
 
     const run_phase2_full_pipeline_tests = b.addRunArtifact(phase2_full_pipeline_tests);
 
@@ -1057,15 +937,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_multi_language_tests.linkSystemLibrary("tree-sitter");
-    phase2_multi_language_tests.linkLibrary(ts_parser_lib);
-    phase2_multi_language_tests.linkLibrary(py_parser_lib);
-    phase2_multi_language_tests.linkLibrary(js_parser_lib);
-    phase2_multi_language_tests.linkLibrary(rust_parser_lib);
-    phase2_multi_language_tests.linkLibrary(go_parser_lib);
-    phase2_multi_language_tests.linkLibrary(zig_parser_lib);
-    phase2_multi_language_tests.linkLibrary(c_parser_lib);
-    phase2_multi_language_tests.linkLibrary(cpp_parser_lib);
-    phase2_multi_language_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| phase2_multi_language_tests.linkLibrary(pl);
 
     const run_phase2_multi_language_tests = b.addRunArtifact(phase2_multi_language_tests);
 
@@ -1084,15 +956,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_strategy_comparison_tests.linkSystemLibrary("tree-sitter");
-    phase2_strategy_comparison_tests.linkLibrary(ts_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(py_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(js_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(rust_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(go_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(zig_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(c_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(cpp_parser_lib);
-    phase2_strategy_comparison_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| phase2_strategy_comparison_tests.linkLibrary(pl);
 
     const run_phase2_strategy_comparison_tests = b.addRunArtifact(phase2_strategy_comparison_tests);
 
@@ -1111,15 +975,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     phase2_constraint_quality_tests.linkSystemLibrary("tree-sitter");
-    phase2_constraint_quality_tests.linkLibrary(ts_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(py_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(js_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(rust_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(go_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(zig_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(c_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(cpp_parser_lib);
-    phase2_constraint_quality_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| phase2_constraint_quality_tests.linkLibrary(pl);
 
     const run_phase2_constraint_quality_tests = b.addRunArtifact(phase2_constraint_quality_tests);
 
@@ -1217,15 +1073,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     hole_detector_tests.linkSystemLibrary("tree-sitter");
-    hole_detector_tests.linkLibrary(ts_parser_lib);
-    hole_detector_tests.linkLibrary(py_parser_lib);
-    hole_detector_tests.linkLibrary(js_parser_lib);
-    hole_detector_tests.linkLibrary(rust_parser_lib);
-    hole_detector_tests.linkLibrary(go_parser_lib);
-    hole_detector_tests.linkLibrary(zig_parser_lib);
-    hole_detector_tests.linkLibrary(c_parser_lib);
-    hole_detector_tests.linkLibrary(cpp_parser_lib);
-    hole_detector_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| hole_detector_tests.linkLibrary(pl);
 
     const run_hole_detector_tests = b.addRunArtifact(hole_detector_tests);
 
@@ -1244,15 +1092,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     semantic_hole_detector_tests.linkSystemLibrary("tree-sitter");
-    semantic_hole_detector_tests.linkLibrary(ts_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(py_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(js_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(rust_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(go_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(zig_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(c_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(cpp_parser_lib);
-    semantic_hole_detector_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| semantic_hole_detector_tests.linkLibrary(pl);
 
     const run_semantic_hole_detector_tests = b.addRunArtifact(semantic_hole_detector_tests);
 
@@ -1430,15 +1270,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     typescript_pipeline_tests.linkSystemLibrary("tree-sitter");
-    typescript_pipeline_tests.linkLibrary(ts_parser_lib);
-    typescript_pipeline_tests.linkLibrary(py_parser_lib);
-    typescript_pipeline_tests.linkLibrary(js_parser_lib);
-    typescript_pipeline_tests.linkLibrary(rust_parser_lib);
-    typescript_pipeline_tests.linkLibrary(go_parser_lib);
-    typescript_pipeline_tests.linkLibrary(zig_parser_lib);
-    typescript_pipeline_tests.linkLibrary(c_parser_lib);
-    typescript_pipeline_tests.linkLibrary(cpp_parser_lib);
-    typescript_pipeline_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| typescript_pipeline_tests.linkLibrary(pl);
 
     const run_typescript_pipeline_tests = b.addRunArtifact(typescript_pipeline_tests);
 
@@ -1457,15 +1289,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     python_pipeline_tests.linkSystemLibrary("tree-sitter");
-    python_pipeline_tests.linkLibrary(ts_parser_lib);
-    python_pipeline_tests.linkLibrary(py_parser_lib);
-    python_pipeline_tests.linkLibrary(js_parser_lib);
-    python_pipeline_tests.linkLibrary(rust_parser_lib);
-    python_pipeline_tests.linkLibrary(go_parser_lib);
-    python_pipeline_tests.linkLibrary(zig_parser_lib);
-    python_pipeline_tests.linkLibrary(c_parser_lib);
-    python_pipeline_tests.linkLibrary(cpp_parser_lib);
-    python_pipeline_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| python_pipeline_tests.linkLibrary(pl);
 
     const run_python_pipeline_tests = b.addRunArtifact(python_pipeline_tests);
 
@@ -1492,15 +1316,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     conformance_tests.linkSystemLibrary("tree-sitter");
-    conformance_tests.linkLibrary(ts_parser_lib);
-    conformance_tests.linkLibrary(py_parser_lib);
-    conformance_tests.linkLibrary(js_parser_lib);
-    conformance_tests.linkLibrary(rust_parser_lib);
-    conformance_tests.linkLibrary(go_parser_lib);
-    conformance_tests.linkLibrary(zig_parser_lib);
-    conformance_tests.linkLibrary(c_parser_lib);
-    conformance_tests.linkLibrary(cpp_parser_lib);
-    conformance_tests.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| conformance_tests.linkLibrary(pl);
 
     const run_conformance_tests = b.addRunArtifact(conformance_tests);
     const conformance_test_step = b.step("test-conformance", "Run ConstraintSpec conformance tests");
@@ -1554,15 +1370,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(clew_bench);
     clew_bench.linkSystemLibrary("tree-sitter");
-    clew_bench.linkLibrary(ts_parser_lib);
-    clew_bench.linkLibrary(py_parser_lib);
-    clew_bench.linkLibrary(js_parser_lib);
-    clew_bench.linkLibrary(rust_parser_lib);
-    clew_bench.linkLibrary(go_parser_lib);
-    clew_bench.linkLibrary(zig_parser_lib);
-    clew_bench.linkLibrary(c_parser_lib);
-    clew_bench.linkLibrary(cpp_parser_lib);
-    clew_bench.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| clew_bench.linkLibrary(pl);
 
     const run_clew_bench = b.addRunArtifact(clew_bench);
     const clew_bench_step = b.step("bench-clew", "Run Clew extraction benchmarks");
@@ -1648,15 +1456,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(multi_lang_bench);
     multi_lang_bench.linkSystemLibrary("tree-sitter");
-    multi_lang_bench.linkLibrary(ts_parser_lib);
-    multi_lang_bench.linkLibrary(py_parser_lib);
-    multi_lang_bench.linkLibrary(js_parser_lib);
-    multi_lang_bench.linkLibrary(rust_parser_lib);
-    multi_lang_bench.linkLibrary(go_parser_lib);
-    multi_lang_bench.linkLibrary(zig_parser_lib);
-    multi_lang_bench.linkLibrary(c_parser_lib);
-    multi_lang_bench.linkLibrary(cpp_parser_lib);
-    multi_lang_bench.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| multi_lang_bench.linkLibrary(pl);
 
     const run_multi_lang_bench = b.addRunArtifact(multi_lang_bench);
     const multi_lang_bench_step = b.step("bench-multi-lang", "Run multi-language extraction benchmarks");
@@ -1697,15 +1497,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(memory_bench);
     memory_bench.linkSystemLibrary("tree-sitter");
-    memory_bench.linkLibrary(ts_parser_lib);
-    memory_bench.linkLibrary(py_parser_lib);
-    memory_bench.linkLibrary(js_parser_lib);
-    memory_bench.linkLibrary(rust_parser_lib);
-    memory_bench.linkLibrary(go_parser_lib);
-    memory_bench.linkLibrary(zig_parser_lib);
-    memory_bench.linkLibrary(c_parser_lib);
-    memory_bench.linkLibrary(cpp_parser_lib);
-    memory_bench.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| memory_bench.linkLibrary(pl);
 
     const run_memory_bench = b.addRunArtifact(memory_bench);
     const memory_bench_step = b.step("bench-memory", "Run memory usage benchmarks");
@@ -1749,15 +1541,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(pipeline_bench);
     pipeline_bench.linkSystemLibrary("tree-sitter");
-    pipeline_bench.linkLibrary(ts_parser_lib);
-    pipeline_bench.linkLibrary(py_parser_lib);
-    pipeline_bench.linkLibrary(js_parser_lib);
-    pipeline_bench.linkLibrary(rust_parser_lib);
-    pipeline_bench.linkLibrary(go_parser_lib);
-    pipeline_bench.linkLibrary(zig_parser_lib);
-    pipeline_bench.linkLibrary(c_parser_lib);
-    pipeline_bench.linkLibrary(cpp_parser_lib);
-    pipeline_bench.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| pipeline_bench.linkLibrary(pl);
 
     const run_pipeline_bench = b.addRunArtifact(pipeline_bench);
     const pipeline_bench_step = b.step("bench-pipeline", "Run end-to-end pipeline benchmarks");
@@ -1779,15 +1563,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(regression_test);
     regression_test.linkSystemLibrary("tree-sitter");
-    regression_test.linkLibrary(ts_parser_lib);
-    regression_test.linkLibrary(py_parser_lib);
-    regression_test.linkLibrary(js_parser_lib);
-    regression_test.linkLibrary(rust_parser_lib);
-    regression_test.linkLibrary(go_parser_lib);
-    regression_test.linkLibrary(zig_parser_lib);
-    regression_test.linkLibrary(c_parser_lib);
-    regression_test.linkLibrary(cpp_parser_lib);
-    regression_test.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| regression_test.linkLibrary(pl);
 
     const run_regression_test = b.addRunArtifact(regression_test);
     const regression_test_step = b.step("bench-regression", "Run performance regression tests");
@@ -1855,15 +1631,7 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(phase8b_bench);
     phase8b_bench.linkSystemLibrary("tree-sitter");
-    phase8b_bench.linkLibrary(ts_parser_lib);
-    phase8b_bench.linkLibrary(py_parser_lib);
-    phase8b_bench.linkLibrary(js_parser_lib);
-    phase8b_bench.linkLibrary(rust_parser_lib);
-    phase8b_bench.linkLibrary(go_parser_lib);
-    phase8b_bench.linkLibrary(zig_parser_lib);
-    phase8b_bench.linkLibrary(c_parser_lib);
-    phase8b_bench.linkLibrary(cpp_parser_lib);
-    phase8b_bench.linkLibrary(java_parser_lib);
+    inline for (parser_libs) |pl| phase8b_bench.linkLibrary(pl);
 
     const run_phase8b_bench = b.addRunArtifact(phase8b_bench);
     const phase8b_bench_step = b.step("bench-phase8b", "Run Phase 8b comprehensive benchmark suite");
