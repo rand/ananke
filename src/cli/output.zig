@@ -302,6 +302,9 @@ pub fn formatIRJson(
         if (rc.scope_bindings_json) |sb| {
             try writer.print("    \"scope_bindings\": {s},\n", .{sb});
         }
+        if (rc.call_graph_json) |cg| {
+            try writer.print("    \"call_graph\": {s},\n", .{cg});
+        }
         try writer.writeAll("    \"_populated\": true\n");
         try writer.writeAll("  }\n");
     } else {

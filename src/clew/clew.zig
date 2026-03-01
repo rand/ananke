@@ -34,6 +34,9 @@ pub const conventions = @import("conventions.zig");
 // Scope-graph-informed name resolution (cross-file bindings from Homer)
 pub const scope_context = @import("scope_context.zig");
 
+// Call-graph context retrieval (InlineCoder-style upstream/downstream inlining)
+pub const call_graph_context = @import("call_graph_context.zig");
+
 // Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
 const structural_parsing_enabled = true;
 

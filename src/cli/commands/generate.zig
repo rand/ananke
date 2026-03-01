@@ -327,13 +327,17 @@ fn callSglangInference(
         if (rc.scope_bindings_json) |sb| {
             try writer.print(",\"scope_bindings\":{s}", .{sb});
         }
+        if (rc.call_graph_json) |cg| {
+            try writer.print(",\"call_graph\":{s}", .{cg});
+        }
         if (verbose) {
-            cli_error.printInfo("Rich context attached: functions={}, types={}, classes={}, imports={}, scope={}", .{
+            cli_error.printInfo("Rich context attached: functions={}, types={}, classes={}, imports={}, scope={}, call_graph={}", .{
                 rc.function_signatures_json != null,
                 rc.type_bindings_json != null,
                 rc.class_definitions_json != null,
                 rc.imports_json != null,
                 rc.scope_bindings_json != null,
+                rc.call_graph_json != null,
             });
         }
     }

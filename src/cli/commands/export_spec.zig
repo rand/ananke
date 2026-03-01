@@ -130,6 +130,10 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         try writer.writeAll(",\n  \"scope_bindings\": ");
         try writer.writeAll(sb);
     }
+    if (rich_context.call_graph_json) |cg| {
+        try writer.writeAll(",\n  \"call_graph\": ");
+        try writer.writeAll(cg);
+    }
 
     try writer.writeAll("\n}\n");
 

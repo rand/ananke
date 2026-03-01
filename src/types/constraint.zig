@@ -186,6 +186,10 @@ pub const RichContext = struct {
     /// {bindings: [{name, kind, qualified_type, definition_file}],
     ///  enclosing_scope: {name, kind, file}, canonical_imports: [...]}
     scope_bindings_json: ?[]const u8 = null,
+    /// JSON object with call graph context from Homer (InlineCoder-style):
+    /// {target_function, callers: [{name, file, arguments, result_usage}],
+    ///  callees: [{name, file, params, return_type, is_async}]}
+    call_graph_json: ?[]const u8 = null,
 
     pub fn deinit(self: *RichContext, allocator: std.mem.Allocator) void {
         if (self.function_signatures_json) |s| allocator.free(s);
@@ -195,6 +199,7 @@ pub const RichContext = struct {
         if (self.control_flow_json) |s| allocator.free(s);
         if (self.semantic_constraints_json) |s| allocator.free(s);
         if (self.scope_bindings_json) |s| allocator.free(s);
+        if (self.call_graph_json) |s| allocator.free(s);
     }
 
     pub fn clone(self: *const RichContext, allocator: std.mem.Allocator) !RichContext {
@@ -206,6 +211,7 @@ pub const RichContext = struct {
             .control_flow_json = if (self.control_flow_json) |s| try allocator.dupe(u8, s) else null,
             .semantic_constraints_json = if (self.semantic_constraints_json) |s| try allocator.dupe(u8, s) else null,
             .scope_bindings_json = if (self.scope_bindings_json) |s| try allocator.dupe(u8, s) else null,
+            .call_graph_json = if (self.call_graph_json) |s| try allocator.dupe(u8, s) else null,
         };
     }
 
@@ -217,7 +223,8 @@ pub const RichContext = struct {
             self.imports_json != null or
             self.control_flow_json != null or
             self.semantic_constraints_json != null or
-            self.scope_bindings_json != null;
+            self.scope_bindings_json != null or
+            self.call_graph_json != null;
     }
 };
 
