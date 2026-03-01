@@ -203,3 +203,6 @@ build.zig.backup
 
 # Test output logs at root
 test_output.log
+
+# Dolt database files (added by bd init)
+.dolt/
