@@ -41,6 +41,9 @@ pub const salience = @import("salience.zig");
 // Import temporal module for stability-informed confidence
 pub const temporal = @import("temporal.zig");
 
+// Import domain fusion for multi-domain composition
+pub const domain_fusion = @import("domain_fusion.zig");
+
 /// Set of changes between constraint compilations
 pub const ChangeSet = struct {
     added: std.ArrayList(usize),

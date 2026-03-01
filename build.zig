@@ -1316,6 +1316,16 @@ pub fn build(b: *std.Build) void {
     });
     const run_regex_analyzer_tests = b.addRunArtifact(regex_analyzer_tests);
 
+    // Braid domain fusion inline tests (distribution-preserving multi-domain composition)
+    const domain_fusion_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/braid/domain_fusion.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_domain_fusion_tests = b.addRunArtifact(domain_fusion_tests);
+
     // Clew conventions inline tests (convention mining → soft constraints)
     const conventions_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1377,6 +1387,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_regex_analyzer_tests.step);
     test_step.dependOn(&run_conventions_tests.step);
     test_step.dependOn(&run_scope_context_tests.step);
+    test_step.dependOn(&run_domain_fusion_tests.step);
 
     // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
     const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");
