@@ -119,6 +119,7 @@ fn test_generation_request_with_constraints() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "documentation".to_string(),
@@ -133,6 +134,7 @@ fn test_generation_request_with_constraints() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
     ];
 

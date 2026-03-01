@@ -20,6 +20,7 @@ fn test_constraint_ir_ffi_roundtrip_simple() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -54,6 +55,7 @@ fn test_constraint_ir_ffi_with_regex() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -98,6 +100,7 @@ fn test_constraint_ir_ffi_with_json_schema() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -138,6 +141,7 @@ fn test_constraint_ir_ffi_with_grammar() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -168,6 +172,7 @@ fn test_constraint_ir_ffi_with_token_masks() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -209,6 +214,7 @@ fn test_constraint_ir_ffi_complex() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -333,6 +339,7 @@ fn test_multiple_constraints_array() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "constraint2".to_string(),
@@ -344,6 +351,7 @@ fn test_multiple_constraints_array() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "constraint3".to_string(),
@@ -355,6 +363,7 @@ fn test_multiple_constraints_array() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
     ];
 
@@ -391,6 +400,7 @@ fn test_constraint_ir_serialization() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     // Test JSON serialization

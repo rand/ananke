@@ -64,6 +64,7 @@ fn test_zig_ffi_constraint_ir_conversion() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     // Convert to FFI representation and back
@@ -139,6 +140,7 @@ fn test_ffi_memory_ownership() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "constraint_2".to_string(),
@@ -153,6 +155,7 @@ fn test_ffi_memory_ownership() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "constraint_3".to_string(),
@@ -176,6 +179,7 @@ fn test_ffi_memory_ownership() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
     ];
 
@@ -240,6 +244,7 @@ fn test_ffi_edge_cases() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = minimal.to_ffi();
@@ -271,6 +276,7 @@ fn test_ffi_edge_cases() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = large.to_ffi();
@@ -330,6 +336,7 @@ fn test_ffi_complex_grammar() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -372,6 +379,7 @@ fn test_ffi_token_masks_edge_cases() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = allowed_only.to_ffi();
@@ -397,6 +405,7 @@ fn test_ffi_token_masks_edge_cases() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = forbidden_only.to_ffi();
@@ -422,6 +431,7 @@ fn test_ffi_token_masks_edge_cases() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = empty_masks.to_ffi();
@@ -480,6 +490,7 @@ fn test_ffi_json_schema_complex() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -531,6 +542,7 @@ fn test_ffi_roundtrip_stress() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         };
 
         let ffi = constraint.to_ffi();

@@ -129,6 +129,7 @@ async fn main() -> anyhow::Result<()> {
         rich_context: None,
         feasibility_score: 0.0,
         is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let routing = ensemble.router().route(&security_hole, &security_constraints);

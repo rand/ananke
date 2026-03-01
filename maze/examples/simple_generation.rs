@@ -140,6 +140,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         // Constraint 2: Security - forbid dangerous operations
         ConstraintIR {
@@ -159,6 +160,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         // Constraint 3: Code style - require documentation
         ConstraintIR {
@@ -174,6 +176,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         // Constraint 4: Async handling
         ConstraintIR {
@@ -189,6 +192,7 @@ fn create_example_constraints() -> Vec<ConstraintIR> {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
     ]
 }

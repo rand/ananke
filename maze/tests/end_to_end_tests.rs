@@ -51,6 +51,7 @@ async fn test_e2e_simple_generation_with_mock() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -117,6 +118,7 @@ async fn test_e2e_typescript_constraints() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "type_annotations".to_string(),
@@ -137,6 +139,7 @@ async fn test_e2e_typescript_constraints() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
     ];
 
@@ -213,6 +216,7 @@ async fn test_e2e_python_with_json_schema() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -285,6 +289,7 @@ async fn test_e2e_with_grammar_constraint() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -342,6 +347,7 @@ async fn test_e2e_with_token_masks() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -398,6 +404,7 @@ async fn test_e2e_constraint_caching() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     }];
 
     let request1 = GenerationRequest {
@@ -475,6 +482,7 @@ async fn test_e2e_multiple_constraints_with_priorities() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "type_safety".to_string(),
@@ -489,6 +497,7 @@ async fn test_e2e_multiple_constraints_with_priorities() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
         ConstraintIR {
             name: "async_handling".to_string(),
@@ -503,6 +512,7 @@ async fn test_e2e_multiple_constraints_with_priorities() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
         },
     ];
 
@@ -591,6 +601,7 @@ async fn test_e2e_provenance_tracking() {
             rich_context: None,
             feasibility_score: 0.0,
             is_feasible: true,
+            type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
