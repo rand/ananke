@@ -231,6 +231,16 @@ fn detectLanguage(file_path: []const u8) []const u8 {
         return "c";
     } else if (std.mem.endsWith(u8, file_path, ".cpp") or std.mem.endsWith(u8, file_path, ".cc")) {
         return "cpp";
+    } else if (std.mem.endsWith(u8, file_path, ".kt") or std.mem.endsWith(u8, file_path, ".kts")) {
+        return "kotlin";
+    } else if (std.mem.endsWith(u8, file_path, ".cs")) {
+        return "csharp";
+    } else if (std.mem.endsWith(u8, file_path, ".rb") or std.mem.endsWith(u8, file_path, ".rake") or std.mem.endsWith(u8, file_path, ".gemspec")) {
+        return "ruby";
+    } else if (std.mem.endsWith(u8, file_path, ".php")) {
+        return "php";
+    } else if (std.mem.endsWith(u8, file_path, ".swift")) {
+        return "swift";
     }
     return "unknown";
 }

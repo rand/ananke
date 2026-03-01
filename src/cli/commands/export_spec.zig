@@ -163,5 +163,10 @@ fn detectLanguage(path: []const u8) ?[]const u8 {
     if (std.mem.eql(u8, ext, ".c")) return "c";
     if (std.mem.eql(u8, ext, ".cpp") or std.mem.eql(u8, ext, ".cc")) return "cpp";
     if (std.mem.eql(u8, ext, ".java")) return "java";
+    if (std.mem.eql(u8, ext, ".kt") or std.mem.eql(u8, ext, ".kts")) return "kotlin";
+    if (std.mem.eql(u8, ext, ".cs")) return "csharp";
+    if (std.mem.eql(u8, ext, ".rb") or std.mem.eql(u8, ext, ".rake") or std.mem.eql(u8, ext, ".gemspec")) return "ruby";
+    if (std.mem.eql(u8, ext, ".php")) return "php";
+    if (std.mem.eql(u8, ext, ".swift")) return "swift";
     return null;
 }
