@@ -904,7 +904,8 @@ pub const Braid = struct {
 
         var analyzer = feasibility.FeasibilityAnalyzer.init(self.allocator);
         defer analyzer.deinit();
-        const feas_result = analyzer.analyze(enabled_constraints);
+        const feas_result = try analyzer.analyze(enabled_constraints);
+        defer feas_result.deinit(self.allocator);
         ir.feasibility_score = feas_result.tightness_score;
         ir.is_feasible = feas_result.is_feasible;
 

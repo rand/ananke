@@ -41,6 +41,12 @@ pub const FeasibilityResult = struct {
     estimated_valid_outputs: u64,
     /// Warning messages about the constraint set
     warnings: []const []const u8,
+
+    /// Free heap-allocated slices owned by this result.
+    pub fn deinit(self: FeasibilityResult, allocator: std.mem.Allocator) void {
+        allocator.free(self.conflicts);
+        allocator.free(self.warnings);
+    }
 };
 
 /// Analyzer for constraint set feasibility
@@ -55,37 +61,40 @@ pub const FeasibilityAnalyzer = struct {
         _ = self;
     }
 
-    /// Analyze a constraint set for feasibility
-    pub fn analyze(self: *FeasibilityAnalyzer, constraints: []const Constraint) FeasibilityResult {
+    /// Analyze a constraint set for feasibility.
+    /// Caller must call `result.deinit(allocator)` to free owned slices.
+    pub fn analyze(self: *FeasibilityAnalyzer, constraints: []const Constraint) !FeasibilityResult {
         var conflicts = std.ArrayList(ConflictPair){};
+        errdefer conflicts.deinit(self.allocator);
         var warnings = std.ArrayList([]const u8){};
+        errdefer warnings.deinit(self.allocator);
 
         // Find mutual exclusions and semantic conflicts
-        self.findConflicts(constraints, &conflicts) catch {};
+        try self.findConflicts(constraints, &conflicts);
 
         // Calculate tightness score
         const tightness = estimateTightness(constraints);
 
         // Add warnings for tight constraints
         if (tightness > 0.9) {
-            warnings.append(self.allocator, "Constraint set is very tight (>90%), generation may be slow or impossible") catch {};
+            try warnings.append(self.allocator, "Constraint set is very tight (>90%), generation may be slow or impossible");
         } else if (tightness > 0.7) {
-            warnings.append(self.allocator, "Constraint set is moderately tight, consider relaxing some constraints") catch {};
+            try warnings.append(self.allocator, "Constraint set is moderately tight, consider relaxing some constraints");
         }
 
         // Check for potential issues
         if (constraints.len > 10) {
-            warnings.append(self.allocator, "Large constraint set (>10 constraints) may cause slow generation") catch {};
+            try warnings.append(self.allocator, "Large constraint set (>10 constraints) may cause slow generation");
         }
 
         const is_feasible = conflicts.items.len == 0;
 
         return FeasibilityResult{
             .is_feasible = is_feasible,
-            .conflicts = conflicts.toOwnedSlice(self.allocator) catch &.{},
+            .conflicts = try conflicts.toOwnedSlice(self.allocator),
             .tightness_score = tightness,
             .estimated_valid_outputs = estimateValidOutputs(tightness),
-            .warnings = warnings.toOwnedSlice(self.allocator) catch &.{},
+            .warnings = try warnings.toOwnedSlice(self.allocator),
         };
     }
 
@@ -283,22 +292,32 @@ pub const CommunityFeasibilityResult = struct {
     tensions: []const CommunityTension,
     /// Suggested relaxation order (import → type → semantic → security)
     relaxation_order: []const RelaxationPriority,
+
+    pub fn deinit(self: CommunityFeasibilityResult, allocator: std.mem.Allocator) void {
+        self.base.deinit(allocator);
+        allocator.free(self.tensions);
+        allocator.free(self.relaxation_order);
+    }
 };
 
 /// Analyze constraints with community context from Homer.
 /// Detects cross-community coupling tensions and provides relaxation ordering.
+/// Caller must call `result.deinit(allocator)` to free owned slices.
 pub fn analyzeWithCommunities(
     allocator: std.mem.Allocator,
     constraints: []const Constraint,
     community: CommunityContext,
-) CommunityFeasibilityResult {
+) !CommunityFeasibilityResult {
     var analyzer = FeasibilityAnalyzer.init(allocator);
     defer analyzer.deinit();
 
-    const base = analyzer.analyze(constraints);
+    const base = try analyzer.analyze(constraints);
+    errdefer base.deinit(allocator);
 
     var tensions = std.ArrayList(CommunityTension){};
+    errdefer tensions.deinit(allocator);
     var relaxation = std.ArrayList(RelaxationPriority){};
+    errdefer relaxation.deinit(allocator);
 
     // Check each constraint for cross-community coupling
     for (constraints) |c| {
@@ -314,13 +333,13 @@ pub fn analyzeWithCommunities(
 
             // Low coupling across communities = architectural tension
             if (coupling < 0.3) {
-                tensions.append(allocator, CommunityTension{
+                try tensions.append(allocator, CommunityTension{
                     .constraint_id = c.id,
                     .source_community = source.?,
                     .target_community = target.?,
                     .coupling_strength = coupling,
                     .description = "Cross-community constraint with low historical coupling",
-                }) catch {};
+                });
             }
         }
 
@@ -343,7 +362,7 @@ pub fn analyzeWithCommunities(
             }
         }
 
-        relaxation.append(allocator, RelaxationPriority{
+        try relaxation.append(allocator, RelaxationPriority{
             .constraint_id = c.id,
             .priority = adjusted_priority,
             .reason = switch (c.kind) {
@@ -354,16 +373,16 @@ pub fn analyzeWithCommunities(
                 .operational => "operational constraint",
                 .security => "security constraint",
             },
-        }) catch {};
+        });
     }
 
     // Sort relaxation order
-    const owned_relaxation = relaxation.toOwnedSlice(allocator) catch &.{};
+    const owned_relaxation = try relaxation.toOwnedSlice(allocator);
     std.mem.sort(RelaxationPriority, @constCast(owned_relaxation), {}, RelaxationPriority.lessThan);
 
     return CommunityFeasibilityResult{
         .base = base,
-        .tensions = tensions.toOwnedSlice(allocator) catch &.{},
+        .tensions = try tensions.toOwnedSlice(allocator),
         .relaxation_order = owned_relaxation,
     };
 }
@@ -402,12 +421,13 @@ fn lookupCoupling(couplings: []const CommunityCoupling, a: u32, b: u32) f32 {
     return 0.0; // No recorded coupling = independent
 }
 
-/// Convenience function to analyze and log warnings
-pub fn analyzeAndWarn(allocator: std.mem.Allocator, constraints: []const Constraint) FeasibilityResult {
+/// Convenience function to analyze, log warnings, and return result.
+/// Caller must call `result.deinit(allocator)` to free owned slices.
+pub fn analyzeAndWarn(allocator: std.mem.Allocator, constraints: []const Constraint) !FeasibilityResult {
     var analyzer = FeasibilityAnalyzer.init(allocator);
     defer analyzer.deinit();
 
-    const result = analyzer.analyze(constraints);
+    const result = try analyzer.analyze(constraints);
 
     if (!result.is_feasible) {
         std.log.warn("Constraint set is infeasible - found {d} conflicts", .{result.conflicts.len});
@@ -435,7 +455,8 @@ test "empty constraints are feasible" {
     var analyzer = FeasibilityAnalyzer.init(std.testing.allocator);
     defer analyzer.deinit();
 
-    const result = analyzer.analyze(&.{});
+    const result = try analyzer.analyze(&.{});
+    defer result.deinit(std.testing.allocator);
 
     try std.testing.expect(result.is_feasible);
     try std.testing.expect(result.tightness_score == 0.0);
@@ -455,7 +476,8 @@ test "single constraint is feasible" {
         },
     };
 
-    const result = analyzer.analyze(&constraints);
+    const result = try analyzer.analyze(&constraints);
+    defer result.deinit(std.testing.allocator);
 
     try std.testing.expect(result.is_feasible);
     try std.testing.expect(result.tightness_score > 0.0);
@@ -495,8 +517,10 @@ test "tightness increases with more constraints" {
         },
     };
 
-    const result_single = analyzer.analyze(&single);
-    const result_multiple = analyzer.analyze(&multiple);
+    const result_single = try analyzer.analyze(&single);
+    defer result_single.deinit(std.testing.allocator);
+    const result_multiple = try analyzer.analyze(&multiple);
+    defer result_multiple.deinit(std.testing.allocator);
 
     try std.testing.expect(result_multiple.tightness_score > result_single.tightness_score);
 }
@@ -523,13 +547,8 @@ test "community-aware: cross-community tension detected" {
         },
     };
 
-    const result = analyzeWithCommunities(std.testing.allocator, &constraints, community);
-    defer {
-        std.testing.allocator.free(result.tensions);
-        std.testing.allocator.free(result.relaxation_order);
-        if (result.base.conflicts.len > 0) std.testing.allocator.free(result.base.conflicts);
-        if (result.base.warnings.len > 0) std.testing.allocator.free(result.base.warnings);
-    }
+    const result = try analyzeWithCommunities(std.testing.allocator, &constraints, community);
+    defer result.deinit(std.testing.allocator);
 
     try std.testing.expect(result.tensions.len == 1);
     try std.testing.expect(result.tensions[0].coupling_strength < 0.3);
@@ -571,13 +590,8 @@ test "community-aware: relaxation prefers imports over types" {
         },
     };
 
-    const result = analyzeWithCommunities(std.testing.allocator, &constraints, community);
-    defer {
-        std.testing.allocator.free(result.tensions);
-        std.testing.allocator.free(result.relaxation_order);
-        if (result.base.conflicts.len > 0) std.testing.allocator.free(result.base.conflicts);
-        if (result.base.warnings.len > 0) std.testing.allocator.free(result.base.warnings);
-    }
+    const result = try analyzeWithCommunities(std.testing.allocator, &constraints, community);
+    defer result.deinit(std.testing.allocator);
 
     // Relaxation order: architectural import (10) < type_safety (50) < security (90)
     try std.testing.expect(result.relaxation_order.len == 3);
@@ -607,13 +621,8 @@ test "community-aware: tightly coupled communities don't flag tension" {
         },
     };
 
-    const result = analyzeWithCommunities(std.testing.allocator, &constraints, community);
-    defer {
-        std.testing.allocator.free(result.tensions);
-        std.testing.allocator.free(result.relaxation_order);
-        if (result.base.conflicts.len > 0) std.testing.allocator.free(result.base.conflicts);
-        if (result.base.warnings.len > 0) std.testing.allocator.free(result.base.warnings);
-    }
+    const result = try analyzeWithCommunities(std.testing.allocator, &constraints, community);
+    defer result.deinit(std.testing.allocator);
 
     // Same community = no tension
     try std.testing.expect(result.tensions.len == 0);
@@ -641,8 +650,10 @@ test "security constraints are tighter than syntactic" {
         },
     };
 
-    const result_syntactic = analyzer.analyze(&syntactic);
-    const result_security = analyzer.analyze(&security);
+    const result_syntactic = try analyzer.analyze(&syntactic);
+    defer result_syntactic.deinit(std.testing.allocator);
+    const result_security = try analyzer.analyze(&security);
+    defer result_security.deinit(std.testing.allocator);
 
     try std.testing.expect(result_security.tightness_score > result_syntactic.tightness_score);
 }
