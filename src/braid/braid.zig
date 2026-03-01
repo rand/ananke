@@ -38,6 +38,9 @@ pub const regex_analyzer = @import("regex_analyzer.zig");
 // Import salience module for priority adjustments
 pub const salience = @import("salience.zig");
 
+// Import temporal module for stability-informed confidence
+pub const temporal = @import("temporal.zig");
+
 /// Set of changes between constraint compilations
 pub const ChangeSet = struct {
     added: std.ArrayList(usize),

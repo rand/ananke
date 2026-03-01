@@ -28,6 +28,9 @@ pub const tree_sitter = @import("tree_sitter");
 // Hybrid extractor combining tree-sitter AST with pattern-based fallback
 pub const hybrid_extractor = @import("hybrid_extractor.zig");
 
+// Convention mining → soft constraints (CLaSH soft-tier)
+pub const conventions = @import("conventions.zig");
+
 // Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
 const structural_parsing_enabled = true;
 
