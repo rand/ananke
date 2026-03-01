@@ -585,7 +585,12 @@ pub fn cloneGrammar(allocator: std.mem.Allocator, grammar: Grammar) !Grammar {
 
 /// Helper function to clone TokenMaskRules
 fn cloneTokenMasks(allocator: std.mem.Allocator, masks: TokenMaskRules) !TokenMaskRules {
-    var cloned = TokenMaskRules{};
+    var cloned = TokenMaskRules{
+        .min_tokens = masks.min_tokens,
+        .max_tokens = masks.max_tokens,
+        .min_characters = masks.min_characters,
+        .max_characters = masks.max_characters,
+    };
 
     if (masks.allowed_tokens) |tokens| {
         const allowed = try allocator.alloc(u32, tokens.len);
@@ -619,6 +624,10 @@ pub const Grammar = struct {
 pub const GrammarRule = struct {
     lhs: []const u8,
     rhs: []const []const u8,
+    /// When true, this rule is optional and can produce epsilon (empty string).
+    /// Grammar consumers should interpret is_optional=true as: the rule can
+    /// either produce the rhs OR produce nothing (epsilon).
+    is_optional: bool = false,
 };
 
 /// Regular expression pattern
@@ -671,6 +680,14 @@ pub const TokenMaskRule = struct {
 pub const TokenMaskRules = struct {
     allowed_tokens: ?[]const u32 = null,
     forbidden_tokens: ?[]const u32 = null,
+    /// Minimum number of tokens required in generated output
+    min_tokens: ?u32 = null,
+    /// Maximum number of tokens allowed in generated output
+    max_tokens: ?u32 = null,
+    /// Minimum number of characters required in generated output
+    min_characters: ?usize = null,
+    /// Maximum number of characters allowed in generated output
+    max_characters: ?usize = null,
 
     /// Apply mask to token probabilities
     pub fn apply(self: TokenMaskRules, logits: []f32) void {

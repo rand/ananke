@@ -4,22 +4,29 @@ const task_spec = @import("task_spec");
 const Allocator = std.mem.Allocator;
 
 /// Modal inference service client for evaluation framework
+/// Supports both the legacy eval-inference API and the new single-endpoint API
 pub const ModalClient = struct {
     allocator: Allocator,
     base_url: []const u8,
     constrained_path: []const u8,
     unconstrained_path: []const u8,
     timeout_ms: u32,
+    use_single_endpoint: bool,
 
-    /// Initialize with base URL (e.g., "https://user--app-name-inferenceservice-fastapi-app.modal.run")
-    /// Paths default to "/generate/constrained" and "/generate/unconstrained"
+    /// Initialize with base URL
+    /// Auto-detects API type based on URL pattern:
+    /// - URLs ending in "-api" use single endpoint
+    /// - Other URLs use legacy /generate/constrained and /generate/unconstrained paths
     pub fn init(allocator: Allocator, base_url: []const u8) ModalClient {
+        const is_single_endpoint = std.mem.endsWith(u8, base_url, "-api.modal.run");
+
         return .{
             .allocator = allocator,
             .base_url = base_url,
-            .constrained_path = "/generate/constrained",
-            .unconstrained_path = "/generate/unconstrained",
+            .constrained_path = if (is_single_endpoint) "" else "/generate/constrained",
+            .unconstrained_path = if (is_single_endpoint) "" else "/generate/unconstrained",
             .timeout_ms = 300000, // 5 minutes for code generation
+            .use_single_endpoint = is_single_endpoint,
         };
     }
 
@@ -32,15 +39,41 @@ pub const ModalClient = struct {
             .constrained_path = "", // Empty path since URL is complete
             .unconstrained_path = "", // Will be handled specially
             .timeout_ms = 300000,
+            .use_single_endpoint = true,
         };
     }
 
     fn buildUrl(self: *ModalClient, path: []const u8) ![]const u8 {
-        if (path.len == 0) {
+        if (path.len == 0 or self.use_single_endpoint) {
             return try self.allocator.dupe(u8, self.base_url);
         }
         const url = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ self.base_url, path });
         return url;
+    }
+
+    /// Extract code from response - tries both 'code' and 'generated_text' fields
+    fn extractCodeFromResponse(result_obj: std.json.ObjectMap) ?[]const u8 {
+        if (result_obj.get("code")) |code_val| {
+            if (code_val == .string) return code_val.string;
+        }
+        if (result_obj.get("generated_text")) |text_val| {
+            if (text_val == .string) return text_val.string;
+        }
+        // Also try nested choices[0].message.content (OpenAI format)
+        if (result_obj.get("choices")) |choices_val| {
+            if (choices_val == .array and choices_val.array.items.len > 0) {
+                if (choices_val.array.items[0] == .object) {
+                    if (choices_val.array.items[0].object.get("message")) |msg| {
+                        if (msg == .object) {
+                            if (msg.object.get("content")) |content| {
+                                if (content == .string) return content.string;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     pub fn deinit(self: *ModalClient) void {

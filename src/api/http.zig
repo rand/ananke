@@ -112,7 +112,8 @@ pub fn post(
     try req.connection.?.flush();
 
     // Receive response head
-    var redirect_buffer: [0]u8 = undefined;
+    // Modal endpoints may redirect, so we need a larger buffer for redirect URLs
+    var redirect_buffer: [2048]u8 = undefined;
     var response = try req.receiveHead(&redirect_buffer);
 
     const status_code: u16 = @intFromEnum(response.head.status);

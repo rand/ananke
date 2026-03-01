@@ -151,6 +151,48 @@ pub const CodeQualityScore = struct {
     lines_of_code: u32,
     max_nesting_depth: u32,
     avg_line_length: f32,
+
+    // === Enhanced metrics ===
+
+    /// Cognitive complexity (SonarQube-style) - measures control flow complexity
+    /// Lower is better. 0-10: simple, 10-20: moderate, 20-50: complex, 50+: very complex
+    cognitive_complexity: u32 = 0,
+
+    /// Cyclomatic complexity (McCabe) - number of independent paths through code
+    cyclomatic_complexity: u32 = 1,
+
+    /// Maintainability index (0-100 scale, higher is better)
+    /// Based on: MI = 171 - 5.2*ln(HV) - 0.23*CC - 16.2*ln(LOC)
+    maintainability_index: f32 = 80.0,
+
+    /// Count of detected code smells
+    code_smells_count: u32 = 0,
+
+    /// Estimated technical debt in minutes (time to fix issues)
+    technical_debt_minutes: u32 = 0,
+
+    /// Detailed code smell breakdown
+    code_smells: CodeSmells = .{},
+};
+
+/// Detected code smell patterns
+pub const CodeSmells = struct {
+    /// Functions longer than 50 lines
+    long_functions: u32 = 0,
+    /// Nesting deeper than 4 levels
+    deep_nesting: u32 = 0,
+    /// Magic numbers (numeric literals not assigned to constants)
+    magic_numbers: u32 = 0,
+    /// Duplicate code blocks (similar patterns detected)
+    duplicate_blocks: u32 = 0,
+    /// Missing error handling where expected
+    missing_error_handling: u32 = 0,
+    /// Variables declared but never used
+    unused_variables: u32 = 0,
+    /// Overly long parameter lists (>5 params)
+    long_parameter_lists: u32 = 0,
+    /// Single-character variable names (excluding loops)
+    poor_naming: u32 = 0,
 };
 
 /// Security and safety metrics

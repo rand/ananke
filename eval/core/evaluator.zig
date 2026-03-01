@@ -5,6 +5,9 @@ const baseline = @import("baseline");
 const test_runner = @import("test_runner");
 const constraint_compiler = @import("constraint_compiler");
 const quality_scorer = @import("quality_scorer");
+const pass_at_k = @import("metrics/pass_at_k.zig");
+const constraint_metrics = @import("metrics/constraint_metrics.zig");
+const statistical_tests = @import("metrics/statistical_tests.zig");
 const Allocator = std.mem.Allocator;
 
 /// Configuration captured at evaluation run time for scientific reproducibility
@@ -43,10 +46,18 @@ pub const EvaluationConfig = struct {
     };
 
     pub const EvaluationParams = struct {
+        /// Sampling temperature (0.0 = deterministic, identical for both modes)
         temperature: f32 = 0.0,
+        /// Top-p nucleus sampling (identical for both modes)
+        top_p: f32 = 0.95,
+        /// Max tokens = expected_loc * multiplier
         max_tokens_multiplier: u32 = 20,
+        /// Hard cap on max tokens
         max_tokens_cap: u32 = 4096,
-        samples_per_task: u32 = 1,
+        /// Number of samples per task for pass@k calculation
+        samples_per_task: u32 = 5,
+        /// Random seed for reproducibility (null = random)
+        random_seed: ?u64 = null,
     };
 
     /// Create default configuration with current timestamp
@@ -110,9 +121,15 @@ pub const EvaluationConfig = struct {
         // Evaluation params
         try writer.writeAll("  \"evaluation\": {\n");
         try writer.print("    \"temperature\": {d:.1},\n", .{self.evaluation.temperature});
+        try writer.print("    \"top_p\": {d:.2},\n", .{self.evaluation.top_p});
         try writer.print("    \"max_tokens_multiplier\": {d},\n", .{self.evaluation.max_tokens_multiplier});
         try writer.print("    \"max_tokens_cap\": {d},\n", .{self.evaluation.max_tokens_cap});
-        try writer.print("    \"samples_per_task\": {d}\n", .{self.evaluation.samples_per_task});
+        try writer.print("    \"samples_per_task\": {d},\n", .{self.evaluation.samples_per_task});
+        if (self.evaluation.random_seed) |seed| {
+            try writer.print("    \"random_seed\": {d}\n", .{seed});
+        } else {
+            try writer.writeAll("    \"random_seed\": null\n");
+        }
         try writer.writeAll("  }\n");
 
         try writer.writeAll("}");
@@ -466,5 +483,397 @@ pub const EvaluationPair = struct {
         try writer.writeAll("}");
 
         return try buf.toOwnedSlice(allocator);
+    }
+};
+
+// =============================================================================
+// Multi-Sample Evaluation for pass@k
+// =============================================================================
+
+/// Result of generating multiple samples for a single task
+pub const MultiSampleResult = struct {
+    task_id: []const u8,
+    mode: task_spec.GenerationMode,
+    samples: []pass_at_k.SampleResult,
+    pass_at_k_results: pass_at_k.PassAtKResults,
+    constraint_result: ?constraint_metrics.TaskConstraintResult,
+    total_generation_time_ms: u64,
+
+    pub fn deinit(self: *MultiSampleResult, allocator: Allocator) void {
+        allocator.free(self.task_id);
+        for (self.samples) |sample| {
+            allocator.free(sample.code);
+        }
+        allocator.free(self.samples);
+    }
+};
+
+/// Complete multi-sample evaluation result for constrained vs unconstrained comparison
+pub const MultiSampleEvaluationResult = struct {
+    task_id: []const u8,
+    constrained: MultiSampleResult,
+    unconstrained: MultiSampleResult,
+    /// Statistical comparison of the two modes
+    comparison: ?statistical_tests.ComparisonResult,
+    /// Constraint satisfaction comparison (CodeIF metrics)
+    constraint_comparison: ?constraint_metrics.ConstraintComparison,
+
+    pub fn deinit(self: *MultiSampleEvaluationResult, allocator: Allocator) void {
+        allocator.free(self.task_id);
+        self.constrained.deinit(allocator);
+        self.unconstrained.deinit(allocator);
+    }
+
+    /// Get the overall winner based on pass@1
+    pub fn getWinner(self: MultiSampleEvaluationResult) enum { constrained, unconstrained, tie } {
+        const delta = self.constrained.pass_at_k_results.pass_at_1 - self.unconstrained.pass_at_k_results.pass_at_1;
+        if (delta > 0.05) return .constrained;
+        if (delta < -0.05) return .unconstrained;
+        return .tie;
+    }
+};
+
+/// Evaluator for multi-sample pass@k evaluation
+pub const MultiSampleEvaluator = struct {
+    allocator: Allocator,
+    base_url: []const u8,
+    config: EvaluationConfig,
+    baseline_generator: baseline.BaselineGenerator,
+    test_runner_inst: test_runner.TestRunner,
+
+    pub fn init(allocator: Allocator, base_url: []const u8, config: EvaluationConfig) MultiSampleEvaluator {
+        return .{
+            .allocator = allocator,
+            .base_url = base_url,
+            .config = config,
+            .baseline_generator = baseline.BaselineGenerator.init(allocator, base_url),
+            .test_runner_inst = test_runner.TestRunner.init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *MultiSampleEvaluator) void {
+        self.baseline_generator.deinit();
+    }
+
+    /// Generate multiple samples for a task in a given mode
+    pub fn generateSamples(
+        self: *MultiSampleEvaluator,
+        task: task_spec.TaskSpec,
+        mode: task_spec.GenerationMode,
+        num_samples: u32,
+    ) !MultiSampleResult {
+        var samples = try self.allocator.alloc(pass_at_k.SampleResult, num_samples);
+        errdefer self.allocator.free(samples);
+
+        var total_time_ms: u64 = 0;
+        var correct_count: u32 = 0;
+        var constraints_total: u32 = 0;
+        var constraints_satisfied: u32 = 0;
+
+        // Load constraints once for all samples
+        const raw_constraints = try self.loadConstraints(task.constraint_path);
+        defer self.allocator.free(raw_constraints);
+
+        // Generate each sample
+        for (0..num_samples) |i| {
+            const sample_idx: u32 = @intCast(i);
+
+            const gen_result = switch (mode) {
+                .constrained => try self.generateConstrainedSample(task, sample_idx),
+                .unconstrained => try self.generateUnconstrainedSample(task, sample_idx),
+            };
+            defer {
+                if (gen_result.error_msg) |msg| self.allocator.free(msg);
+            }
+
+            total_time_ms += gen_result.duration_ms;
+
+            // Run tests on generated code
+            const test_result = try self.test_runner_inst.runTests(
+                task.language.toString(),
+                gen_result.code,
+                task.test_suite_path,
+            );
+
+            // Calculate constraint satisfaction for this sample
+            var sample_constraints_satisfied: u32 = 0;
+            var sample_constraints_total: u32 = 0;
+            if (mode == .constrained) {
+                sample_constraints_total = 1;
+                sample_constraints_satisfied = if (gen_result.success) @as(u32, 1) else @as(u32, 0);
+            }
+
+            const passed_all = test_result.passed_tests == test_result.total_tests and test_result.total_tests > 0;
+            if (passed_all) correct_count += 1;
+
+            constraints_total += sample_constraints_total;
+            constraints_satisfied += sample_constraints_satisfied;
+
+            samples[i] = pass_at_k.SampleResult{
+                .sample_id = sample_idx,
+                .passed_all_tests = passed_all,
+                .tests_passed = test_result.passed_tests,
+                .tests_total = test_result.total_tests,
+                .constraints_satisfied = sample_constraints_satisfied,
+                .constraints_total = sample_constraints_total,
+                .generation_time_ms = gen_result.duration_ms,
+                .code = try self.allocator.dupe(u8, gen_result.code),
+            };
+
+            // Free test result
+            var mut_test = test_result;
+            mut_test.deinit(self.allocator);
+
+            // Free generation result (but we already duped the code)
+            self.allocator.free(gen_result.task_id);
+            self.allocator.free(gen_result.code);
+        }
+
+        // Compute pass@k results
+        const pass_at_k_results = pass_at_k.PassAtKResults.compute(num_samples, correct_count);
+
+        // Create constraint result if applicable
+        const constraint_result: ?constraint_metrics.TaskConstraintResult = if (mode == .constrained) blk: {
+            break :blk constraint_metrics.TaskConstraintResult{
+                .task_id = task.id,
+                .evaluations = &.{},
+                .total_constraints = constraints_total,
+                .satisfied_constraints = constraints_satisfied,
+            };
+        } else null;
+
+        return MultiSampleResult{
+            .task_id = try self.allocator.dupe(u8, task.id),
+            .mode = mode,
+            .samples = samples,
+            .pass_at_k_results = pass_at_k_results,
+            .constraint_result = constraint_result,
+            .total_generation_time_ms = total_time_ms,
+        };
+    }
+
+    /// Run full multi-sample evaluation on a task
+    pub fn evaluateTask(
+        self: *MultiSampleEvaluator,
+        task: task_spec.TaskSpec,
+    ) !MultiSampleEvaluationResult {
+        const num_samples = self.config.evaluation.samples_per_task;
+
+        std.log.info("Evaluating task {s} with {d} samples per mode", .{ task.id, num_samples });
+
+        // Generate samples for both modes
+        var constrained_result = try self.generateSamples(task, .constrained, num_samples);
+        errdefer constrained_result.deinit(self.allocator);
+
+        var unconstrained_result = try self.generateSamples(task, .unconstrained, num_samples);
+        errdefer unconstrained_result.deinit(self.allocator);
+
+        // Perform statistical comparison if we have enough samples
+        var comparison: ?statistical_tests.ComparisonResult = null;
+        if (num_samples >= 5) {
+            var constrained_rates = try self.allocator.alloc(f64, num_samples);
+            defer self.allocator.free(constrained_rates);
+            var unconstrained_rates = try self.allocator.alloc(f64, num_samples);
+            defer self.allocator.free(unconstrained_rates);
+
+            for (constrained_result.samples, 0..) |sample, idx| {
+                constrained_rates[idx] = sample.passRate();
+            }
+            for (unconstrained_result.samples, 0..) |sample, idx| {
+                unconstrained_rates[idx] = sample.passRate();
+            }
+
+            comparison = statistical_tests.pairedTTest(constrained_rates, unconstrained_rates);
+        }
+
+        // Compute constraint comparison if available
+        var constraint_comparison: ?constraint_metrics.ConstraintComparison = null;
+        if (constrained_result.constraint_result != null) {
+            var all_constrained = try self.allocator.alloc(constraint_metrics.TaskConstraintResult, 1);
+            defer self.allocator.free(all_constrained);
+            all_constrained[0] = constrained_result.constraint_result.?;
+
+            var all_unconstrained = try self.allocator.alloc(constraint_metrics.TaskConstraintResult, 1);
+            defer self.allocator.free(all_unconstrained);
+            all_unconstrained[0] = constraint_metrics.TaskConstraintResult{
+                .task_id = task.id,
+                .evaluations = &.{},
+                .total_constraints = 0,
+                .satisfied_constraints = 0,
+            };
+
+            const constrained_codeif = constraint_metrics.CodeIFMetrics.compute(all_constrained);
+            const unconstrained_codeif = constraint_metrics.CodeIFMetrics.compute(all_unconstrained);
+
+            constraint_comparison = constraint_metrics.ConstraintComparison{
+                .constrained = constrained_codeif,
+                .unconstrained = unconstrained_codeif,
+            };
+        }
+
+        return MultiSampleEvaluationResult{
+            .task_id = try self.allocator.dupe(u8, task.id),
+            .constrained = constrained_result,
+            .unconstrained = unconstrained_result,
+            .comparison = comparison,
+            .constraint_comparison = constraint_comparison,
+        };
+    }
+
+    /// Evaluate multiple tasks and aggregate results
+    pub fn evaluateBatch(
+        self: *MultiSampleEvaluator,
+        tasks: []const task_spec.TaskSpec,
+    ) !BatchEvaluationResult {
+        var task_results = try self.allocator.alloc(MultiSampleEvaluationResult, tasks.len);
+        errdefer self.allocator.free(task_results);
+
+        var constrained_pass_at_1 = try self.allocator.alloc(f64, tasks.len);
+        defer self.allocator.free(constrained_pass_at_1);
+        var unconstrained_pass_at_1 = try self.allocator.alloc(f64, tasks.len);
+        defer self.allocator.free(unconstrained_pass_at_1);
+
+        for (tasks, 0..) |task, idx| {
+            task_results[idx] = try self.evaluateTask(task);
+            constrained_pass_at_1[idx] = task_results[idx].constrained.pass_at_k_results.pass_at_1;
+            unconstrained_pass_at_1[idx] = task_results[idx].unconstrained.pass_at_k_results.pass_at_1;
+        }
+
+        const constrained_aggregate = try pass_at_k.AggregatePassAtK.fromValues(
+            self.allocator,
+            constrained_pass_at_1,
+            1,
+        );
+        const unconstrained_aggregate = try pass_at_k.AggregatePassAtK.fromValues(
+            self.allocator,
+            unconstrained_pass_at_1,
+            1,
+        );
+
+        const overall_comparison = statistical_tests.pairedTTest(constrained_pass_at_1, unconstrained_pass_at_1);
+
+        return BatchEvaluationResult{
+            .task_results = task_results,
+            .constrained_aggregate = constrained_aggregate,
+            .unconstrained_aggregate = unconstrained_aggregate,
+            .overall_comparison = overall_comparison,
+        };
+    }
+
+    fn loadConstraints(self: *MultiSampleEvaluator, path: []const u8) ![]const u8 {
+        const file = try std.fs.cwd().openFile(path, .{});
+        defer file.close();
+        return try file.readToEndAlloc(self.allocator, 1024 * 1024);
+    }
+
+    fn generateConstrainedSample(
+        self: *MultiSampleEvaluator,
+        task: task_spec.TaskSpec,
+        sample_idx: u32,
+    ) !task_spec.GenerationResult {
+        _ = sample_idx;
+
+        var total_timer = try std.time.Timer.start();
+
+        const raw_constraints_json = try self.loadConstraints(task.constraint_path);
+        defer self.allocator.free(raw_constraints_json);
+
+        const compiled_constraints = try constraint_compiler.compileForModal(
+            self.allocator,
+            raw_constraints_json,
+        );
+        defer self.allocator.free(compiled_constraints);
+
+        const prompt = try self.buildPrompt(task, true);
+        defer self.allocator.free(prompt);
+
+        const max_tokens: u32 = @min(
+            task.expected_loc * self.config.evaluation.max_tokens_multiplier,
+            self.config.evaluation.max_tokens_cap,
+        );
+
+        var client = modal_client.ModalClient.init(self.allocator, self.base_url);
+        defer client.deinit();
+
+        var result = try client.generateConstrained(prompt, compiled_constraints, max_tokens);
+        result.duration_ms = total_timer.read() / std.time.ns_per_ms;
+
+        return result;
+    }
+
+    fn generateUnconstrainedSample(
+        self: *MultiSampleEvaluator,
+        task: task_spec.TaskSpec,
+        sample_idx: u32,
+    ) !task_spec.GenerationResult {
+        _ = sample_idx;
+
+        return try self.baseline_generator.generate(task);
+    }
+
+    fn buildPrompt(self: *MultiSampleEvaluator, task: task_spec.TaskSpec, constrained: bool) ![]const u8 {
+        var buf = try std.ArrayList(u8).initCapacity(self.allocator, 2048);
+        errdefer buf.deinit();
+
+        const writer = buf.writer();
+
+        try writer.print("Generate {s} code for the following task:\n\n", .{task.language.toString()});
+        try writer.print("Title: {s}\n", .{task.title});
+        try writer.print("Description: {s}\n\n", .{task.description});
+
+        if (task.requirements.len > 0) {
+            try writer.writeAll("Requirements:\n");
+            for (task.requirements) |req| {
+                try writer.print("- {s}\n", .{req});
+            }
+            try writer.writeAll("\n");
+        }
+
+        if (constrained) {
+            try writer.writeAll("Note: Your output will be automatically validated against structural requirements.\n");
+        } else {
+            try writer.writeAll("Follow these structural guidelines:\n");
+            try writer.writeAll("- Follow the standard patterns and conventions for this language\n");
+            try writer.writeAll("- Include proper type annotations where applicable\n");
+            try writer.writeAll("- Use meaningful variable and function names\n");
+        }
+
+        return try buf.toOwnedSlice();
+    }
+};
+
+/// Aggregated results from evaluating a batch of tasks
+pub const BatchEvaluationResult = struct {
+    task_results: []MultiSampleEvaluationResult,
+    constrained_aggregate: pass_at_k.AggregatePassAtK,
+    unconstrained_aggregate: pass_at_k.AggregatePassAtK,
+    overall_comparison: ?statistical_tests.ComparisonResult,
+
+    pub fn deinit(self: *BatchEvaluationResult, allocator: Allocator) void {
+        for (self.task_results) |*result| {
+            result.deinit(allocator);
+        }
+        allocator.free(self.task_results);
+    }
+
+    /// Get the delta in mean pass@1 (constrained - unconstrained)
+    pub fn passAt1Delta(self: BatchEvaluationResult) f64 {
+        return self.constrained_aggregate.mean - self.unconstrained_aggregate.mean;
+    }
+
+    /// Check if the difference is statistically significant (p < 0.05)
+    pub fn isSignificant(self: BatchEvaluationResult) bool {
+        if (self.overall_comparison) |comp| {
+            return comp.p_value < 0.05;
+        }
+        return false;
+    }
+
+    /// Get effect size interpretation
+    pub fn effectSizeInterpretation(self: BatchEvaluationResult) []const u8 {
+        if (self.overall_comparison) |comp| {
+            return comp.interpretEffectSize();
+        }
+        return "unknown";
     }
 };

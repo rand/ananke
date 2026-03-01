@@ -5,30 +5,54 @@ const Allocator = std.mem.Allocator;
 pub const TaskCategory = enum {
     algorithms,
     api,
+    @"async",
+    caching,
     concurrency,
     data_processing,
     data_structures,
     database,
+    error_handling,
     file_io,
     mathematics,
+    memory_management,
+    messaging,
+    parsing,
+    patterns,
+    performance,
+    resilience,
     security,
     string_processing,
     system_utilities,
+    type_system,
+    utilities,
+    validation,
     web_components,
 
     pub fn toString(self: TaskCategory) []const u8 {
         return switch (self) {
             .algorithms => "algorithms",
             .api => "api",
+            .@"async" => "async",
+            .caching => "caching",
             .concurrency => "concurrency",
             .data_processing => "data_processing",
             .data_structures => "data_structures",
             .database => "database",
+            .error_handling => "error_handling",
             .file_io => "file_io",
             .mathematics => "mathematics",
+            .memory_management => "memory_management",
+            .messaging => "messaging",
+            .parsing => "parsing",
+            .patterns => "patterns",
+            .performance => "performance",
+            .resilience => "resilience",
             .security => "security",
             .string_processing => "string_processing",
             .system_utilities => "system_utilities",
+            .type_system => "type_system",
+            .utilities => "utilities",
+            .validation => "validation",
             .web_components => "web_components",
         };
     }
@@ -36,15 +60,27 @@ pub const TaskCategory = enum {
     pub fn fromString(s: []const u8) ?TaskCategory {
         if (std.mem.eql(u8, s, "algorithms")) return .algorithms;
         if (std.mem.eql(u8, s, "api")) return .api;
+        if (std.mem.eql(u8, s, "async")) return .@"async";
+        if (std.mem.eql(u8, s, "caching")) return .caching;
         if (std.mem.eql(u8, s, "concurrency")) return .concurrency;
         if (std.mem.eql(u8, s, "data_processing")) return .data_processing;
         if (std.mem.eql(u8, s, "data_structures")) return .data_structures;
         if (std.mem.eql(u8, s, "database")) return .database;
+        if (std.mem.eql(u8, s, "error_handling")) return .error_handling;
         if (std.mem.eql(u8, s, "file_io")) return .file_io;
         if (std.mem.eql(u8, s, "mathematics")) return .mathematics;
+        if (std.mem.eql(u8, s, "memory_management")) return .memory_management;
+        if (std.mem.eql(u8, s, "messaging")) return .messaging;
+        if (std.mem.eql(u8, s, "parsing")) return .parsing;
+        if (std.mem.eql(u8, s, "patterns")) return .patterns;
+        if (std.mem.eql(u8, s, "performance")) return .performance;
+        if (std.mem.eql(u8, s, "resilience")) return .resilience;
         if (std.mem.eql(u8, s, "security")) return .security;
         if (std.mem.eql(u8, s, "string_processing")) return .string_processing;
         if (std.mem.eql(u8, s, "system_utilities")) return .system_utilities;
+        if (std.mem.eql(u8, s, "type_system")) return .type_system;
+        if (std.mem.eql(u8, s, "utilities")) return .utilities;
+        if (std.mem.eql(u8, s, "validation")) return .validation;
         if (std.mem.eql(u8, s, "web_components")) return .web_components;
         return null;
     }
