@@ -33,32 +33,37 @@ const typescript_real_world =
     \\interface ValidationError {
     \\    field: string;
     \\    message: string;
+    \\}
+    \\
     \\class EmailValidator {
     \\    private static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    \\    
+    \\
     \\    static validate(email: string): ValidationError | null {
     \\        if (!this.EMAIL_REGEX.test(email)) {
     \\            return { field: 'email', message: 'Invalid email format' };
     \\        }
     \\        return null;
     \\    }
+    \\}
+    \\
     \\class UserService {
     \\    async createUser(request: UserCreateRequest): Promise<User> {
-    \\        // Validate email
     \\        const emailError = EmailValidator.validate(request.email);
     \\        if (emailError) {
     \\            throw new ValidationError(emailError.message);
-    \\        
-    \\        // Hash password
+    \\        }
     \\        const hashedPassword = await this.hashPassword(request.password);
     \\        return await this.db.insert({
     \\            username: request.username,
     \\            email: request.email,
     \\            password: hashedPassword
     \\        });
+    \\    }
+    \\
     \\    private async hashPassword(password: string): Promise<string> {
-    \\        // bcrypt implementation
     \\        return "";
+    \\    }
+    \\}
 ;
 const python_real_world =
     \\# Real-world Python: Async rate limiter with decorators

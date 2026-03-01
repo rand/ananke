@@ -255,7 +255,7 @@ pub const HybridExtractor = struct {
 
         // Check for parse errors
         if (root.hasError()) {
-            return error.ParseError;
+            return error.ParseFailed;
         }
 
         var constraints = std.ArrayList(Constraint){};
