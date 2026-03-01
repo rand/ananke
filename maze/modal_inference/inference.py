@@ -485,7 +485,7 @@ def health():
 @modal.fastapi_endpoint(method="POST")
 def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
     """
-    HTTP API endpoint for constrained generation.
+    HTTP API endpoint for constrained generation (custom format).
 
     POST /generate_api
     {
@@ -499,22 +499,158 @@ def generate_api(request: Dict[str, Any]) -> Dict[str, Any]:
         "temperature": 0.7,
         ...
     }
-
-    Returns:
-    {
-        "generated_text": "...",
-        "tokens_generated": 123,
-        "generation_time_ms": 4567,
-        "constraint_satisfied": true,
-        "model_name": "meta-llama/Llama-3.1-8B-Instruct",
-        "finish_reason": "stop",
-        "metadata": {...}
-    }
     """
-    # Get Modal reference to the AnankeLLM class and call its generate method
-    # Modal handles the lifecycle and caching automatically
     llm = AnankeLLM()
     return llm.generate.remote(request)
+
+
+def _build_context_prompt(constraint_spec: Dict[str, Any]) -> str:
+    """Build a structured context block from CLaSH domain fields."""
+    parts = []
+    lang = constraint_spec.get("language", "")
+    if lang:
+        parts.append(f"Target language: {lang}")
+
+    if "function_signatures" in constraint_spec:
+        sigs = constraint_spec["function_signatures"]
+        names = [s.get("name", "?") for s in sigs[:10]]
+        parts.append(f"Functions in scope: {', '.join(names)}")
+
+    if "type_bindings" in constraint_spec:
+        types = constraint_spec["type_bindings"]
+        names = [t.get("name", "?") for t in types[:10]]
+        parts.append(f"Types in scope: {', '.join(names)}")
+
+    if "class_definitions" in constraint_spec:
+        classes = constraint_spec["class_definitions"]
+        names = [c.get("name", "?") for c in classes[:10]]
+        parts.append(f"Classes in scope: {', '.join(names)}")
+
+    if "imports" in constraint_spec:
+        imports = constraint_spec["imports"]
+        mods = [i.get("module", "?") for i in imports[:10]]
+        parts.append(f"Imports: {', '.join(mods)}")
+
+    if "control_flow" in constraint_spec:
+        cf = constraint_spec["control_flow"]
+        style = cf.get("error_handling_style", "none")
+        is_async = cf.get("is_async", False)
+        hints = []
+        if is_async:
+            hints.append("async context")
+        if style != "none":
+            hints.append(f"error handling: {style}")
+        if hints:
+            parts.append(f"Control flow: {', '.join(hints)}")
+
+    if "call_graph" in constraint_spec:
+        cg = constraint_spec["call_graph"]
+        target = cg.get("target_function", "")
+        callers = [c.get("name", "?") for c in cg.get("callers", [])[:5]]
+        callees = [c.get("name", "?") for c in cg.get("callees", [])[:5]]
+        if target:
+            parts.append(f"Target function: {target}")
+        if callers:
+            parts.append(f"Called by: {', '.join(callers)}")
+        if callees:
+            parts.append(f"Calls: {', '.join(callees)}")
+
+    if "fim" in constraint_spec:
+        parts.append("Mode: fill-in-the-middle")
+
+    return "\n".join(parts)
+
+
+@app.function(
+    image=vllm_image,
+    timeout=3600,
+)
+@modal.fastapi_endpoint(method="POST", label="v1-chat-completions")
+def v1_chat_completions(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    OpenAI-compatible /v1/chat/completions endpoint with constraint_spec extension.
+
+    This is the endpoint used by `ananke generate --backend sglang`.
+    Accepts the standard OpenAI chat format plus a constraint_spec field
+    containing CLaSH domain context for constrained decoding.
+    """
+    import time as _time
+    import uuid
+
+    request_id = str(uuid.uuid4())[:8]
+    start_time = _time.time()
+
+    # Extract OpenAI fields
+    messages = request.get("messages", [])
+    model = request.get("model", "default")
+    max_tokens = request.get("max_tokens", 4096)
+    temperature = request.get("temperature", 0.7)
+    constraint_spec = request.get("constraint_spec", {})
+
+    # Build prompt from messages
+    prompt_parts = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "system":
+            prompt_parts.append(f"System: {content}")
+        elif role == "user":
+            prompt_parts.append(content)
+
+    # Enrich prompt with CLaSH domain context from constraint_spec
+    context_block = _build_context_prompt(constraint_spec) if constraint_spec else ""
+    if context_block:
+        prompt_parts.insert(0, f"[Context]\n{context_block}\n[/Context]")
+
+    full_prompt = "\n\n".join(prompt_parts)
+
+    # Map constraint_spec to internal format
+    # Only apply grammar (EBNF) as an llguidance generation constraint.
+    # The json_schema in the IR describes code structure metadata, NOT output format.
+    # Rich context fields (function_signatures, type_bindings, etc.) enrich the prompt.
+    constraints = {}
+    if "ebnf" in constraint_spec:
+        constraints["grammar"] = constraint_spec["ebnf"]
+
+    # Build internal request
+    internal_request = {
+        "prompt": full_prompt,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if constraints:
+        internal_request["constraints"] = constraints
+
+    # Call the LLM
+    llm = AnankeLLM()
+    result = llm.generate.remote(internal_request)
+
+    generation_time_ms = int((_time.time() - start_time) * 1000)
+
+    # Map to OpenAI-compatible response
+    return {
+        "id": f"chatcmpl-{request_id}",
+        "object": "chat.completion",
+        "model": result.get("model_name", model),
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": result.get("generated_text", ""),
+                },
+                "finish_reason": result.get("finish_reason", "stop"),
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": result.get("tokens_generated", 0),
+            "total_tokens": result.get("tokens_generated", 0),
+        },
+        "constraint_spec_applied": bool(constraint_spec),
+        "domains_active": [k for k in constraint_spec if k not in ("language",)],
+        "generation_time_ms": generation_time_ms,
+    }
 
 
 # Local development helper
