@@ -1,0 +1,23 @@
+{
+  "task_id": "javascript_004_deep_clone",
+  "constraints": {
+    "grammar": "function deepClone(obj) {\n  // Returns deep clone of object\n  // Handles: objects, arrays, Date, RegExp, Map, Set\n  // Handles circular references\n}",
+    "regex_pattern": "function\\s+deepClone",
+    "type_constraints": {
+      "functions": [
+        {"name": "deepClone", "parameters": ["obj"]}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["deepClone"],
+      "variable_patterns": ["clone", "seen", "visited"]
+    },
+    "structural_constraints": {
+      "must_use": ["WeakMap for circular refs", "instanceof checks"],
+      "must_not_use": ["JSON.parse/stringify only", "structuredClone only"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/javascript/deep_clone.js",
+  "extraction_method": "generated",
+  "verified": false
+}

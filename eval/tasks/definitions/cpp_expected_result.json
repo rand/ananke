@@ -1,0 +1,50 @@
+{
+  "id": "cpp_004_expected_result",
+  "version": "1.0.0",
+  "title": "Expected/Result Type for Error Handling",
+  "description": "Implement an Expected<T, E> type for error handling without exceptions, similar to Rust's Result or C++23 std::expected.",
+  "category": "error_handling",
+  "language": "cpp",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "std::expected (C++23) and Rust Result",
+    "complexity": {
+      "time": "O(1) for all operations",
+      "space": "O(max(sizeof(T), sizeof(E)))"
+    },
+    "tags": [
+      "error-handling",
+      "result-type",
+      "monadic",
+      "functional"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Template class must be named 'Expected<T, E>'",
+    "Store either value T or error E (not both)",
+    "Implement has_value() returning bool",
+    "Implement value() with exception on error state",
+    "Implement error() with exception on value state",
+    "Implement value_or(default) for safe access",
+    "Implement and_then(f) for monadic chaining",
+    "Implement map(f) for value transformation"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/cpp/expected_result.cpp",
+  "test_suite_path": "eval/tasks/fixtures/cpp/expected_result_test.cpp",
+  "constraint_path": "eval/tasks/constraints/cpp_expected_result.json",
+  "expected_loc": 75,
+  "few_shot_examples": [
+    {
+      "prompt": "Store value or error in union with tag.",
+      "code": "template<typename T, typename E>\nclass Expected {\nprivate:\n    union {\n        T value_;\n        E error_;\n    };\n    bool has_value_;\n    \npublic:\n    Expected(const T& val) : value_(val), has_value_(true) {}\n    Expected(const E& err) : error_(err), has_value_(false) {}\n    \n    ~Expected() {\n        if (has_value_) value_.~T();\n        else error_.~E();\n    }\n};"
+    },
+    {
+      "prompt": "Implement monadic and_then for chaining.",
+      "code": "template<typename F>\nauto and_then(F&& f) -> decltype(f(std::declval<T>())) {\n    using ReturnType = decltype(f(std::declval<T>()));\n    if (has_value_) {\n        return f(value_);\n    }\n    return ReturnType(error_);\n}"
+    }
+  ]
+}

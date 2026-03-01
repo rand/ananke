@@ -1,0 +1,51 @@
+{
+  "id": "chain_validation_002_schema",
+  "version": "1.0.0",
+  "title": "Schema-Based Validation",
+  "description": "Implement a schema validation system that builds on basic validators to validate complex object shapes.",
+  "category": "validation",
+  "language": "typescript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n * f) where f = fields",
+      "space": "O(d) where d = depth"
+    },
+    "tags": [
+      "validation",
+      "schema",
+      "recursive"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "validation",
+    "chain_position": 2
+  },
+  "requirements": [
+    "Build on chain_validation_001 validators",
+    "Define Schema type with field definitions",
+    "Implement validateSchema<T>(data: unknown, schema: Schema): ValidationResult<T>",
+    "Support required and optional fields",
+    "Support nested object schemas",
+    "Support array validation with item schema",
+    "Return detailed errors with field paths",
+    "Infer TypeScript types from schema"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/typescript/chain_validation_2.ts",
+  "test_suite_path": "eval/tasks/fixtures/typescript/chain_validation_2_test.ts",
+  "constraint_path": "eval/tasks/constraints/chain_validation_2.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "Define a validation schema type.",
+      "code": "type FieldValidator = \n  | { type: 'string'; minLength?: number; maxLength?: number; pattern?: RegExp }\n  | { type: 'number'; min?: number; max?: number }\n  | { type: 'boolean' }\n  | { type: 'array'; items: FieldValidator }\n  | { type: 'object'; schema: Schema };\n\ntype Schema = Record<string, FieldValidator & { required?: boolean }>;"
+    },
+    {
+      "prompt": "Validate a field and return error with path.",
+      "code": "function validateField(\n  value: unknown,\n  validator: FieldValidator,\n  path: string\n): ValidationError[] {\n  const errors: ValidationError[] = [];\n  if (validator.type === 'string') {\n    if (typeof value !== 'string') {\n      errors.push({ path, message: 'Expected string' });\n    } else if (validator.minLength && value.length < validator.minLength) {\n      errors.push({ path, message: `Minimum length is ${validator.minLength}` });\n    }\n  }\n  return errors;\n}"
+    }
+  ]
+}

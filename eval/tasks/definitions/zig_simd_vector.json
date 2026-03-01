@@ -1,0 +1,50 @@
+{
+  "id": "zig_004_simd_vector",
+  "version": "1.0.0",
+  "title": "SIMD Vector Operations",
+  "description": "Implement SIMD-accelerated vector math operations using Zig's built-in vector types for dot product, normalization, and matrix multiplication.",
+  "category": "performance",
+  "language": "zig",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Zig SIMD documentation",
+    "complexity": {
+      "time": "O(n/w) where w = SIMD width",
+      "space": "O(1)"
+    },
+    "tags": [
+      "simd",
+      "vectors",
+      "performance",
+      "math"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Use @Vector for SIMD types",
+    "Implement dotProduct(a: []const f32, b: []const f32) returning f32",
+    "Implement normalize(v: []f32) normalizing in-place",
+    "Implement matMul4x4(a: *const [16]f32, b: *const [16]f32) returning [16]f32",
+    "Handle non-aligned tail elements correctly",
+    "Use @reduce for horizontal operations",
+    "Support configurable SIMD width (4, 8, 16)",
+    "Provide scalar fallback for small inputs"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/zig/simd_vector.zig",
+  "test_suite_path": "eval/tasks/fixtures/zig/simd_vector_test.zig",
+  "constraint_path": "eval/tasks/constraints/zig_simd_vector.json",
+  "expected_loc": 75,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement SIMD dot product with @Vector.",
+      "code": "fn dotProduct(a: []const f32, b: []const f32) f32 {\n    const Vec4 = @Vector(4, f32);\n    var sum: Vec4 = @splat(0);\n    \n    const len = @min(a.len, b.len);\n    const vec_len = len / 4 * 4;\n    \n    var i: usize = 0;\n    while (i < vec_len) : (i += 4) {\n        const va: Vec4 = a[i..][0..4].*;\n        const vb: Vec4 = b[i..][0..4].*;\n        sum += va * vb;\n    }\n    \n    var result = @reduce(.Add, sum);\n    while (i < len) : (i += 1) {\n        result += a[i] * b[i];\n    }\n    return result;\n}"
+    },
+    {
+      "prompt": "Use @sqrt for vector normalization.",
+      "code": "fn normalize(v: []f32) void {\n    const len_sq = dotProduct(v, v);\n    if (len_sq == 0) return;\n    \n    const inv_len = 1.0 / @sqrt(len_sq);\n    const Vec4 = @Vector(4, f32);\n    const scale: Vec4 = @splat(inv_len);\n    \n    var i: usize = 0;\n    while (i + 4 <= v.len) : (i += 4) {\n        const vec: Vec4 = v[i..][0..4].*;\n        v[i..][0..4].* = vec * scale;\n    }\n    while (i < v.len) : (i += 1) {\n        v[i] *= inv_len;\n    }\n}"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "go_001_concurrent_worker",
+  "version": "1.0.0",
+  "title": "Concurrent Worker Pool",
+  "description": "Implement a worker pool pattern in Go using goroutines and channels. The pool should process jobs concurrently with configurable number of workers.",
+  "category": "concurrency",
+  "language": "go",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Go concurrency patterns",
+    "complexity": {
+      "time": "O(n/w) where w = workers",
+      "space": "O(w + buffer)"
+    },
+    "tags": [
+      "goroutines",
+      "channels",
+      "worker-pool",
+      "concurrency"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'NewWorkerPool'",
+    "Accept numWorkers int and bufferSize int parameters",
+    "Return a WorkerPool struct with Submit and Wait methods",
+    "Submit should accept a func() interface{} job",
+    "Use buffered channels for job queue",
+    "Implement graceful shutdown with sync.WaitGroup",
+    "Handle panics in worker goroutines",
+    "Results should be collectible via Results() method"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/workerpool/concurrent_worker.go",
+  "test_suite_path": "eval/tasks/fixtures/go/workerpool/concurrent_worker_test.go",
+  "constraint_path": "eval/tasks/constraints/go_concurrent_worker.json",
+  "expected_loc": 50,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple goroutine that processes items from a channel.",
+      "code": "func processItems(items <-chan int, results chan<- int, done chan<- bool) {\n    for item := range items {\n        results <- item * 2\n    }\n    done <- true\n}"
+    },
+    {
+      "prompt": "Implement a function that runs multiple goroutines and waits for completion.",
+      "code": "import \"sync\"\n\nfunc runConcurrently(tasks []func()) {\n    var wg sync.WaitGroup\n    for _, task := range tasks {\n        wg.Add(1)\n        go func(t func()) {\n            defer wg.Done()\n            t()\n        }(task)\n    }\n    wg.Wait()\n}"
+    }
+  ]
+}

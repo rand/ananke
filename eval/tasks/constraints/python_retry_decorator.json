@@ -1,0 +1,28 @@
+{
+  "task_id": "python_006_retry_decorator",
+  "constraints": {
+    "grammar": "def retry(\n    max_attempts: int = 3,\n    exceptions: tuple = (Exception,),\n    delay: float = 1.0,\n    backoff: float = 2.0,\n    on_retry: Callable = None\n) -> Callable: ...",
+    "regex_pattern": "def\\s+retry\\(",
+    "type_constraints": {
+      "functions": [{"name": "retry", "return_type": "Callable"}],
+      "parameters": [
+        {"name": "max_attempts", "type": "int"},
+        {"name": "exceptions", "type": "tuple"},
+        {"name": "delay", "type": "float"},
+        {"name": "backoff", "type": "float"},
+        {"name": "on_retry", "type": "Callable"}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["retry"],
+      "variable_patterns": ["attempts", "delay", "backoff", "exception"]
+    },
+    "structural_constraints": {
+      "must_use": ["decorator with arguments", "exponential backoff", "time.sleep"],
+      "must_not_use": ["tenacity", "retrying library"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/python/retry_decorator.py",
+  "extraction_method": "generated",
+  "verified": false
+}

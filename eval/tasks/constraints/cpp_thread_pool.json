@@ -1,0 +1,28 @@
+{
+  "task_id": "cpp_thread_pool",
+  "constraints": {
+    "grammar": "class ThreadPool {\npublic:\n    explicit ThreadPool(size_t num_threads);\n    ~ThreadPool();\n    template<class F, class... Args>\n    auto enqueue(F&& f, Args&&... args) -> std::future<std::invoke_result_t<F, Args...>>;\n    void shutdown();\nprivate:\n    std::vector<std::thread> workers;\n    std::queue<std::function<void()>> tasks;\n    std::mutex queue_mutex;\n    std::condition_variable condition;\n    bool stop;\n};",
+    "regex_pattern": "class\\s+ThreadPool\\s*\\{",
+    "type_constraints": {
+      "class_name": "ThreadPool",
+      "methods": [
+        {"name": "ThreadPool", "explicit": true, "parameters": [{"name": "num_threads", "type": "size_t"}]},
+        {"name": "~ThreadPool"},
+        {"name": "enqueue", "template": true, "return_type": "std::future"},
+        {"name": "shutdown"}
+      ],
+      "members": ["workers", "tasks", "queue_mutex", "condition", "stop"]
+    },
+    "naming_constraints": {
+      "class_name": "ThreadPool",
+      "variable_patterns": ["workers", "tasks", "mutex", "condition", "stop"]
+    },
+    "structural_constraints": {
+      "must_use": ["std::thread", "std::mutex", "std::condition_variable", "std::future"],
+      "must_not_use": ["raw new/delete", "busy waiting"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/cpp/thread_pool.cpp",
+  "extraction_method": "generated",
+  "verified": false
+}

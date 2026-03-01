@@ -1,0 +1,50 @@
+{
+  "id": "rust_002_iterator_chain",
+  "version": "1.0.0",
+  "title": "Iterator Chain Processing",
+  "description": "Implement a data processing pipeline using Rust's iterator combinators. Process a list of transactions to compute statistics using map, filter, fold, and other iterator methods.",
+  "category": "data_processing",
+  "language": "rust",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Functional programming in Rust",
+    "complexity": {
+      "time": "O(n)",
+      "space": "O(1) streaming"
+    },
+    "tags": [
+      "iterators",
+      "functional",
+      "map-filter-reduce",
+      "lazy-evaluation"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'process_transactions'",
+    "Input: slice of Transaction structs with amount: f64, category: String, is_credit: bool",
+    "Return TransactionSummary with total_credit, total_debit, count_by_category (HashMap)",
+    "Use iterator chain (no explicit loops)",
+    "Filter out transactions with amount <= 0",
+    "Group by category using fold or collect",
+    "Calculate sum of credits and debits separately",
+    "Must handle empty input gracefully"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/rust/iterator_chain.rs",
+  "test_suite_path": "eval/tasks/fixtures/rust/iterator_chain_test.rs",
+  "constraint_path": "eval/tasks/constraints/rust_iterator_chain.json",
+  "expected_loc": 40,
+  "few_shot_examples": [
+    {
+      "prompt": "Use iterators to sum all even numbers in a list.",
+      "code": "pub fn sum_even(numbers: &[i32]) -> i32 {\n    numbers.iter()\n        .filter(|&&n| n % 2 == 0)\n        .sum()\n}"
+    },
+    {
+      "prompt": "Group strings by their first character using iterators.",
+      "code": "use std::collections::HashMap;\n\npub fn group_by_first_char(words: &[&str]) -> HashMap<char, Vec<&str>> {\n    words.iter()\n        .filter(|w| !w.is_empty())\n        .fold(HashMap::new(), |mut acc, &word| {\n            let first = word.chars().next().unwrap();\n            acc.entry(first).or_default().push(word);\n            acc\n        })\n}"
+    }
+  ]
+}

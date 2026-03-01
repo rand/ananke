@@ -1,0 +1,26 @@
+{
+  "task_id": "python_context_manager",
+  "constraints": {
+    "grammar": "class ResourceManager:\n    def __init__(self, resource_path: str) -> None:\n        ...\n    def __enter__(self) -> 'ResourceManager':\n        ...\n    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:\n        ...",
+    "regex_pattern": "class\\s+ResourceManager:",
+    "type_constraints": {
+      "class_name": "ResourceManager",
+      "methods": [
+        {"name": "__init__", "parameters": [{"name": "resource_path", "type": "str"}], "return_type": "None"},
+        {"name": "__enter__", "return_type": "ResourceManager"},
+        {"name": "__exit__", "parameters": ["exc_type", "exc_val", "exc_tb"], "return_type": "bool"}
+      ]
+    },
+    "naming_constraints": {
+      "class_name": "ResourceManager",
+      "variable_patterns": ["resource", "path", "handle"]
+    },
+    "structural_constraints": {
+      "must_use": ["__enter__", "__exit__", "exception handling"],
+      "must_not_use": ["global state", "daemon threads"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/python/context_manager.py",
+  "extraction_method": "generated",
+  "verified": false
+}

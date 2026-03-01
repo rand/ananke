@@ -1,0 +1,50 @@
+{
+  "id": "c_001_ring_buffer",
+  "version": "1.0.0",
+  "title": "Lock-Free Ring Buffer",
+  "description": "Implement a fixed-size ring buffer (circular buffer) in C with proper memory management and thread-safe single-producer single-consumer operations.",
+  "category": "data_structures",
+  "language": "c",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Linux kernel kfifo",
+    "complexity": {
+      "time": "O(1) push/pop",
+      "space": "O(n) where n = capacity"
+    },
+    "tags": [
+      "ring-buffer",
+      "memory-management",
+      "lock-free",
+      "systems"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Struct must be named 'ring_buffer_t'",
+    "Implement ring_buffer_create(capacity) returning allocated buffer",
+    "Implement ring_buffer_destroy(rb) for cleanup",
+    "Implement ring_buffer_push(rb, data, size) returning bytes written",
+    "Implement ring_buffer_pop(rb, buf, size) returning bytes read",
+    "Implement ring_buffer_is_empty(rb) and ring_buffer_is_full(rb)",
+    "Use power-of-2 capacity for efficient modulo via bitmask",
+    "Handle wraparound correctly at buffer boundaries"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/c/ring_buffer.c",
+  "test_suite_path": "eval/tasks/fixtures/c/ring_buffer_test.c",
+  "constraint_path": "eval/tasks/constraints/c_ring_buffer.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Allocate a buffer with error checking in C.",
+      "code": "#include <stdlib.h>\n#include <stddef.h>\n\nvoid* safe_malloc(size_t size) {\n    void* ptr = malloc(size);\n    if (ptr == NULL && size > 0) {\n        return NULL;\n    }\n    return ptr;\n}"
+    },
+    {
+      "prompt": "Calculate power of 2 ceiling for a given value.",
+      "code": "static size_t next_power_of_2(size_t n) {\n    if (n == 0) return 1;\n    n--;\n    n |= n >> 1;\n    n |= n >> 2;\n    n |= n >> 4;\n    n |= n >> 8;\n    n |= n >> 16;\n    return n + 1;\n}"
+    }
+  ]
+}

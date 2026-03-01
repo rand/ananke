@@ -1,0 +1,36 @@
+{
+  "task_id": "chain_sort_001_basic",
+  "constraints": {
+    "grammar": "import \"golang.org/x/exp/constraints\"\n\nfunc QuickSort[T constraints.Ordered](arr []T) { }\nfunc MergeSort[T constraints.Ordered](arr []T) []T { }\nfunc InsertionSort[T constraints.Ordered](arr []T) { }",
+    "regex_pattern": "func\\s+QuickSort\\[T\\s+constraints\\.Ordered\\]",
+    "type_constraints": {
+      "functions": [
+        {"name": "QuickSort", "generics": ["T constraints.Ordered"], "parameters": ["arr []T"]},
+        {"name": "MergeSort", "generics": ["T constraints.Ordered"], "parameters": ["arr []T"], "return_type": "[]T"},
+        {"name": "InsertionSort", "generics": ["T constraints.Ordered"], "parameters": ["arr []T"]}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["QuickSort", "MergeSort", "InsertionSort"],
+      "variable_patterns": ["left", "right", "pivot", "mid", "merged"]
+    },
+    "structural_constraints": {
+      "must_use": ["generics with constraints.Ordered", "recursive or iterative logic", "comparison operators"],
+      "must_not_use": ["sort.Slice directly", "reflection"]
+    },
+    "complexity_constraints": {
+      "quicksort_time": "O(n log n) average",
+      "mergesort_time": "O(n log n)",
+      "quicksort_space": "O(log n)",
+      "mergesort_space": "O(n)"
+    }
+  },
+  "chain": {
+    "id": "sort",
+    "position": 1,
+    "total": 3
+  },
+  "extracted_from": "eval/tasks/fixtures/go/chain_sort_1.go",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,50 @@
+{
+  "id": "c_003_memory_pool",
+  "version": "1.0.0",
+  "title": "Fixed-Size Memory Pool Allocator",
+  "description": "Implement a memory pool allocator for fixed-size blocks, useful for reducing fragmentation and allocation overhead in embedded systems.",
+  "category": "system_utilities",
+  "language": "c",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Embedded systems memory management",
+    "complexity": {
+      "time": "O(1) alloc/free",
+      "space": "O(n * block_size)"
+    },
+    "tags": [
+      "memory-pool",
+      "allocator",
+      "embedded",
+      "fragmentation"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Struct must be named 'mem_pool_t'",
+    "Implement pool_create(block_size, block_count) allocating backing memory",
+    "Implement pool_destroy(pool) freeing all resources",
+    "Implement pool_alloc(pool) returning a block or NULL if exhausted",
+    "Implement pool_free(pool, ptr) returning block to pool",
+    "Use a free list for O(1) allocation/deallocation",
+    "Validate that freed pointers belong to the pool",
+    "Implement pool_available(pool) returning free block count"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/c/memory_pool.c",
+  "test_suite_path": "eval/tasks/fixtures/c/memory_pool_test.c",
+  "constraint_path": "eval/tasks/constraints/c_memory_pool.json",
+  "expected_loc": 65,
+  "few_shot_examples": [
+    {
+      "prompt": "Initialize a free list within a memory region.",
+      "code": "static void init_free_list(void* memory, size_t block_size, size_t count) {\n    char* ptr = (char*)memory;\n    for (size_t i = 0; i < count - 1; i++) {\n        *(void**)(ptr + i * block_size) = ptr + (i + 1) * block_size;\n    }\n    *(void**)(ptr + (count - 1) * block_size) = NULL;\n}"
+    },
+    {
+      "prompt": "Check if pointer is within a memory range.",
+      "code": "static int ptr_in_range(void* ptr, void* start, size_t total_size) {\n    return (char*)ptr >= (char*)start && \n           (char*)ptr < (char*)start + total_size;\n}"
+    }
+  ]
+}

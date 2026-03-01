@@ -1,0 +1,28 @@
+{
+  "task_id": "javascript_005_event_emitter",
+  "constraints": {
+    "grammar": "class EventEmitter {\n  on(event, listener) { }\n  off(event, listener) { }\n  once(event, listener) { }\n  emit(event, ...args) { }\n  listenerCount(event) { }\n}",
+    "regex_pattern": "class\\s+EventEmitter",
+    "type_constraints": {
+      "classes": ["EventEmitter"],
+      "methods": [
+        {"name": "on", "return_type": "this"},
+        {"name": "off", "return_type": "this"},
+        {"name": "once", "return_type": "this"},
+        {"name": "emit", "return_type": "boolean"},
+        {"name": "listenerCount", "return_type": "number"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["EventEmitter"],
+      "variable_patterns": ["listeners", "events", "event"]
+    },
+    "structural_constraints": {
+      "must_use": ["Map or object for listeners", "Array for multiple listeners"],
+      "must_not_use": ["Node.js EventEmitter", "external libraries"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/javascript/event_emitter.js",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,27 @@
+{
+  "task_id": "go_circuit_breaker",
+  "constraints": {
+    "grammar": "type CircuitBreaker struct { }\nfunc NewCircuitBreaker(threshold int, timeout time.Duration) *CircuitBreaker { }\nfunc (cb *CircuitBreaker) Execute(fn func() error) error { }\nfunc (cb *CircuitBreaker) State() State { }",
+    "regex_pattern": "type\\s+CircuitBreaker\\s+struct",
+    "type_constraints": {
+      "struct_name": "CircuitBreaker",
+      "functions": [
+        {"name": "NewCircuitBreaker", "parameters": ["threshold int", "timeout time.Duration"], "return_type": "*CircuitBreaker"},
+        {"name": "Execute", "receiver": "*CircuitBreaker", "parameters": ["fn func() error"], "return_type": "error"},
+        {"name": "State", "receiver": "*CircuitBreaker", "return_type": "State"}
+      ],
+      "state_enum": ["Closed", "Open", "HalfOpen"]
+    },
+    "naming_constraints": {
+      "type_names": ["CircuitBreaker", "State"],
+      "variable_patterns": ["failures", "lastFailure", "state", "threshold", "timeout"]
+    },
+    "structural_constraints": {
+      "must_use": ["sync.Mutex or sync.RWMutex", "time.Duration", "state machine pattern"],
+      "must_not_use": ["global state", "busy waiting"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/go/circuit_breaker.go",
+  "extraction_method": "generated",
+  "verified": false
+}

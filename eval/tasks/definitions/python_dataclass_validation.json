@@ -1,0 +1,50 @@
+{
+  "id": "python_004_dataclass_validation",
+  "version": "1.0.0",
+  "title": "Validated Dataclass with Custom Descriptors",
+  "description": "Implement a dataclass decorator that adds runtime validation using descriptors for type checking and custom validators.",
+  "category": "type_system",
+  "language": "python",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Pydantic and attrs",
+    "complexity": {
+      "time": "O(f) where f = fields",
+      "space": "O(1)"
+    },
+    "tags": [
+      "dataclass",
+      "descriptors",
+      "validation",
+      "metaprogramming"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Decorator must be named 'validated'",
+    "Implement Field descriptor with validators",
+    "Support type validation from annotations",
+    "Support min/max validators for numbers",
+    "Support pattern validator for strings (regex)",
+    "Support custom validator functions",
+    "Raise ValidationError with field name on failure",
+    "Preserve original class docstring and attributes"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/dataclass_validation.py",
+  "test_suite_path": "eval/tasks/fixtures/python/dataclass_validation_test.py",
+  "constraint_path": "eval/tasks/constraints/python_dataclass_validation.json",
+  "expected_loc": 65,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a basic descriptor for validation.",
+      "code": "class ValidatedField:\n    def __set_name__(self, owner, name):\n        self.name = name\n        self.private_name = f'_{name}'\n    \n    def __get__(self, obj, type=None):\n        if obj is None:\n            return self\n        return getattr(obj, self.private_name, None)\n    \n    def __set__(self, obj, value):\n        self.validate(value)\n        setattr(obj, self.private_name, value)"
+    },
+    {
+      "prompt": "Create a class decorator that modifies __init__.",
+      "code": "def validated(cls):\n    original_init = cls.__init__\n    \n    def new_init(self, **kwargs):\n        for name, value in kwargs.items():\n            setattr(self, name, value)  # triggers descriptor validation\n    \n    cls.__init__ = new_init\n    return cls"
+    }
+  ]
+}

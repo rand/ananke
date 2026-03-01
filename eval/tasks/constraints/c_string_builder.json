@@ -1,0 +1,28 @@
+{
+  "task_id": "c_004_string_builder",
+  "constraints": {
+    "grammar": "typedef struct string_builder sb_t;\nsb_t* sb_create(size_t initial_capacity);\nvoid sb_destroy(sb_t* sb);\nvoid sb_append(sb_t* sb, const char* str);\nvoid sb_append_char(sb_t* sb, char c);\nchar* sb_to_string(sb_t* sb);",
+    "regex_pattern": "typedef\\s+struct\\s+string_builder\\s+sb_t|struct\\s+string_builder",
+    "type_constraints": {
+      "structs": ["sb_t"],
+      "functions": [
+        {"name": "sb_create", "return_type": "sb_t*"},
+        {"name": "sb_destroy", "return_type": "void"},
+        {"name": "sb_append", "return_type": "void"},
+        {"name": "sb_to_string", "return_type": "char*"}
+      ]
+    },
+    "naming_constraints": {
+      "type_names": ["sb_t"],
+      "function_prefixes": ["sb_"],
+      "variable_patterns": ["buffer", "length", "capacity"]
+    },
+    "structural_constraints": {
+      "must_use": ["realloc for growth", "null termination"],
+      "must_not_use": ["global buffers"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/c/string_builder.c",
+  "extraction_method": "generated",
+  "verified": false
+}

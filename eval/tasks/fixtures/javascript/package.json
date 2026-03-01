@@ -1,0 +1,13 @@
+{
+  "name": "javascript-fixtures",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "jest": {
+    "testMatch": ["**/*_test.js", "**/*.test.js"]
+  }
+}

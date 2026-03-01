@@ -1,0 +1,32 @@
+{
+  "task_id": "go_004_http_middleware",
+  "constraints": {
+    "grammar": "type Middleware func(http.Handler) http.Handler\nfunc Chain(middlewares ...Middleware) Middleware { }\nfunc Logger(next http.Handler) http.Handler { }\nfunc Recovery(next http.Handler) http.Handler { }\nfunc RateLimit(rps int) Middleware { }",
+    "regex_pattern": "type\\s+Middleware\\s+func\\(http\\.Handler\\)\\s+http\\.Handler",
+    "length_constraints": {
+      "min_tokens": 150,
+      "min_characters": 750,
+      "description": "Go HTTP middleware requires type definition, 4 functions with closures, and http.Handler implementation - cannot be under 150 tokens"
+    },
+    "type_constraints": {
+      "type_aliases": ["Middleware"],
+      "functions": [
+        {"name": "Chain", "return_type": "Middleware"},
+        {"name": "Logger", "return_type": "http.Handler"},
+        {"name": "Recovery", "return_type": "http.Handler"},
+        {"name": "RateLimit", "return_type": "Middleware"}
+      ]
+    },
+    "naming_constraints": {
+      "type_names": ["Middleware"],
+      "function_names": ["Chain", "Logger", "Recovery", "RateLimit"]
+    },
+    "structural_constraints": {
+      "must_use": ["http.Handler interface", "closure for state"],
+      "must_not_use": ["global middleware state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/go/http_middleware.go",
+  "extraction_method": "generated",
+  "verified": false
+}

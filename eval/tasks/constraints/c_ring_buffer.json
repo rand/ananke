@@ -1,0 +1,30 @@
+{
+  "task_id": "c_ring_buffer",
+  "constraints": {
+    "grammar": "typedef struct {\n    void *buffer;\n    size_t capacity;\n    size_t head;\n    size_t tail;\n    size_t count;\n} ring_buffer_t;\n\nring_buffer_t* ring_buffer_create(size_t capacity);\nvoid ring_buffer_destroy(ring_buffer_t *rb);\nint ring_buffer_push(ring_buffer_t *rb, void *item);\nvoid* ring_buffer_pop(ring_buffer_t *rb);\nint ring_buffer_is_empty(ring_buffer_t *rb);\nint ring_buffer_is_full(ring_buffer_t *rb);",
+    "regex_pattern": "typedef\\s+struct\\s*\\{[^}]*\\}\\s*ring_buffer_t",
+    "type_constraints": {
+      "struct_name": "ring_buffer_t",
+      "fields": ["buffer", "capacity", "head", "tail", "count"],
+      "functions": [
+        {"name": "ring_buffer_create", "return_type": "ring_buffer_t*"},
+        {"name": "ring_buffer_destroy", "parameters": ["ring_buffer_t*"]},
+        {"name": "ring_buffer_push", "return_type": "int"},
+        {"name": "ring_buffer_pop", "return_type": "void*"},
+        {"name": "ring_buffer_is_empty", "return_type": "int"},
+        {"name": "ring_buffer_is_full", "return_type": "int"}
+      ]
+    },
+    "naming_constraints": {
+      "prefix": "ring_buffer_",
+      "variable_patterns": ["head", "tail", "capacity", "count"]
+    },
+    "structural_constraints": {
+      "must_use": ["malloc/free", "modulo arithmetic", "bounds checking"],
+      "must_not_use": ["global variables", "VLAs"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/c/ring_buffer.c",
+  "extraction_method": "generated",
+  "verified": false
+}

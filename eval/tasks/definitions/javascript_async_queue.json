@@ -1,0 +1,50 @@
+{
+  "id": "javascript_001_async_queue",
+  "version": "1.0.0",
+  "title": "Async Task Queue",
+  "description": "Implement an async task queue with configurable concurrency that processes promises in order while limiting parallel execution.",
+  "category": "concurrency",
+  "language": "javascript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Node.js async patterns",
+    "complexity": {
+      "time": "O(n) total, O(c) parallel where c = concurrency",
+      "space": "O(n)"
+    },
+    "tags": [
+      "async",
+      "promises",
+      "concurrency",
+      "queue"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'AsyncQueue'",
+    "Constructor accepts concurrency limit (default: 1)",
+    "Implement add(asyncFn) method that returns a Promise",
+    "Tasks execute in FIFO order",
+    "Never exceed concurrency limit",
+    "Implement pause() and resume() methods",
+    "Implement clear() to cancel pending tasks",
+    "Handle task errors without stopping the queue"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/javascript/async_queue.js",
+  "test_suite_path": "eval/tasks/fixtures/javascript/async_queue_test.js",
+  "constraint_path": "eval/tasks/constraints/javascript_async_queue.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple promise queue that runs one at a time.",
+      "code": "class SimpleQueue {\n  constructor() {\n    this.queue = [];\n    this.running = false;\n  }\n\n  async add(fn) {\n    return new Promise((resolve, reject) => {\n      this.queue.push({ fn, resolve, reject });\n      this.process();\n    });\n  }\n\n  async process() {\n    if (this.running || this.queue.length === 0) return;\n    this.running = true;\n    const { fn, resolve, reject } = this.queue.shift();\n    try {\n      resolve(await fn());\n    } catch (e) {\n      reject(e);\n    }\n    this.running = false;\n    this.process();\n  }\n}"
+    },
+    {
+      "prompt": "Run N promises concurrently with Promise.all.",
+      "code": "async function runConcurrent(fns, concurrency) {\n  const results = [];\n  for (let i = 0; i < fns.length; i += concurrency) {\n    const batch = fns.slice(i, i + concurrency);\n    const batchResults = await Promise.all(batch.map(fn => fn()));\n    results.push(...batchResults);\n  }\n  return results;\n}"
+    }
+  ]
+}

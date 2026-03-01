@@ -1,0 +1,26 @@
+{
+  "task_id": "chain_parser_003_dsl",
+  "constraints": {
+    "grammar": "pub enum Token { }\npub enum Expr { }\npub struct Lexer { }\npub struct Parser { }\nimpl Parser {\n  pub fn parse(&mut self) -> Result<Expr, ParseError> { }\n}",
+    "regex_pattern": "pub\\s+enum\\s+Token|pub\\s+struct\\s+Parser",
+    "type_constraints": {
+      "enums": ["Token", "Expr"],
+      "structs": ["Lexer", "Parser"],
+      "methods": [
+        {"name": "parse", "return_type": "Result<Expr, ParseError>"}
+      ]
+    },
+    "naming_constraints": {
+      "enum_names": ["Token", "Expr"],
+      "struct_names": ["Lexer", "Parser"],
+      "variable_patterns": ["tokens", "current", "ast"]
+    },
+    "structural_constraints": {
+      "must_use": ["lexer/tokenizer", "recursive descent or Pratt parsing"],
+      "must_not_use": ["parser generators"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_parser_3.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

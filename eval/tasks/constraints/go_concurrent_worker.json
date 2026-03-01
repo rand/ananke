@@ -1,0 +1,27 @@
+{
+  "task_id": "go_002_concurrent_worker",
+  "constraints": {
+    "grammar": "type WorkerPool struct { }\nfunc NewWorkerPool(size int) *WorkerPool { }\nfunc (p *WorkerPool) Submit(task func()) error { }\nfunc (p *WorkerPool) Shutdown() { }\nfunc (p *WorkerPool) Wait() { }",
+    "regex_pattern": "type\\s+WorkerPool\\s+struct",
+    "type_constraints": {
+      "struct_name": "WorkerPool",
+      "functions": [
+        {"name": "NewWorkerPool", "return_type": "*WorkerPool"},
+        {"name": "Submit", "receiver": "*WorkerPool", "return_type": "error"},
+        {"name": "Shutdown", "receiver": "*WorkerPool"},
+        {"name": "Wait", "receiver": "*WorkerPool"}
+      ]
+    },
+    "naming_constraints": {
+      "type_names": ["WorkerPool"],
+      "variable_patterns": ["workers", "tasks", "quit", "wg"]
+    },
+    "structural_constraints": {
+      "must_use": ["goroutines", "channels", "sync.WaitGroup"],
+      "must_not_use": ["global state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/go/concurrent_worker.go",
+  "extraction_method": "generated",
+  "verified": false
+}

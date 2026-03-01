@@ -1,0 +1,38 @@
+{
+  "task_id": "chain_sort_003_external",
+  "constraints": {
+    "grammar": "type Encoder interface {\n    Encode(item interface{}) ([]byte, error)\n}\n\ntype Decoder interface {\n    Decode(data []byte) (interface{}, error)\n}\n\nfunc ExternalSort(input io.Reader, output io.Writer, chunkSize int, encoder Encoder, decoder Decoder) error { }",
+    "regex_pattern": "func\\s+ExternalSort\\(",
+    "type_constraints": {
+      "interfaces": [
+        {"name": "Encoder", "methods": [{"name": "Encode", "return_type": "([]byte, error)"}]},
+        {"name": "Decoder", "methods": [{"name": "Decode", "return_type": "(interface{}, error)"}]}
+      ],
+      "functions": [
+        {"name": "ExternalSort", "parameters": ["input io.Reader", "output io.Writer", "chunkSize int", "encoder Encoder", "decoder Decoder"], "return_type": "error"}
+      ]
+    },
+    "naming_constraints": {
+      "interface_names": ["Encoder", "Decoder"],
+      "function_names": ["ExternalSort"],
+      "variable_patterns": ["chunk", "temp", "heap", "merger"]
+    },
+    "structural_constraints": {
+      "must_use": ["io.Reader/io.Writer", "temporary files", "k-way merge", "min-heap for merging"],
+      "must_not_use": ["loading all data in memory"]
+    },
+    "complexity_constraints": {
+      "time": "O(n log n)",
+      "space": "O(chunk_size) memory"
+    }
+  },
+  "chain": {
+    "id": "sort",
+    "position": 3,
+    "total": 3,
+    "builds_on": "chain_sort_002_custom"
+  },
+  "extracted_from": "eval/tasks/fixtures/go/chain_sort_3.go",
+  "extraction_method": "generated",
+  "verified": false
+}

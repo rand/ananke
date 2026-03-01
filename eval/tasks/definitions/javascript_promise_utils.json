@@ -1,0 +1,50 @@
+{
+  "id": "javascript_005_promise_utils",
+  "version": "1.0.0",
+  "title": "Promise Utility Functions",
+  "description": "Implement promise utility functions including retry with backoff, timeout wrapper, and promise pool for controlled concurrency.",
+  "category": "async",
+  "language": "javascript",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "p-limit, p-retry npm packages",
+    "complexity": {
+      "time": "O(n * retries) for retry, O(n/c) for pool",
+      "space": "O(c) where c = concurrency"
+    },
+    "tags": [
+      "promises",
+      "async",
+      "error-handling",
+      "retry-patterns"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Implement retry(fn, options) with exponential backoff",
+    "Options include: retries, minTimeout, maxTimeout, factor",
+    "Implement timeout(promise, ms) that rejects on timeout",
+    "Implement promisePool(fns, concurrency) for controlled execution",
+    "retry should call onRetry callback with attempt number and error",
+    "timeout should clean up pending promise on timeout",
+    "promisePool should return array of settled results",
+    "All functions should preserve proper error stack traces"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/javascript/promise_utils.js",
+  "test_suite_path": "eval/tasks/fixtures/javascript/promise_utils_test.js",
+  "constraint_path": "eval/tasks/constraints/javascript_promise_utils.json",
+  "expected_loc": 60,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple retry function.",
+      "code": "async function retry(fn, retries = 3) {\n  for (let i = 0; i < retries; i++) {\n    try {\n      return await fn();\n    } catch (err) {\n      if (i === retries - 1) throw err;\n    }\n  }\n}"
+    },
+    {
+      "prompt": "Wrap a promise with a timeout.",
+      "code": "function withTimeout(promise, ms) {\n  const timeout = new Promise((_, reject) =>\n    setTimeout(() => reject(new Error('Timeout')), ms)\n  );\n  return Promise.race([promise, timeout]);\n}"
+    }
+  ]
+}

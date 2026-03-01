@@ -1,0 +1,27 @@
+{
+  "task_id": "chain_cache_002_lru",
+  "constraints": {
+    "grammar": "pub struct LruCache<K, V> { }\nimpl<K: Hash + Eq, V> LruCache<K, V> {\n  pub fn new(capacity: usize) -> Self { }\n  pub fn get(&mut self, key: &K) -> Option<&V> { }\n  pub fn put(&mut self, key: K, value: V) { }\n}",
+    "regex_pattern": "pub\\s+struct\\s+LruCache<",
+    "type_constraints": {
+      "structs": [{"name": "LruCache", "generics": ["K", "V"]}],
+      "trait_bounds": ["Hash", "Eq"],
+      "methods": [
+        {"name": "new", "return_type": "Self"},
+        {"name": "get", "return_type": "Option<&V>"},
+        {"name": "put", "return_type": "()"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["LruCache"],
+      "variable_patterns": ["capacity", "cache", "order", "key", "value"]
+    },
+    "structural_constraints": {
+      "must_use": ["HashMap", "LinkedList or VecDeque", "capacity limit"],
+      "must_not_use": ["unsafe without justification"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_cache_2.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,50 @@
+{
+  "id": "java_002_repository_pattern",
+  "version": "1.0.0",
+  "title": "Generic Repository with Specification Pattern",
+  "description": "Implement a generic repository interface with specification pattern for flexible querying, supporting CRUD operations and composable predicates.",
+  "category": "patterns",
+  "language": "java",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Domain-Driven Design patterns",
+    "complexity": {
+      "time": "O(n) for find operations",
+      "space": "O(n)"
+    },
+    "tags": [
+      "repository-pattern",
+      "specification-pattern",
+      "generics",
+      "DDD"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Interface must be named 'Repository<T, ID>'",
+    "Implement findById(ID id) returning Optional<T>",
+    "Implement findAll() returning List<T>",
+    "Implement findAll(Specification<T> spec) for filtered queries",
+    "Implement save(T entity) returning T",
+    "Implement delete(T entity)",
+    "Specification<T> interface with isSatisfiedBy(T entity)",
+    "Implement and(), or(), not() for specification composition"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/java/RepositoryPattern.java",
+  "test_suite_path": "eval/tasks/fixtures/java/RepositoryPatternTest.java",
+  "constraint_path": "eval/tasks/constraints/java_repository_pattern.json",
+  "expected_loc": 80,
+  "few_shot_examples": [
+    {
+      "prompt": "Define a generic repository interface.",
+      "code": "public interface Repository<T, ID> {\n    Optional<T> findById(ID id);\n    List<T> findAll();\n    T save(T entity);\n    void delete(T entity);\n    boolean existsById(ID id);\n}"
+    },
+    {
+      "prompt": "Implement specification composition with and().",
+      "code": "public interface Specification<T> {\n    boolean isSatisfiedBy(T entity);\n    \n    default Specification<T> and(Specification<T> other) {\n        return entity -> this.isSatisfiedBy(entity) && other.isSatisfiedBy(entity);\n    }\n    \n    default Specification<T> or(Specification<T> other) {\n        return entity -> this.isSatisfiedBy(entity) || other.isSatisfiedBy(entity);\n    }\n}"
+    }
+  ]
+}

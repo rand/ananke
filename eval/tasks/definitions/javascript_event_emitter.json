@@ -1,0 +1,50 @@
+{
+  "id": "javascript_002_event_emitter",
+  "version": "1.0.0",
+  "title": "Custom Event Emitter",
+  "description": "Implement a Node.js-style EventEmitter with support for on, once, off, and emit methods, plus wildcard listeners.",
+  "category": "patterns",
+  "language": "javascript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Node.js EventEmitter",
+    "complexity": {
+      "time": "O(n) for emit where n = listeners",
+      "space": "O(n)"
+    },
+    "tags": [
+      "events",
+      "pub-sub",
+      "observer-pattern",
+      "callbacks"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'EventEmitter'",
+    "Implement on(event, listener) for subscribing",
+    "Implement once(event, listener) for one-time listeners",
+    "Implement off(event, listener) for unsubscribing",
+    "Implement emit(event, ...args) for triggering",
+    "Support wildcard '*' listener that receives all events",
+    "Implement listenerCount(event) method",
+    "Return this from on/once/off for chaining"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/javascript/event_emitter.js",
+  "test_suite_path": "eval/tasks/fixtures/javascript/event_emitter_test.js",
+  "constraint_path": "eval/tasks/constraints/javascript_event_emitter.json",
+  "expected_loc": 50,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a basic pub-sub pattern.",
+      "code": "class PubSub {\n  constructor() {\n    this.events = {};\n  }\n\n  subscribe(event, callback) {\n    if (!this.events[event]) this.events[event] = [];\n    this.events[event].push(callback);\n    return () => this.unsubscribe(event, callback);\n  }\n\n  publish(event, data) {\n    if (!this.events[event]) return;\n    this.events[event].forEach(cb => cb(data));\n  }\n}"
+    },
+    {
+      "prompt": "Remove a specific listener from an array.",
+      "code": "function removeListener(listeners, listener) {\n  const index = listeners.indexOf(listener);\n  if (index !== -1) {\n    listeners.splice(index, 1);\n  }\n}"
+    }
+  ]
+}

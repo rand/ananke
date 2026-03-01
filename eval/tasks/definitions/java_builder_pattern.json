@@ -1,0 +1,50 @@
+{
+  "id": "java_001_builder_pattern",
+  "version": "1.0.0",
+  "title": "Fluent Builder Pattern",
+  "description": "Implement a fluent builder pattern for constructing complex objects with validation, supporting required and optional fields.",
+  "category": "patterns",
+  "language": "java",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Effective Java Builder Pattern",
+    "complexity": {
+      "time": "O(1) for all builder operations",
+      "space": "O(1)"
+    },
+    "tags": [
+      "builder-pattern",
+      "fluent-api",
+      "design-patterns",
+      "validation"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'User' with nested 'Builder' class",
+    "Builder methods return 'this' for chaining",
+    "Implement required fields: id, email",
+    "Implement optional fields: name, age, address",
+    "Implement build() that validates and returns User",
+    "User should be immutable (final fields, no setters)",
+    "Throw IllegalStateException for missing required fields",
+    "Validate email format in build()"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/java/User.java",
+  "test_suite_path": "eval/tasks/fixtures/java/UserTest.java",
+  "constraint_path": "eval/tasks/constraints/java_builder_pattern.json",
+  "expected_loc": 60,
+  "few_shot_examples": [
+    {
+      "prompt": "Create a basic builder with chained setters.",
+      "code": "public class Person {\n    private final String name;\n    \n    private Person(Builder builder) {\n        this.name = builder.name;\n    }\n    \n    public static class Builder {\n        private String name;\n        \n        public Builder name(String name) {\n            this.name = name;\n            return this;\n        }\n        \n        public Person build() {\n            return new Person(this);\n        }\n    }\n}"
+    },
+    {
+      "prompt": "Validate email format with regex.",
+      "code": "private static final Pattern EMAIL_PATTERN = \n    Pattern.compile(\"^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$\");\n\nprivate void validateEmail(String email) {\n    if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {\n        throw new IllegalArgumentException(\"Invalid email format\");\n    }\n}"
+    }
+  ]
+}

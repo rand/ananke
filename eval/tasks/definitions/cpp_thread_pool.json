@@ -1,0 +1,50 @@
+{
+  "id": "cpp_002_thread_pool",
+  "version": "1.0.0",
+  "title": "Thread Pool with Future Support",
+  "description": "Implement a thread pool that accepts tasks and returns std::future for result retrieval, with graceful shutdown support.",
+  "category": "concurrency",
+  "language": "cpp",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Modern C++ concurrency patterns",
+    "complexity": {
+      "time": "O(1) submit, O(n/t) execution where t = threads",
+      "space": "O(t + queue_size)"
+    },
+    "tags": [
+      "threading",
+      "concurrency",
+      "futures",
+      "task-queue"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'ThreadPool'",
+    "Constructor accepts number of worker threads",
+    "Implement submit<F>(F&& f) returning std::future<result_type>",
+    "Use std::packaged_task for future support",
+    "Implement graceful shutdown in destructor",
+    "Use condition variable for worker notification",
+    "Tasks should be executed in FIFO order",
+    "Handle exceptions in tasks properly"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/cpp/thread_pool.cpp",
+  "test_suite_path": "eval/tasks/fixtures/cpp/thread_pool_test.cpp",
+  "constraint_path": "eval/tasks/constraints/cpp_thread_pool.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Worker thread loop with condition variable.",
+      "code": "void worker() {\n    while (true) {\n        std::function<void()> task;\n        {\n            std::unique_lock<std::mutex> lock(mutex_);\n            cv_.wait(lock, [this] { return stop_ || !tasks_.empty(); });\n            if (stop_ && tasks_.empty()) return;\n            task = std::move(tasks_.front());\n            tasks_.pop();\n        }\n        task();\n    }\n}"
+    },
+    {
+      "prompt": "Submit a task with future return.",
+      "code": "template<typename F>\nauto submit(F&& f) -> std::future<decltype(f())> {\n    using return_type = decltype(f());\n    auto task = std::make_shared<std::packaged_task<return_type()>>(std::forward<F>(f));\n    std::future<return_type> result = task->get_future();\n    {\n        std::lock_guard<std::mutex> lock(mutex_);\n        tasks_.emplace([task]() { (*task)(); });\n    }\n    cv_.notify_one();\n    return result;\n}"
+    }
+  ]
+}

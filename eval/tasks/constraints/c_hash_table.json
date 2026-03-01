@@ -1,0 +1,29 @@
+{
+  "task_id": "c_002_hash_table",
+  "constraints": {
+    "grammar": "typedef struct hash_table hash_table_t;\nhash_table_t* ht_create(size_t initial_capacity);\nvoid ht_destroy(hash_table_t* ht);\nint ht_set(hash_table_t* ht, const char* key, void* value);\nvoid* ht_get(hash_table_t* ht, const char* key);\nint ht_delete(hash_table_t* ht, const char* key);",
+    "regex_pattern": "typedef\\s+struct\\s+hash_table\\s+hash_table_t|struct\\s+hash_table",
+    "type_constraints": {
+      "structs": ["hash_table_t", "ht_entry_t"],
+      "functions": [
+        {"name": "ht_create", "return_type": "hash_table_t*"},
+        {"name": "ht_destroy", "return_type": "void"},
+        {"name": "ht_set", "return_type": "int"},
+        {"name": "ht_get", "return_type": "void*"},
+        {"name": "ht_delete", "return_type": "int"}
+      ]
+    },
+    "naming_constraints": {
+      "type_names": ["hash_table_t", "ht_entry_t"],
+      "function_prefixes": ["ht_"],
+      "variable_patterns": ["bucket", "key", "value", "capacity", "size"]
+    },
+    "structural_constraints": {
+      "must_use": ["malloc/calloc", "free", "hash function", "linked list for chaining"],
+      "must_not_use": ["global variables"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/c/hash_table.c",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,25 @@
+{
+  "task_id": "javascript_003_debounce_throttle",
+  "constraints": {
+    "grammar": "function debounce(fn, wait, options) {\n  // Returns wrapped function with cancel() and flush() methods\n}\nfunction throttle(fn, wait, options) {\n  // Returns wrapped function with cancel() and flush() methods\n}",
+    "regex_pattern": "function\\s+debounce|function\\s+throttle",
+    "type_constraints": {
+      "functions": [
+        {"name": "debounce", "parameters": ["fn", "wait", "options"]},
+        {"name": "throttle", "parameters": ["fn", "wait", "options"]}
+      ],
+      "returned_methods": ["cancel", "flush"]
+    },
+    "naming_constraints": {
+      "function_names": ["debounce", "throttle"],
+      "variable_patterns": ["timeout", "lastArgs", "leading", "trailing"]
+    },
+    "structural_constraints": {
+      "must_use": ["setTimeout", "clearTimeout", "closure for state"],
+      "must_not_use": ["lodash", "external libraries"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/javascript/debounce_throttle.js",
+  "extraction_method": "generated",
+  "verified": false
+}

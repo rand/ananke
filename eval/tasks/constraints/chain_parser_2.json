@@ -1,0 +1,25 @@
+{
+  "task_id": "chain_parser_002_json",
+  "constraints": {
+    "grammar": "pub enum JsonValue {\n  Null,\n  Bool(bool),\n  Number(f64),\n  String(String),\n  Array(Vec<JsonValue>),\n  Object(HashMap<String, JsonValue>),\n}\npub fn parse_json(input: &str) -> Result<JsonValue, ParseError> { }",
+    "regex_pattern": "pub\\s+enum\\s+JsonValue|pub\\s+fn\\s+parse_json",
+    "type_constraints": {
+      "enums": ["JsonValue"],
+      "variants": ["Null", "Bool", "Number", "String", "Array", "Object"],
+      "functions": [
+        {"name": "parse_json", "return_type": "Result<JsonValue, ParseError>"}
+      ]
+    },
+    "naming_constraints": {
+      "enum_names": ["JsonValue", "ParseError"],
+      "variable_patterns": ["input", "parser", "token"]
+    },
+    "structural_constraints": {
+      "must_use": ["recursive descent", "Result type"],
+      "must_not_use": ["serde crate", "external JSON libraries"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_parser_2.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

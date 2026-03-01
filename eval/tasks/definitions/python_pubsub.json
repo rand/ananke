@@ -1,0 +1,50 @@
+{
+  "id": "python_006_pubsub",
+  "version": "1.0.0",
+  "title": "Type-Safe Pub/Sub Message Broker",
+  "description": "Implement a type-safe publish/subscribe message broker with topic filtering, async subscribers, and message replay capability.",
+  "category": "messaging",
+  "language": "python",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Redis Pub/Sub and ZeroMQ",
+    "complexity": {
+      "time": "O(s) where s = subscribers per topic",
+      "space": "O(m) where m = message history"
+    },
+    "tags": [
+      "pubsub",
+      "async",
+      "messaging",
+      "generics"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'MessageBroker'",
+    "Implement subscribe(topic, handler) returning subscription ID",
+    "Implement unsubscribe(subscription_id)",
+    "Implement publish(topic, message) with async delivery",
+    "Support topic patterns with wildcards (e.g., 'user.*')",
+    "Implement message history with configurable retention",
+    "Implement replay(topic, from_id) for new subscribers",
+    "Use typing.Generic for type-safe message types"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/pubsub.py",
+  "test_suite_path": "eval/tasks/fixtures/python/pubsub_test.py",
+  "constraint_path": "eval/tasks/constraints/python_pubsub.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Match topic against pattern with wildcards.",
+      "code": "import fnmatch\n\ndef topic_matches(pattern: str, topic: str) -> bool:\n    \"\"\"Match topic against pattern. '*' matches one segment, '#' matches multiple.\"\"\"\n    pattern_parts = pattern.split('.')\n    topic_parts = topic.split('.')\n    \n    if '#' in pattern_parts:\n        idx = pattern_parts.index('#')\n        return pattern_parts[:idx] == topic_parts[:idx]\n    \n    if len(pattern_parts) != len(topic_parts):\n        return False\n    \n    return all(p == '*' or p == t for p, t in zip(pattern_parts, topic_parts))"
+    },
+    {
+      "prompt": "Type-safe generic message handler.",
+      "code": "from typing import Generic, TypeVar, Callable, Awaitable\n\nT = TypeVar('T')\n\nclass Subscription(Generic[T]):\n    def __init__(self, topic: str, handler: Callable[[T], Awaitable[None]]):\n        self.topic = topic\n        self.handler = handler\n    \n    async def deliver(self, message: T) -> None:\n        await self.handler(message)"
+    }
+  ]
+}

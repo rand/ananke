@@ -1,0 +1,50 @@
+{
+  "id": "c_004_string_builder",
+  "version": "1.0.0",
+  "title": "Dynamic String Builder",
+  "description": "Implement a dynamic string builder in C that efficiently handles string concatenation with automatic buffer resizing.",
+  "category": "utilities",
+  "language": "c",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "StringBuilder patterns",
+    "complexity": {
+      "time": "O(1) amortized append",
+      "space": "O(n) where n = total length"
+    },
+    "tags": [
+      "strings",
+      "dynamic-allocation",
+      "buffer-management",
+      "utilities"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Struct must be named 'string_builder_t'",
+    "Implement sb_create() returning new builder with initial capacity",
+    "Implement sb_destroy(sb) freeing resources",
+    "Implement sb_append(sb, str) appending null-terminated string",
+    "Implement sb_append_char(sb, c) appending single character",
+    "Implement sb_append_fmt(sb, fmt, ...) for formatted append",
+    "Implement sb_to_string(sb) returning owned null-terminated string",
+    "Double capacity on resize for amortized O(1) appends"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/c/string_builder.c",
+  "test_suite_path": "eval/tasks/fixtures/c/string_builder_test.c",
+  "constraint_path": "eval/tasks/constraints/c_string_builder.json",
+  "expected_loc": 60,
+  "few_shot_examples": [
+    {
+      "prompt": "Ensure buffer has capacity for additional bytes.",
+      "code": "static int ensure_capacity(string_builder_t* sb, size_t additional) {\n    size_t required = sb->length + additional + 1;\n    if (required <= sb->capacity) return 1;\n    size_t new_cap = sb->capacity * 2;\n    while (new_cap < required) new_cap *= 2;\n    char* new_buf = realloc(sb->buffer, new_cap);\n    if (!new_buf) return 0;\n    sb->buffer = new_buf;\n    sb->capacity = new_cap;\n    return 1;\n}"
+    },
+    {
+      "prompt": "Variadic function wrapper for vsnprintf.",
+      "code": "#include <stdarg.h>\n#include <stdio.h>\n\nint sb_append_fmt(string_builder_t* sb, const char* fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    int needed = vsnprintf(NULL, 0, fmt, args);\n    va_end(args);\n    if (needed < 0) return -1;\n    if (!ensure_capacity(sb, needed)) return -1;\n    va_start(args, fmt);\n    vsnprintf(sb->buffer + sb->length, needed + 1, fmt, args);\n    va_end(args);\n    sb->length += needed;\n    return needed;\n}"
+    }
+  ]
+}

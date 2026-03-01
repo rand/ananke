@@ -1,0 +1,52 @@
+{
+  "id": "chain_sort_003_external",
+  "version": "1.0.0",
+  "title": "External Merge Sort",
+  "description": "Implement external merge sort for data that doesn't fit in memory, using file-based chunking and k-way merge.",
+  "category": "algorithms",
+  "language": "go",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n log n)",
+      "space": "O(chunk_size) memory"
+    },
+    "tags": [
+      "sorting",
+      "external-sort",
+      "file-io",
+      "streaming"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "sort",
+    "chain_position": 3
+  },
+  "requirements": [
+    "Build on chain_sort_002 concepts",
+    "Function ExternalSort(input io.Reader, output io.Writer, chunkSize int)",
+    "Split input into sorted chunks that fit in memory",
+    "Write sorted chunks to temporary files",
+    "Implement k-way merge of sorted chunks",
+    "Use min-heap for efficient merge",
+    "Clean up temporary files after completion",
+    "Support custom serialization via Encoder/Decoder interfaces"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/sort/chain_sort_3.go",
+  "test_suite_path": "eval/tasks/fixtures/go/sort/chain_sort_3_test.go",
+  "constraint_path": "eval/tasks/constraints/chain_sort_3.json",
+  "expected_loc": 100,
+  "few_shot_examples": [
+    {
+      "prompt": "K-way merge using min-heap.",
+      "code": "import \"container/heap\"\n\ntype mergeItem struct {\n    value   int\n    chunkID int\n}\n\ntype mergeHeap []mergeItem\n\nfunc (h mergeHeap) Len() int           { return len(h) }\nfunc (h mergeHeap) Less(i, j int) bool { return h[i].value < h[j].value }\nfunc (h mergeHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }\nfunc (h *mergeHeap) Push(x any)        { *h = append(*h, x.(mergeItem)) }\nfunc (h *mergeHeap) Pop() any {\n    old := *h\n    n := len(old)\n    x := old[n-1]\n    *h = old[0 : n-1]\n    return x\n}"
+    },
+    {
+      "prompt": "Read and sort chunks from input.",
+      "code": "func sortChunks(input io.Reader, chunkSize int) ([]string, error) {\n    var chunks []string\n    buffer := make([]int, 0, chunkSize)\n    scanner := bufio.NewScanner(input)\n    \n    for scanner.Scan() {\n        val, _ := strconv.Atoi(scanner.Text())\n        buffer = append(buffer, val)\n        \n        if len(buffer) >= chunkSize {\n            sort.Ints(buffer)\n            filename, _ := writeChunk(buffer)\n            chunks = append(chunks, filename)\n            buffer = buffer[:0]\n        }\n    }\n    if len(buffer) > 0 {\n        sort.Ints(buffer)\n        filename, _ := writeChunk(buffer)\n        chunks = append(chunks, filename)\n    }\n    return chunks, nil\n}"
+    }
+  ]
+}

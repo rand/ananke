@@ -1,0 +1,26 @@
+{
+  "task_id": "javascript_006_promise_utils",
+  "constraints": {
+    "grammar": "function promiseAllSettled(promises) { }\nfunction promiseAny(promises) { }\nfunction promiseTimeout(promise, ms) { }\nfunction retry(fn, options) { }",
+    "regex_pattern": "function\\s+promiseAllSettled|function\\s+promiseAny|function\\s+promiseTimeout|function\\s+retry",
+    "type_constraints": {
+      "functions": [
+        {"name": "promiseAllSettled", "return_type": "Promise<Array>"},
+        {"name": "promiseAny", "return_type": "Promise"},
+        {"name": "promiseTimeout", "return_type": "Promise"},
+        {"name": "retry", "return_type": "Promise"}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["promiseAllSettled", "promiseAny", "promiseTimeout", "retry"],
+      "variable_patterns": ["results", "errors", "attempts", "timeout"]
+    },
+    "structural_constraints": {
+      "must_use": ["Promise constructor", "async/await or .then()"],
+      "must_not_use": ["Promise.allSettled", "Promise.any directly"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/javascript/promise_utils.js",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,26 @@
+{
+  "task_id": "java_004_stream_collector",
+  "constraints": {
+    "grammar": "public class CustomCollectors {\n  public static <T> Collector<T, ?, ImmutableList<T>> toImmutableList() { }\n  public static <T, K> Collector<T, ?, Map<K, List<T>>> groupingByOrdered(Function<T, K> classifier) { }\n  public static <T> Collector<T, ?, Optional<T>> onlyElement() { }\n}",
+    "regex_pattern": "public\\s+class\\s+CustomCollectors|public\\s+static.*Collector<",
+    "type_constraints": {
+      "classes": ["CustomCollectors"],
+      "methods": [
+        {"name": "toImmutableList", "return_type": "Collector<T, ?, ImmutableList<T>>"},
+        {"name": "groupingByOrdered", "return_type": "Collector<T, ?, Map<K, List<T>>>"},
+        {"name": "onlyElement", "return_type": "Collector<T, ?, Optional<T>>"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["CustomCollectors"],
+      "method_names": ["toImmutableList", "groupingByOrdered", "onlyElement"]
+    },
+    "structural_constraints": {
+      "must_use": ["Collector.of", "supplier/accumulator/combiner/finisher"],
+      "must_not_use": ["Guava collectors"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/java/stream_collector.java",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,52 @@
+{
+  "id": "chain_cache_003_distributed",
+  "version": "1.0.0",
+  "title": "Distributed Cache Interface",
+  "description": "Design a trait-based distributed cache interface with TTL, multiple backends, and async operations.",
+  "category": "caching",
+  "language": "rust",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(1) local, O(network) distributed",
+      "space": "O(capacity)"
+    },
+    "tags": [
+      "distributed",
+      "async",
+      "traits",
+      "TTL"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "cache",
+    "chain_position": 3
+  },
+  "requirements": [
+    "Build on chain_cache_002 LRU concepts",
+    "Define CacheBackend trait with async methods",
+    "Implement get, set, delete, exists methods",
+    "Support TTL (time-to-live) for entries",
+    "Implement local memory backend",
+    "Define interface for Redis-compatible backend",
+    "Support cache-aside pattern (read-through, write-through)",
+    "Implement multi-level cache (L1 local, L2 distributed)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/rust/chain_cache_3.rs",
+  "test_suite_path": "eval/tasks/fixtures/rust/chain_cache_3_test.rs",
+  "constraint_path": "eval/tasks/constraints/chain_cache_3.json",
+  "expected_loc": 90,
+  "few_shot_examples": [
+    {
+      "prompt": "Define async cache backend trait.",
+      "code": "use async_trait::async_trait;\nuse std::time::Duration;\n\n#[async_trait]\npub trait CacheBackend: Send + Sync {\n    type Error;\n    \n    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Self::Error>;\n    async fn set(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> Result<(), Self::Error>;\n    async fn delete(&self, key: &str) -> Result<bool, Self::Error>;\n    async fn exists(&self, key: &str) -> Result<bool, Self::Error>;\n}"
+    },
+    {
+      "prompt": "Implement multi-level cache with fallback.",
+      "code": "pub struct MultiLevelCache<L1, L2> {\n    l1: L1,  // local (fast)\n    l2: L2,  // distributed (slow)\n}\n\nimpl<L1: CacheBackend, L2: CacheBackend> MultiLevelCache<L1, L2> {\n    pub async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, CacheError> {\n        // Try L1 first\n        if let Some(value) = self.l1.get(key).await? {\n            return Ok(Some(value));\n        }\n        // Fall back to L2\n        if let Some(value) = self.l2.get(key).await? {\n            // Populate L1\n            self.l1.set(key, &value, None).await?;\n            return Ok(Some(value));\n        }\n        Ok(None)\n    }\n}"
+    }
+  ]
+}

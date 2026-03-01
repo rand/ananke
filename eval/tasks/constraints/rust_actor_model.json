@@ -1,0 +1,29 @@
+{
+  "task_id": "rust_actor_model",
+  "constraints": {
+    "grammar": "pub struct Actor<M> { }\nimpl<M: Send + 'static> Actor<M> {\n  pub fn spawn(handler: impl FnMut(M)) -> ActorRef<M> { }\n}\npub struct ActorRef<M> { }\nimpl<M: Send + 'static> ActorRef<M> {\n  pub fn send(&self, msg: M) -> Result<(), SendError<M>> { }\n}",
+    "regex_pattern": "pub\\s+struct\\s+Actor<M>",
+    "type_constraints": {
+      "structs": [
+        {"name": "Actor", "generics": ["M"]},
+        {"name": "ActorRef", "generics": ["M"]}
+      ],
+      "traits": ["Send", "'static"],
+      "methods": [
+        {"name": "spawn", "return_type": "ActorRef<M>"},
+        {"name": "send", "return_type": "Result<(), SendError<M>>"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["Actor", "ActorRef"],
+      "variable_patterns": ["sender", "receiver", "handler", "msg"]
+    },
+    "structural_constraints": {
+      "must_use": ["mpsc channel", "thread spawn", "Arc or similar for shared state"],
+      "must_not_use": ["unsafe without justification", "global mutable state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/actor_model.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

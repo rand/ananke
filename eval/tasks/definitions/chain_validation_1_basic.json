@@ -1,0 +1,47 @@
+{
+  "id": "chain_validation_001_basic",
+  "version": "1.0.0",
+  "title": "Basic Input Validation",
+  "description": "Implement basic input validation functions for strings and numbers with type guards.",
+  "category": "validation",
+  "language": "typescript",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n) for string validation",
+      "space": "O(1)"
+    },
+    "tags": [
+      "validation",
+      "type-guards",
+      "basics"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "validation",
+    "chain_position": 1
+  },
+  "requirements": [
+    "Function isNonEmptyString(value: unknown): value is string",
+    "Function isPositiveNumber(value: unknown): value is number",
+    "Function isValidEmail(email: string): boolean",
+    "Function isInRange(num: number, min: number, max: number): boolean",
+    "Email validation using regex pattern",
+    "Type guards should narrow types correctly",
+    "Handle null/undefined inputs gracefully",
+    "Return false for invalid types (no exceptions)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/typescript/chain_validation_1.ts",
+  "test_suite_path": "eval/tasks/fixtures/typescript/chain_validation_1_test.ts",
+  "constraint_path": "eval/tasks/constraints/chain_validation_1.json",
+  "expected_loc": 30,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a type guard for non-empty strings.",
+      "code": "function isNonEmptyString(value: unknown): value is string {\n  return typeof value === 'string' && value.length > 0;\n}"
+    }
+  ]
+}

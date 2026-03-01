@@ -1,0 +1,26 @@
+{
+  "task_id": "rust_003_result_handling",
+  "constraints": {
+    "grammar": "pub fn parse_config(path: &Path) -> Result<Config, ConfigError> { }\npub enum ConfigError {\n  IoError(std::io::Error),\n  ParseError(String),\n  ValidationError(String),\n}\nimpl From<std::io::Error> for ConfigError { }",
+    "regex_pattern": "pub\\s+fn\\s+parse_config|pub\\s+enum\\s+ConfigError",
+    "type_constraints": {
+      "functions": [
+        {"name": "parse_config", "return_type": "Result<Config, ConfigError>"}
+      ],
+      "enums": ["ConfigError"],
+      "traits_implemented": ["From<std::io::Error>", "Display", "Error"]
+    },
+    "naming_constraints": {
+      "function_names": ["parse_config"],
+      "enum_names": ["ConfigError"],
+      "variable_patterns": ["config", "error", "path"]
+    },
+    "structural_constraints": {
+      "must_use": ["? operator", "From trait", "custom error enum"],
+      "must_not_use": ["unwrap()", "expect()"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/result_handling.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

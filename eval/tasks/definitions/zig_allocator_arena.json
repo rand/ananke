@@ -1,0 +1,50 @@
+{
+  "id": "zig_002_allocator_arena",
+  "version": "1.0.0",
+  "title": "Arena Allocator Implementation",
+  "description": "Implement a simple arena allocator in Zig that implements the Allocator interface. The arena should support bulk allocation and single-operation deallocation.",
+  "category": "system_utilities",
+  "language": "zig",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Zig memory management patterns",
+    "complexity": {
+      "time": "O(1) alloc, O(1) reset",
+      "space": "O(n) where n = total allocations"
+    },
+    "tags": [
+      "allocator",
+      "memory-management",
+      "arena",
+      "low-level"
+    ],
+    "constraint_types": [
+      "type_constraints",
+      "pattern_constraints"
+    ]
+  },
+  "requirements": [
+    "Struct must be named 'ArenaAllocator'",
+    "Implement std.mem.Allocator interface",
+    "Back the arena with a child allocator (configurable)",
+    "Support alloc, resize, and free operations",
+    "Implement reset() to free all allocations at once",
+    "Track total bytes allocated",
+    "Handle alignment requirements correctly",
+    "Support deinit() for cleanup"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/zig/allocator_arena.zig",
+  "test_suite_path": "eval/tasks/fixtures/zig/allocator_arena_test.zig",
+  "constraint_path": "eval/tasks/constraints/zig_allocator_arena.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple bump allocator.",
+      "code": "const BumpAllocator = struct {\n    buffer: []u8,\n    offset: usize = 0,\n\n    pub fn alloc(self: *BumpAllocator, size: usize) ?[]u8 {\n        if (self.offset + size > self.buffer.len) return null;\n        const ptr = self.buffer[self.offset..][0..size];\n        self.offset += size;\n        return ptr;\n    }\n\n    pub fn reset(self: *BumpAllocator) void {\n        self.offset = 0;\n    }\n};"
+    },
+    {
+      "prompt": "Create an allocator vtable function for alloc.",
+      "code": "fn allocFn(ctx: *anyopaque, len: usize, ptr_align: u8, ret_addr: usize) ?[*]u8 {\n    _ = ret_addr;\n    const self: *MyAllocator = @ptrCast(@alignCast(ctx));\n    const aligned_offset = std.mem.alignForward(usize, self.offset, @as(usize, 1) << @intCast(ptr_align));\n    if (aligned_offset + len > self.buffer.len) return null;\n    const ptr = self.buffer.ptr + aligned_offset;\n    self.offset = aligned_offset + len;\n    return ptr;\n}"
+    }
+  ]
+}

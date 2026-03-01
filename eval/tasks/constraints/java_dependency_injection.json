@@ -1,0 +1,28 @@
+{
+  "task_id": "java_002_dependency_injection",
+  "constraints": {
+    "grammar": "public class Container {\n  public <T> void register(Class<T> type, Supplier<T> factory) { }\n  public <T> void registerSingleton(Class<T> type, Supplier<T> factory) { }\n  public <T> T resolve(Class<T> type) { }\n}\n@interface Inject { }",
+    "regex_pattern": "public\\s+class\\s+Container|@interface\\s+Inject",
+    "type_constraints": {
+      "classes": ["Container"],
+      "annotations": ["Inject"],
+      "methods": [
+        {"name": "register", "return_type": "void"},
+        {"name": "registerSingleton", "return_type": "void"},
+        {"name": "resolve", "return_type": "T"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["Container"],
+      "annotation_names": ["Inject"],
+      "variable_patterns": ["factory", "instances", "type"]
+    },
+    "structural_constraints": {
+      "must_use": ["generics", "reflection", "Supplier interface"],
+      "must_not_use": ["Spring framework", "Guice"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/java/dependency_injection.java",
+  "extraction_method": "generated",
+  "verified": false
+}

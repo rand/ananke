@@ -1,0 +1,50 @@
+{
+  "id": "rust_003_actor_model",
+  "version": "1.0.0",
+  "title": "Minimal Actor System",
+  "description": "Implement a minimal actor system in Rust using message passing with typed messages and supervision for failure handling.",
+  "category": "concurrency",
+  "language": "rust",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Actix and Erlang OTP",
+    "complexity": {
+      "time": "O(1) message send",
+      "space": "O(m) where m = mailbox size"
+    },
+    "tags": [
+      "actors",
+      "concurrency",
+      "message-passing",
+      "supervision"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Trait must be named 'Actor'",
+    "Define Message trait for typed messages",
+    "Implement ActorRef<A> for sending messages",
+    "Implement Context for actor self-reference and spawning",
+    "Use mpsc channels for message passing",
+    "Support async message handling",
+    "Implement basic supervision (restart on panic)",
+    "Return handle for waiting on actor completion"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/rust/actor_model.rs",
+  "test_suite_path": "eval/tasks/fixtures/rust/actor_model_test.rs",
+  "constraint_path": "eval/tasks/constraints/rust_actor_model.json",
+  "expected_loc": 80,
+  "few_shot_examples": [
+    {
+      "prompt": "Define actor and message traits.",
+      "code": "use std::any::Any;\n\npub trait Message: Send + 'static {}\n\npub trait Actor: Send + 'static {\n    type Msg: Message;\n    \n    fn receive(&mut self, msg: Self::Msg, ctx: &mut Context<Self>)\n    where\n        Self: Sized;\n}"
+    },
+    {
+      "prompt": "Implement actor ref for message sending.",
+      "code": "use tokio::sync::mpsc;\n\npub struct ActorRef<A: Actor> {\n    sender: mpsc::Sender<A::Msg>,\n}\n\nimpl<A: Actor> ActorRef<A> {\n    pub async fn send(&self, msg: A::Msg) -> Result<(), SendError> {\n        self.sender.send(msg).await.map_err(|_| SendError::Disconnected)\n    }\n}"
+    }
+  ]
+}

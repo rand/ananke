@@ -1,0 +1,50 @@
+{
+  "id": "python_005_retry_decorator",
+  "version": "1.0.0",
+  "title": "Retry Decorator with Exponential Backoff",
+  "description": "Implement a retry decorator supporting both sync and async functions with configurable exponential backoff and jitter.",
+  "category": "utilities",
+  "language": "python",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "tenacity library",
+    "complexity": {
+      "time": "O(r * backoff) where r = retries",
+      "space": "O(1)"
+    },
+    "tags": [
+      "decorators",
+      "retry",
+      "async",
+      "error-handling"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Decorator must be named 'retry'",
+    "Accept max_retries, base_delay, max_delay parameters",
+    "Support exponential backoff with configurable factor",
+    "Support jitter (randomized delay component)",
+    "Accept exceptions parameter to specify retriable errors",
+    "Support both sync and async functions",
+    "Call on_retry callback with attempt number and exception",
+    "Raise last exception after all retries exhausted"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/retry_decorator.py",
+  "test_suite_path": "eval/tasks/fixtures/python/retry_decorator_test.py",
+  "constraint_path": "eval/tasks/constraints/python_retry_decorator.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement basic retry decorator.",
+      "code": "import functools\nimport time\n\ndef retry(max_retries=3):\n    def decorator(func):\n        @functools.wraps(func)\n        def wrapper(*args, **kwargs):\n            for attempt in range(max_retries):\n                try:\n                    return func(*args, **kwargs)\n                except Exception as e:\n                    if attempt == max_retries - 1:\n                        raise\n                    time.sleep(1)\n        return wrapper\n    return decorator"
+    },
+    {
+      "prompt": "Calculate exponential backoff with jitter.",
+      "code": "import random\n\ndef calculate_backoff(attempt, base_delay, max_delay, factor=2, jitter=True):\n    delay = min(base_delay * (factor ** attempt), max_delay)\n    if jitter:\n        delay = delay * (0.5 + random.random())\n    return delay"
+    }
+  ]
+}

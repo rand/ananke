@@ -1,0 +1,27 @@
+{
+  "task_id": "chain_cache_001_memoize",
+  "constraints": {
+    "grammar": "pub struct Memoize<F, K, V> { }\nimpl<F, K, V> Memoize<F, K, V>\nwhere K: Hash + Eq + Clone, V: Clone, F: Fn(K) -> V {\n  pub fn new(func: F) -> Self { }\n  pub fn call(&mut self, key: K) -> V { }\n  pub fn clear(&mut self) { }\n}",
+    "regex_pattern": "pub\\s+struct\\s+Memoize<",
+    "type_constraints": {
+      "structs": [{"name": "Memoize", "generics": ["F", "K", "V"]}],
+      "trait_bounds": ["Hash", "Eq", "Clone"],
+      "methods": [
+        {"name": "new", "return_type": "Self"},
+        {"name": "call", "return_type": "V"},
+        {"name": "clear", "return_type": "()"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["Memoize"],
+      "variable_patterns": ["cache", "func", "key", "value"]
+    },
+    "structural_constraints": {
+      "must_use": ["HashMap", "Clone trait"],
+      "must_not_use": ["unsafe", "global state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_cache_1.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

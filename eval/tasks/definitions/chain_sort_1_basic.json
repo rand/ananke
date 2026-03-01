@@ -1,0 +1,47 @@
+{
+  "id": "chain_sort_001_basic",
+  "version": "1.0.0",
+  "title": "Basic Sorting Algorithms",
+  "description": "Implement basic sorting algorithms (quicksort, mergesort) with generic type support using Go generics.",
+  "category": "algorithms",
+  "language": "go",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n log n) average",
+      "space": "O(log n) quicksort, O(n) mergesort"
+    },
+    "tags": [
+      "sorting",
+      "generics",
+      "algorithms"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "sort",
+    "chain_position": 1
+  },
+  "requirements": [
+    "Function QuickSort[T constraints.Ordered](slice []T)",
+    "Function MergeSort[T constraints.Ordered](slice []T) []T",
+    "In-place quicksort with good pivot selection",
+    "Stable mergesort returning new slice",
+    "Handle empty and single-element slices",
+    "Use generics for type-safe comparison",
+    "Avoid quadratic worst case in quicksort",
+    "Implement InsertionSort for small subarrays"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/sort/chain_sort_1.go",
+  "test_suite_path": "eval/tasks/fixtures/go/sort/chain_sort_1_test.go",
+  "constraint_path": "eval/tasks/constraints/chain_sort_1.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Generic quicksort with median-of-three pivot.",
+      "code": "import \"golang.org/x/exp/constraints\"\n\nfunc QuickSort[T constraints.Ordered](arr []T) {\n    if len(arr) <= 1 {\n        return\n    }\n    quicksortHelper(arr, 0, len(arr)-1)\n}\n\nfunc medianOfThree[T constraints.Ordered](arr []T, lo, hi int) int {\n    mid := lo + (hi-lo)/2\n    if arr[mid] < arr[lo] {\n        arr[lo], arr[mid] = arr[mid], arr[lo]\n    }\n    if arr[hi] < arr[lo] {\n        arr[lo], arr[hi] = arr[hi], arr[lo]\n    }\n    if arr[hi] < arr[mid] {\n        arr[mid], arr[hi] = arr[hi], arr[mid]\n    }\n    return mid\n}"
+    }
+  ]
+}

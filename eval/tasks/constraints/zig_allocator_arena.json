@@ -1,0 +1,27 @@
+{
+  "task_id": "zig_002_allocator_arena",
+  "constraints": {
+    "grammar": "pub const ArenaAllocator = struct {\n  pub fn init(child_allocator: Allocator) ArenaAllocator { }\n  pub fn deinit(self: *ArenaAllocator) void { }\n  pub fn reset(self: *ArenaAllocator) void { }\n  pub fn allocator(self: *ArenaAllocator) Allocator { }\n};",
+    "regex_pattern": "pub\\s+const\\s+ArenaAllocator\\s*=\\s*struct",
+    "type_constraints": {
+      "structs": ["ArenaAllocator"],
+      "methods": [
+        {"name": "init", "return_type": "ArenaAllocator"},
+        {"name": "deinit", "return_type": "void"},
+        {"name": "reset", "return_type": "void"},
+        {"name": "allocator", "return_type": "Allocator"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["ArenaAllocator"],
+      "variable_patterns": ["child", "buffer", "end_index"]
+    },
+    "structural_constraints": {
+      "must_use": ["Allocator interface", "linked list of buffers or similar"],
+      "must_not_use": ["std.heap.ArenaAllocator directly"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/zig/allocator_arena.zig",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,47 @@
+{
+  "id": "chain_cache_001_memoize",
+  "version": "1.0.0",
+  "title": "Basic Memoization",
+  "description": "Implement a basic memoization wrapper for pure functions using a HashMap cache.",
+  "category": "caching",
+  "language": "rust",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(1) cache hit, O(f) cache miss",
+      "space": "O(n) cached results"
+    },
+    "tags": [
+      "memoization",
+      "caching",
+      "closures"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "cache",
+    "chain_position": 1
+  },
+  "requirements": [
+    "Struct must be named 'Memoize<F, K, V>'",
+    "Accept a function F: Fn(K) -> V",
+    "Implement call(&mut self, key: K) -> V",
+    "Use HashMap for caching results",
+    "Key type must be Hash + Eq + Clone",
+    "Value type must be Clone",
+    "Cache hits should not re-call function",
+    "Implement clear() to reset cache"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/rust/chain_cache_1.rs",
+  "test_suite_path": "eval/tasks/fixtures/rust/chain_cache_1_test.rs",
+  "constraint_path": "eval/tasks/constraints/chain_cache_1.json",
+  "expected_loc": 30,
+  "few_shot_examples": [
+    {
+      "prompt": "Basic memoization struct.",
+      "code": "use std::collections::HashMap;\nuse std::hash::Hash;\n\npub struct Memoize<F, K, V>\nwhere\n    K: Hash + Eq + Clone,\n    V: Clone,\n{\n    func: F,\n    cache: HashMap<K, V>,\n}\n\nimpl<F, K, V> Memoize<F, K, V>\nwhere\n    K: Hash + Eq + Clone,\n    V: Clone,\n    F: Fn(K) -> V,\n{\n    pub fn new(func: F) -> Self {\n        Memoize {\n            func,\n            cache: HashMap::new(),\n        }\n    }\n}"
+    }
+  ]
+}

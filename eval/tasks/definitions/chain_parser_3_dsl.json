@@ -1,0 +1,52 @@
+{
+  "id": "chain_parser_003_dsl",
+  "version": "1.0.0",
+  "title": "DSL Parser with AST",
+  "description": "Implement a parser for a simple DSL (query language) with lexer, parser, and AST representation.",
+  "category": "parsing",
+  "language": "python",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n) lexing + O(n) parsing",
+      "space": "O(n) for AST"
+    },
+    "tags": [
+      "parsing",
+      "DSL",
+      "AST",
+      "compilers"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "parser",
+    "chain_position": 3
+  },
+  "requirements": [
+    "Build on chain_parser_002 concepts",
+    "Parse query DSL: SELECT fields FROM table WHERE conditions",
+    "Implement Lexer class producing Token stream",
+    "Implement Parser class producing AST nodes",
+    "Define AST node types: Select, Field, Table, Where, BinaryOp, etc.",
+    "Support operators: =, !=, <, >, AND, OR, NOT",
+    "Support nested expressions with parentheses",
+    "Implement AST visitor pattern for evaluation/compilation"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/chain_parser_3.py",
+  "test_suite_path": "eval/tasks/fixtures/python/chain_parser_3_test.py",
+  "constraint_path": "eval/tasks/constraints/chain_parser_3.json",
+  "expected_loc": 120,
+  "few_shot_examples": [
+    {
+      "prompt": "Define AST node types.",
+      "code": "from dataclasses import dataclass\nfrom typing import List, Union\nfrom abc import ABC, abstractmethod\n\nclass ASTNode(ABC):\n    @abstractmethod\n    def accept(self, visitor: 'Visitor') -> any:\n        pass\n\n@dataclass\nclass SelectNode(ASTNode):\n    fields: List['FieldNode']\n    table: 'TableNode'\n    where: Optional['WhereNode'] = None\n    \n    def accept(self, visitor):\n        return visitor.visit_select(self)\n\n@dataclass\nclass BinaryOpNode(ASTNode):\n    op: str\n    left: ASTNode\n    right: ASTNode\n    \n    def accept(self, visitor):\n        return visitor.visit_binary_op(self)"
+    },
+    {
+      "prompt": "Recursive descent parser for expressions.",
+      "code": "class Parser:\n    def parse_expression(self) -> ASTNode:\n        return self.parse_or()\n    \n    def parse_or(self) -> ASTNode:\n        left = self.parse_and()\n        while self.match('OR'):\n            right = self.parse_and()\n            left = BinaryOpNode('OR', left, right)\n        return left\n    \n    def parse_and(self) -> ASTNode:\n        left = self.parse_comparison()\n        while self.match('AND'):\n            right = self.parse_comparison()\n            left = BinaryOpNode('AND', left, right)\n        return left"
+    }
+  ]
+}

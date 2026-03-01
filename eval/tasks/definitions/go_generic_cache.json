@@ -1,0 +1,50 @@
+{
+  "id": "go_004_generic_cache",
+  "version": "1.0.0",
+  "title": "Generic LRU Cache",
+  "description": "Implement a generic LRU cache using Go 1.18+ generics with TTL support and concurrent access safety.",
+  "category": "data_structures",
+  "language": "go",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "hashicorp/golang-lru",
+    "complexity": {
+      "time": "O(1) get/put",
+      "space": "O(n) where n = capacity"
+    },
+    "tags": [
+      "generics",
+      "caching",
+      "LRU",
+      "concurrency"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Type must be named 'Cache[K comparable, V any]'",
+    "Implement NewCache[K, V](capacity int) returning *Cache[K, V]",
+    "Implement Get(key K) (V, bool) returning value and found flag",
+    "Implement Put(key K, value V) adding or updating entry",
+    "Implement PutWithTTL(key K, value V, ttl time.Duration)",
+    "Evict least recently used when at capacity",
+    "Thread-safe with sync.RWMutex",
+    "Implement Len() and Clear() methods"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/cache/generic_cache.go",
+  "test_suite_path": "eval/tasks/fixtures/go/cache/generic_cache_test.go",
+  "constraint_path": "eval/tasks/constraints/go_generic_cache.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Define generic cache structure.",
+      "code": "type entry[V any] struct {\n    value     V\n    expiresAt time.Time\n}\n\ntype Cache[K comparable, V any] struct {\n    capacity int\n    items    map[K]*list.Element\n    order    *list.List\n    mutex    sync.RWMutex\n}\n\nfunc NewCache[K comparable, V any](capacity int) *Cache[K, V] {\n    return &Cache[K, V]{\n        capacity: capacity,\n        items:    make(map[K]*list.Element),\n        order:    list.New(),\n    }\n}"
+    },
+    {
+      "prompt": "Move accessed item to front of LRU list.",
+      "code": "func (c *Cache[K, V]) Get(key K) (V, bool) {\n    c.mutex.Lock()\n    defer c.mutex.Unlock()\n    \n    if elem, ok := c.items[key]; ok {\n        entry := elem.Value.(*entry[V])\n        if !entry.expiresAt.IsZero() && time.Now().After(entry.expiresAt) {\n            c.removeElement(elem, key)\n            var zero V\n            return zero, false\n        }\n        c.order.MoveToFront(elem)\n        return entry.value, true\n    }\n    var zero V\n    return zero, false\n}"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "task_id": "chain_sort_002_custom",
+  "constraints": {
+    "grammar": "import \"golang.org/x/exp/constraints\"\n\nfunc SortBy[T any](arr []T, less func(a, b T) bool) { }\nfunc StableSort[T any](arr []T, less func(a, b T) bool) { }\nfunc SortByKey[T any, K constraints.Ordered](arr []T, key func(T) K) { }",
+    "regex_pattern": "func\\s+SortBy\\[T\\s+any\\]",
+    "type_constraints": {
+      "functions": [
+        {"name": "SortBy", "generics": ["T any"], "parameters": ["arr []T", "less func(a, b T) bool"]},
+        {"name": "StableSort", "generics": ["T any"], "parameters": ["arr []T", "less func(a, b T) bool"]},
+        {"name": "SortByKey", "generics": ["T any", "K constraints.Ordered"], "parameters": ["arr []T", "key func(T) K"]}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["SortBy", "StableSort", "SortByKey"],
+      "variable_patterns": ["less", "key", "comparator"]
+    },
+    "structural_constraints": {
+      "must_use": ["custom comparator functions", "stable sort algorithm for StableSort"],
+      "must_not_use": ["sort.Slice directly", "reflection"]
+    },
+    "complexity_constraints": {
+      "time": "O(n log n)",
+      "space": "O(n) for stable sort"
+    }
+  },
+  "chain": {
+    "id": "sort",
+    "position": 2,
+    "total": 3,
+    "builds_on": "chain_sort_001_basic"
+  },
+  "extracted_from": "eval/tasks/fixtures/go/chain_sort_2.go",
+  "extraction_method": "generated",
+  "verified": false
+}

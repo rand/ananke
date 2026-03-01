@@ -1,0 +1,28 @@
+{
+  "task_id": "python_004_dataclass_validation",
+  "constraints": {
+    "grammar": "@validated\nclass MyClass:\n    field: Type\n\nclass Field:\n    def __init__(self, validators=None): ...\n    def __set_name__(self, owner, name): ...\n    def __get__(self, obj, type=None): ...\n    def __set__(self, obj, value): ...",
+    "regex_pattern": "def\\s+validated|class\\s+Field:",
+    "type_constraints": {
+      "decorators": ["validated"],
+      "classes": ["Field", "ValidationError"],
+      "methods": [
+        {"name": "__set_name__"},
+        {"name": "__get__"},
+        {"name": "__set__"}
+      ]
+    },
+    "naming_constraints": {
+      "decorator_names": ["validated"],
+      "class_names": ["Field", "ValidationError"],
+      "variable_patterns": ["validators", "value", "name"]
+    },
+    "structural_constraints": {
+      "must_use": ["descriptor protocol", "type hints", "decorators"],
+      "must_not_use": ["pydantic", "attrs"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/python/dataclass_validation.py",
+  "extraction_method": "generated",
+  "verified": false
+}

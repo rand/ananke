@@ -1,0 +1,47 @@
+{
+  "id": "chain_parser_001_line",
+  "version": "1.0.0",
+  "title": "Line-Based Log Parser",
+  "description": "Implement a line-based parser for structured log files with timestamp, level, and message extraction.",
+  "category": "parsing",
+  "language": "python",
+  "difficulty": "simple",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n) where n = lines",
+      "space": "O(1) per line"
+    },
+    "tags": [
+      "parsing",
+      "regex",
+      "logs"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "parser",
+    "chain_position": 1
+  },
+  "requirements": [
+    "Class must be named 'LogParser'",
+    "Parse format: [TIMESTAMP] LEVEL: MESSAGE",
+    "Implement parse_line(line: str) -> LogEntry | None",
+    "Implement parse_file(path: Path) -> Iterator[LogEntry]",
+    "LogEntry dataclass with timestamp, level, message fields",
+    "Support log levels: DEBUG, INFO, WARN, ERROR, FATAL",
+    "Parse ISO 8601 timestamps",
+    "Handle malformed lines gracefully (skip or report)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/chain_parser_1.py",
+  "test_suite_path": "eval/tasks/fixtures/python/chain_parser_1_test.py",
+  "constraint_path": "eval/tasks/constraints/chain_parser_1.json",
+  "expected_loc": 35,
+  "few_shot_examples": [
+    {
+      "prompt": "Define LogEntry dataclass.",
+      "code": "from dataclasses import dataclass\nfrom datetime import datetime\nfrom enum import Enum\n\nclass LogLevel(Enum):\n    DEBUG = 'DEBUG'\n    INFO = 'INFO'\n    WARN = 'WARN'\n    ERROR = 'ERROR'\n    FATAL = 'FATAL'\n\n@dataclass\nclass LogEntry:\n    timestamp: datetime\n    level: LogLevel\n    message: str"
+    }
+  ]
+}

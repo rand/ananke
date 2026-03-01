@@ -1,0 +1,47 @@
+{
+  "id": "chain_sort_002_custom",
+  "version": "1.0.0",
+  "title": "Custom Comparator Sorting",
+  "description": "Extend sorting to support custom comparison functions and multi-key sorting with sort stability.",
+  "category": "algorithms",
+  "language": "go",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n log n)",
+      "space": "O(n) for stable sort"
+    },
+    "tags": [
+      "sorting",
+      "comparators",
+      "generics"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "sort",
+    "chain_position": 2
+  },
+  "requirements": [
+    "Build on chain_sort_001 algorithms",
+    "Function SortBy[T any](slice []T, less func(a, b T) bool)",
+    "Implement stable sort variant",
+    "Function SortByKey[T any, K constraints.Ordered](slice []T, key func(T) K)",
+    "Support multi-key sorting with ThenBy chaining",
+    "Implement reverse sorting",
+    "Handle nil comparators gracefully",
+    "Optimize for partially sorted data"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/sort/chain_sort_2.go",
+  "test_suite_path": "eval/tasks/fixtures/go/sort/chain_sort_2_test.go",
+  "constraint_path": "eval/tasks/constraints/chain_sort_2.json",
+  "expected_loc": 60,
+  "few_shot_examples": [
+    {
+      "prompt": "Sort by custom comparator.",
+      "code": "func SortBy[T any](arr []T, less func(a, b T) bool) {\n    n := len(arr)\n    for i := n/2 - 1; i >= 0; i-- {\n        heapify(arr, n, i, less)\n    }\n    for i := n - 1; i > 0; i-- {\n        arr[0], arr[i] = arr[i], arr[0]\n        heapify(arr, i, 0, less)\n    }\n}\n\nfunc heapify[T any](arr []T, n, i int, less func(a, b T) bool) {\n    largest := i\n    left, right := 2*i+1, 2*i+2\n    if left < n && less(arr[largest], arr[left]) {\n        largest = left\n    }\n    if right < n && less(arr[largest], arr[right]) {\n        largest = right\n    }\n    if largest != i {\n        arr[i], arr[largest] = arr[largest], arr[i]\n        heapify(arr, n, largest, less)\n    }\n}"
+    }
+  ]
+}

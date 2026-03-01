@@ -1,0 +1,50 @@
+{
+  "id": "javascript_003_debounce_throttle",
+  "version": "1.0.0",
+  "title": "Debounce and Throttle Utilities",
+  "description": "Implement debounce and throttle higher-order functions with support for leading/trailing edge execution and cancellation.",
+  "category": "utilities",
+  "language": "javascript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Lodash utilities",
+    "complexity": {
+      "time": "O(1) per call",
+      "space": "O(1)"
+    },
+    "tags": [
+      "higher-order-functions",
+      "timing",
+      "rate-limiting",
+      "closures"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'debounce' and 'throttle'",
+    "debounce(fn, wait, options) - delays execution until wait ms after last call",
+    "throttle(fn, wait, options) - limits execution to once per wait ms",
+    "Support options.leading (execute on first call)",
+    "Support options.trailing (execute after wait period)",
+    "Return wrapper with cancel() method",
+    "Return wrapper with flush() method for immediate execution",
+    "Preserve 'this' context when calling wrapped function"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/javascript/debounce_throttle.js",
+  "test_suite_path": "eval/tasks/fixtures/javascript/debounce_throttle_test.js",
+  "constraint_path": "eval/tasks/constraints/javascript_debounce_throttle.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple debounce function.",
+      "code": "function debounce(fn, delay) {\n  let timeoutId;\n  return function(...args) {\n    clearTimeout(timeoutId);\n    timeoutId = setTimeout(() => fn.apply(this, args), delay);\n  };\n}"
+    },
+    {
+      "prompt": "Implement a simple throttle function.",
+      "code": "function throttle(fn, limit) {\n  let inThrottle;\n  return function(...args) {\n    if (!inThrottle) {\n      fn.apply(this, args);\n      inThrottle = true;\n      setTimeout(() => inThrottle = false, limit);\n    }\n  };\n}"
+    }
+  ]
+}

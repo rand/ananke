@@ -1,0 +1,28 @@
+{
+  "task_id": "cpp_003_expected_result",
+  "constraints": {
+    "grammar": "template<typename T, typename E>\nclass Expected {\npublic:\n  Expected(T value);\n  Expected(E error);\n  bool has_value() const;\n  T& value();\n  E& error();\n  template<typename F> auto and_then(F&& f) -> Expected<...>;\n  template<typename F> auto or_else(F&& f) -> Expected<...>;\n};",
+    "regex_pattern": "template\\s*<.*>\\s*class\\s+Expected",
+    "type_constraints": {
+      "templates": [{"name": "Expected", "params": ["T", "E"]}],
+      "methods": [
+        {"name": "has_value", "return_type": "bool"},
+        {"name": "value", "return_type": "T&"},
+        {"name": "error", "return_type": "E&"},
+        {"name": "and_then"},
+        {"name": "or_else"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["Expected"],
+      "variable_patterns": ["value", "error", "has_value"]
+    },
+    "structural_constraints": {
+      "must_use": ["std::variant or union", "noexcept where appropriate"],
+      "must_not_use": ["exceptions for control flow"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/cpp/expected_result.cpp",
+  "extraction_method": "generated",
+  "verified": false
+}

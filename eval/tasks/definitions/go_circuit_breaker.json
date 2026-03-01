@@ -1,0 +1,50 @@
+{
+  "id": "go_003_circuit_breaker",
+  "version": "1.0.0",
+  "title": "Circuit Breaker Pattern",
+  "description": "Implement the circuit breaker pattern for resilient service calls with configurable thresholds and automatic recovery.",
+  "category": "resilience",
+  "language": "go",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Netflix Hystrix and Sony gobreaker",
+    "complexity": {
+      "time": "O(1) per call",
+      "space": "O(1)"
+    },
+    "tags": [
+      "circuit-breaker",
+      "resilience",
+      "fault-tolerance",
+      "patterns"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Struct must be named 'CircuitBreaker'",
+    "Implement three states: Closed, Open, HalfOpen",
+    "Accept failure threshold and timeout parameters",
+    "Implement Execute(func() (interface{}, error)) returning result or error",
+    "Track consecutive failures to trip the breaker",
+    "Automatically transition to HalfOpen after timeout",
+    "Reset to Closed on successful call in HalfOpen state",
+    "Return ErrCircuitOpen when breaker is open"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/circuitbreaker/circuit_breaker.go",
+  "test_suite_path": "eval/tasks/fixtures/go/circuitbreaker/circuit_breaker_test.go",
+  "constraint_path": "eval/tasks/constraints/go_circuit_breaker.json",
+  "expected_loc": 65,
+  "few_shot_examples": [
+    {
+      "prompt": "Define circuit breaker states.",
+      "code": "type State int\n\nconst (\n    StateClosed State = iota\n    StateOpen\n    StateHalfOpen\n)\n\ntype CircuitBreaker struct {\n    state         State\n    failures      int\n    threshold     int\n    timeout       time.Duration\n    lastFailure   time.Time\n    mutex         sync.RWMutex\n}"
+    },
+    {
+      "prompt": "Check if circuit should transition from open to half-open.",
+      "code": "func (cb *CircuitBreaker) shouldAttempt() bool {\n    cb.mutex.RLock()\n    defer cb.mutex.RUnlock()\n    \n    if cb.state == StateClosed {\n        return true\n    }\n    if cb.state == StateOpen {\n        if time.Since(cb.lastFailure) > cb.timeout {\n            return true // transition to half-open\n        }\n        return false\n    }\n    return true // half-open allows one attempt\n}"
+    }
+  ]
+}

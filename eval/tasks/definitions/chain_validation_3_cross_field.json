@@ -1,0 +1,52 @@
+{
+  "id": "chain_validation_003_cross_field",
+  "version": "1.0.0",
+  "title": "Cross-Field and Async Validation",
+  "description": "Extend schema validation with cross-field dependencies, async validators, and conditional validation rules.",
+  "category": "validation",
+  "language": "typescript",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n * f + async)",
+      "space": "O(f)"
+    },
+    "tags": [
+      "validation",
+      "async",
+      "cross-field",
+      "advanced"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "validation",
+    "chain_position": 3
+  },
+  "requirements": [
+    "Build on chain_validation_002 schema system",
+    "Add cross-field validators: when field A has value X, validate field B",
+    "Implement async validators (e.g., uniqueness checks)",
+    "Support validation dependencies (run validator A before B)",
+    "Implement conditional required fields",
+    "Add custom validator functions with access to full object",
+    "Support validation abort-early vs collect-all modes",
+    "Provide i18n-ready error messages with interpolation"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/typescript/chain_validation_3.ts",
+  "test_suite_path": "eval/tasks/fixtures/typescript/chain_validation_3_test.ts",
+  "constraint_path": "eval/tasks/constraints/chain_validation_3.json",
+  "expected_loc": 80,
+  "few_shot_examples": [
+    {
+      "prompt": "Define cross-field validation rule.",
+      "code": "interface CrossFieldRule {\n  dependsOn: string[];  // field names this rule depends on\n  validate: (value: unknown, context: ValidationContext) => ValidationError | null;\n}\n\ninterface ValidationContext {\n  data: Record<string, unknown>;  // full object being validated\n  path: string;                    // current field path\n  getFieldValue: (path: string) => unknown;\n}"
+    },
+    {
+      "prompt": "Implement async validation with Promise.all.",
+      "code": "async function validateAsync<T>(\n  data: unknown,\n  schema: AsyncSchema\n): Promise<ValidationResult<T>> {\n  const syncErrors = validateSync(data, schema);\n  if (syncErrors.length > 0 && schema.abortEarly) {\n    return { success: false, errors: syncErrors };\n  }\n  \n  const asyncResults = await Promise.all(\n    schema.asyncValidators.map(v => v.validate(data))\n  );\n  \n  const allErrors = [...syncErrors, ...asyncResults.filter(Boolean)];\n  return allErrors.length === 0\n    ? { success: true, data: data as T }\n    : { success: false, errors: allErrors };\n}"
+    }
+  ]
+}

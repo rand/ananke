@@ -1,0 +1,30 @@
+{
+  "task_id": "java_003_repository_pattern",
+  "constraints": {
+    "grammar": "public interface Repository<T, ID> {\n  Optional<T> findById(ID id);\n  List<T> findAll();\n  T save(T entity);\n  void delete(T entity);\n}\npublic abstract class BaseRepository<T, ID> implements Repository<T, ID> { }",
+    "regex_pattern": "public\\s+interface\\s+Repository<T,\\s*ID>|public\\s+abstract\\s+class\\s+BaseRepository",
+    "type_constraints": {
+      "interfaces": ["Repository"],
+      "classes": ["BaseRepository"],
+      "generic_params": ["T", "ID"],
+      "methods": [
+        {"name": "findById", "return_type": "Optional<T>"},
+        {"name": "findAll", "return_type": "List<T>"},
+        {"name": "save", "return_type": "T"},
+        {"name": "delete", "return_type": "void"}
+      ]
+    },
+    "naming_constraints": {
+      "interface_names": ["Repository"],
+      "class_names": ["BaseRepository"],
+      "method_prefixes": ["find", "save", "delete"]
+    },
+    "structural_constraints": {
+      "must_use": ["Optional", "generics", "abstract base class"],
+      "must_not_use": ["JPA", "Spring Data"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/java/repository_pattern.java",
+  "extraction_method": "generated",
+  "verified": false
+}

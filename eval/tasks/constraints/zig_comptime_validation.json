@@ -1,0 +1,24 @@
+{
+  "task_id": "zig_003_comptime_validation",
+  "constraints": {
+    "grammar": "pub fn validate(comptime T: type) void {\n  // Comptime validation of type T\n}\npub fn ValidatedStruct(comptime T: type) type {\n  return struct { ... };\n}",
+    "regex_pattern": "pub\\s+fn\\s+validate\\(comptime|pub\\s+fn\\s+ValidatedStruct",
+    "type_constraints": {
+      "functions": [
+        {"name": "validate", "comptime_params": ["T: type"]},
+        {"name": "ValidatedStruct", "return_type": "type"}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["validate", "ValidatedStruct"],
+      "variable_patterns": ["fields", "info", "T"]
+    },
+    "structural_constraints": {
+      "must_use": ["@typeInfo", "@compileError", "comptime blocks"],
+      "must_not_use": ["runtime validation for compile-time known values"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/zig/comptime_validation.zig",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,50 @@
+{
+  "id": "c_002_hash_table",
+  "version": "1.0.0",
+  "title": "Hash Table with Chaining",
+  "description": "Implement a hash table in C using separate chaining for collision resolution, with dynamic resizing and string keys.",
+  "category": "data_structures",
+  "language": "c",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Classic hash table implementations",
+    "complexity": {
+      "time": "O(1) average, O(n) worst case",
+      "space": "O(n)"
+    },
+    "tags": [
+      "hash-table",
+      "memory-management",
+      "data-structures",
+      "chaining"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Struct must be named 'hash_table_t'",
+    "Implement ht_create(initial_capacity) returning new table",
+    "Implement ht_destroy(ht) freeing all memory",
+    "Implement ht_set(ht, key, value) for insertion/update",
+    "Implement ht_get(ht, key) returning value or NULL",
+    "Implement ht_delete(ht, key) returning success bool",
+    "Use djb2 or similar hash function for strings",
+    "Resize when load factor exceeds 0.75"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/c/hash_table.c",
+  "test_suite_path": "eval/tasks/fixtures/c/hash_table_test.c",
+  "constraint_path": "eval/tasks/constraints/c_hash_table.json",
+  "expected_loc": 90,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement djb2 hash function.",
+      "code": "static unsigned long djb2_hash(const char* str) {\n    unsigned long hash = 5381;\n    int c;\n    while ((c = *str++)) {\n        hash = ((hash << 5) + hash) + c;\n    }\n    return hash;\n}"
+    },
+    {
+      "prompt": "Create a linked list node for chaining.",
+      "code": "typedef struct ht_entry {\n    char* key;\n    void* value;\n    struct ht_entry* next;\n} ht_entry_t;\n\nht_entry_t* entry_create(const char* key, void* value) {\n    ht_entry_t* entry = malloc(sizeof(ht_entry_t));\n    if (!entry) return NULL;\n    entry->key = strdup(key);\n    entry->value = value;\n    entry->next = NULL;\n    return entry;\n}"
+    }
+  ]
+}

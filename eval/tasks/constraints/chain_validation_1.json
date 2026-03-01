@@ -1,0 +1,24 @@
+{
+  "task_id": "chain_validation_001_basic",
+  "constraints": {
+    "grammar": "pub fn validate_email(email: &str) -> Result<(), ValidationError> { }\npub fn validate_phone(phone: &str) -> Result<(), ValidationError> { }",
+    "regex_pattern": "pub\\s+fn\\s+validate_email|pub\\s+fn\\s+validate_phone",
+    "type_constraints": {
+      "functions": [
+        {"name": "validate_email", "return_type": "Result<(), ValidationError>"},
+        {"name": "validate_phone", "return_type": "Result<(), ValidationError>"}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["validate_email", "validate_phone"],
+      "enum_names": ["ValidationError"]
+    },
+    "structural_constraints": {
+      "must_use": ["Result type", "pattern matching"],
+      "must_not_use": ["external validation crates"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_validation_1.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

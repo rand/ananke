@@ -1,0 +1,50 @@
+{
+  "id": "go_002_http_middleware",
+  "version": "1.0.0",
+  "title": "HTTP Middleware Chain",
+  "description": "Implement a composable HTTP middleware system using Go's http.Handler interface. Create middleware for logging, authentication, and rate limiting.",
+  "category": "api",
+  "language": "go",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Go web server patterns",
+    "complexity": {
+      "time": "O(m) where m = middleware count",
+      "space": "O(1)"
+    },
+    "tags": [
+      "http",
+      "middleware",
+      "handlers",
+      "composition"
+    ],
+    "constraint_types": [
+      "type_constraints",
+      "pattern_constraints"
+    ]
+  },
+  "requirements": [
+    "Define Middleware type as func(http.Handler) http.Handler",
+    "Implement LoggingMiddleware that logs request method and path",
+    "Implement AuthMiddleware that checks for Authorization header",
+    "Implement RateLimitMiddleware with token bucket algorithm",
+    "Create Chain function to compose multiple middlewares",
+    "Use standard library http package only",
+    "Handle errors by returning appropriate HTTP status codes",
+    "Context should be used for passing request-scoped values"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/go/middleware/http_middleware.go",
+  "test_suite_path": "eval/tasks/fixtures/go/middleware/http_middleware_test.go",
+  "constraint_path": "eval/tasks/constraints/go_http_middleware.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a simple logging middleware.",
+      "code": "func LoggingMiddleware(next http.Handler) http.Handler {\n    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n        log.Printf(\"%s %s\", r.Method, r.URL.Path)\n        next.ServeHTTP(w, r)\n    })\n}"
+    },
+    {
+      "prompt": "Chain multiple http.Handler wrappers together.",
+      "code": "func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {\n    for i := len(middlewares) - 1; i >= 0; i-- {\n        h = middlewares[i](h)\n    }\n    return h\n}"
+    }
+  ]
+}

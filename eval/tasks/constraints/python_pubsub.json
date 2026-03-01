@@ -1,0 +1,27 @@
+{
+  "task_id": "python_005_pubsub",
+  "constraints": {
+    "grammar": "class PubSub:\n    def subscribe(self, topic: str, callback: Callable) -> str: ...\n    def unsubscribe(self, subscription_id: str) -> bool: ...\n    def publish(self, topic: str, message: Any) -> int: ...\n    async def publish_async(self, topic: str, message: Any) -> int: ...",
+    "regex_pattern": "class\\s+PubSub:",
+    "type_constraints": {
+      "classes": ["PubSub"],
+      "methods": [
+        {"name": "subscribe", "return_type": "str"},
+        {"name": "unsubscribe", "return_type": "bool"},
+        {"name": "publish", "return_type": "int"},
+        {"name": "publish_async", "return_type": "int"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["PubSub"],
+      "variable_patterns": ["topic", "callback", "subscribers", "message"]
+    },
+    "structural_constraints": {
+      "must_use": ["type hints", "asyncio for async methods"],
+      "must_not_use": ["external pubsub libraries"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/python/pubsub.py",
+  "extraction_method": "generated",
+  "verified": false
+}

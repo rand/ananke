@@ -1,0 +1,29 @@
+{
+  "task_id": "rust_004_state_machine",
+  "constraints": {
+    "grammar": "pub trait State {\n  fn on_enter(&self);\n  fn on_exit(&self);\n  fn handle_event(&self, event: Event) -> Option<Box<dyn State>>;\n}\npub struct StateMachine { }\nimpl StateMachine {\n  pub fn new(initial: Box<dyn State>) -> Self { }\n  pub fn dispatch(&mut self, event: Event) { }\n}",
+    "regex_pattern": "pub\\s+trait\\s+State|pub\\s+struct\\s+StateMachine",
+    "type_constraints": {
+      "traits": ["State"],
+      "structs": ["StateMachine"],
+      "methods": [
+        {"name": "on_enter"},
+        {"name": "on_exit"},
+        {"name": "handle_event", "return_type": "Option<Box<dyn State>>"},
+        {"name": "dispatch"}
+      ]
+    },
+    "naming_constraints": {
+      "trait_names": ["State"],
+      "struct_names": ["StateMachine"],
+      "variable_patterns": ["state", "event", "transition"]
+    },
+    "structural_constraints": {
+      "must_use": ["trait objects", "state pattern"],
+      "must_not_use": ["match on enum for all states in one place"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/state_machine.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

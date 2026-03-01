@@ -1,0 +1,31 @@
+{
+  "task_id": "javascript_async_queue",
+  "constraints": {
+    "grammar": "class AsyncQueue {\n  constructor(concurrency) { }\n  async enqueue(task) { }\n  async drain() { }\n}",
+    "regex_pattern": "^class\\s+AsyncQueue\\s*\\{",
+    "length_constraints": {
+      "min_tokens": 100,
+      "min_characters": 500,
+      "description": "Async queue requires class with constructor, queue management, concurrency control, and Promise handling - cannot be under 100 tokens"
+    },
+    "type_constraints": {
+      "class_name": "AsyncQueue",
+      "methods": [
+        {"name": "constructor", "parameters": [{"name": "concurrency", "type": "number"}]},
+        {"name": "enqueue", "parameters": [{"name": "task", "type": "function"}], "return_type": "Promise"},
+        {"name": "drain", "parameters": [], "return_type": "Promise"}
+      ]
+    },
+    "naming_constraints": {
+      "class_name": "AsyncQueue",
+      "variable_patterns": ["queue", "running", "concurrency"]
+    },
+    "structural_constraints": {
+      "must_use": ["Promise", "async/await", "queue management"],
+      "must_not_use": ["global state", "synchronous blocking"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/javascript/async_queue.js",
+  "extraction_method": "generated",
+  "verified": false
+}

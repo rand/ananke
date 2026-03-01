@@ -1,0 +1,51 @@
+{
+  "id": "chain_parser_002_json",
+  "version": "1.0.0",
+  "title": "JSON Parser with Streaming",
+  "description": "Implement a JSON parser that can handle large files through streaming and provides detailed parse errors.",
+  "category": "parsing",
+  "language": "python",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(n) where n = input length",
+      "space": "O(d) where d = nesting depth"
+    },
+    "tags": [
+      "parsing",
+      "JSON",
+      "streaming"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "parser",
+    "chain_position": 2
+  },
+  "requirements": [
+    "Build on chain_parser_001 concepts",
+    "Class must be named 'JsonParser'",
+    "Implement parse(source: str | TextIO) -> JsonValue",
+    "Implement parse_stream(source: TextIO) -> Iterator[JsonValue]",
+    "Support JSON5 extensions (comments, trailing commas)",
+    "Provide detailed ParseError with line/column",
+    "Handle large files without loading fully into memory",
+    "Support incremental parsing for real-time streams"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/chain_parser_2.py",
+  "test_suite_path": "eval/tasks/fixtures/python/chain_parser_2_test.py",
+  "constraint_path": "eval/tasks/constraints/chain_parser_2.json",
+  "expected_loc": 75,
+  "few_shot_examples": [
+    {
+      "prompt": "JSON tokenizer for streaming.",
+      "code": "from enum import Enum, auto\nfrom typing import Iterator\n\nclass TokenType(Enum):\n    LBRACE = auto()\n    RBRACE = auto()\n    LBRACKET = auto()\n    RBRACKET = auto()\n    COLON = auto()\n    COMMA = auto()\n    STRING = auto()\n    NUMBER = auto()\n    TRUE = auto()\n    FALSE = auto()\n    NULL = auto()\n\ndef tokenize(source: str) -> Iterator[tuple[TokenType, str, int, int]]:\n    line, col = 1, 1\n    i = 0\n    while i < len(source):\n        # ... tokenization logic\n        pass"
+    },
+    {
+      "prompt": "Parse error with location.",
+      "code": "class ParseError(Exception):\n    def __init__(self, message: str, line: int, column: int, context: str = ''):\n        self.line = line\n        self.column = column\n        self.context = context\n        super().__init__(f'{message} at line {line}, column {column}')\n    \n    def __str__(self):\n        msg = super().__str__()\n        if self.context:\n            msg += f'\\n  {self.context}\\n  {\" \" * (self.column - 1)}^'\n        return msg"
+    }
+  ]
+}

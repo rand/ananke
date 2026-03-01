@@ -1,0 +1,26 @@
+{
+  "task_id": "cpp_004_variant_visitor",
+  "constraints": {
+    "grammar": "template<typename... Ts>\nclass Variant {\npublic:\n  template<typename T> Variant(T value);\n  template<typename Visitor> auto visit(Visitor&& v) -> decltype(auto);\n  template<typename T> bool holds() const;\n  template<typename T> T& get();\n};",
+    "regex_pattern": "template\\s*<.*>\\s*class\\s+Variant",
+    "type_constraints": {
+      "templates": [{"name": "Variant", "params": ["Ts..."]}],
+      "methods": [
+        {"name": "visit"},
+        {"name": "holds", "return_type": "bool"},
+        {"name": "get"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["Variant"],
+      "variable_patterns": ["storage", "index", "visitor"]
+    },
+    "structural_constraints": {
+      "must_use": ["aligned_union or similar", "type index tracking"],
+      "must_not_use": ["std::variant"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/cpp/variant_visitor.cpp",
+  "extraction_method": "generated",
+  "verified": false
+}

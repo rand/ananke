@@ -1,0 +1,25 @@
+{
+  "task_id": "zig_004_simd_vector",
+  "constraints": {
+    "grammar": "pub fn dotProduct(a: []const f32, b: []const f32) f32 { }\npub fn normalize(v: []f32) void { }\npub fn matMul4x4(a: *const [16]f32, b: *const [16]f32) [16]f32 { }",
+    "regex_pattern": "pub\\s+fn\\s+dotProduct|pub\\s+fn\\s+normalize|pub\\s+fn\\s+matMul4x4",
+    "type_constraints": {
+      "functions": [
+        {"name": "dotProduct", "return_type": "f32"},
+        {"name": "normalize", "return_type": "void"},
+        {"name": "matMul4x4", "return_type": "[16]f32"}
+      ]
+    },
+    "naming_constraints": {
+      "function_names": ["dotProduct", "normalize", "matMul4x4"],
+      "variable_patterns": ["Vec4", "sum", "result"]
+    },
+    "structural_constraints": {
+      "must_use": ["@Vector", "@reduce", "@splat"],
+      "must_not_use": ["external SIMD libraries"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/zig/simd_vector.zig",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,30 @@
+{
+  "task_id": "zig_error_union",
+  "constraints": {
+    "grammar": "pub const ParserError = error {\n    InvalidToken,\n    UnexpectedEof,\n    BufferOverflow,\n};\n\npub fn parse(input: []const u8) ParserError!ParseResult { }",
+    "regex_pattern": "pub\\s+const\\s+\\w+Error\\s*=\\s*error\\s*\\{",
+    "length_constraints": {
+      "min_tokens": 80,
+      "min_characters": 400,
+      "description": "Zig error union requires error set definition, ParseResult struct, and parse function with try/catch/errdefer - cannot be under 80 tokens"
+    },
+    "type_constraints": {
+      "error_set_name": "ParserError",
+      "error_variants": ["InvalidToken", "UnexpectedEof", "BufferOverflow"],
+      "functions": [
+        {"name": "parse", "parameters": [{"name": "input", "type": "[]const u8"}], "return_type": "ParserError!ParseResult"}
+      ]
+    },
+    "naming_constraints": {
+      "error_set_suffix": "Error",
+      "variable_patterns": ["result", "input", "token"]
+    },
+    "structural_constraints": {
+      "must_use": ["error union", "try or catch", "errdefer"],
+      "must_not_use": ["@panic", "unreachable in error paths"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/zig/error_union.zig",
+  "extraction_method": "generated",
+  "verified": false
+}

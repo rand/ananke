@@ -1,0 +1,25 @@
+{
+  "task_id": "rust_002_iterator_chain",
+  "constraints": {
+    "grammar": "pub struct Transaction {\n  pub amount: f64,\n  pub category: String,\n  pub is_credit: bool,\n}\npub struct TransactionSummary {\n  pub total_credit: f64,\n  pub total_debit: f64,\n  pub count_by_category: HashMap<String, usize>,\n}\npub fn process_transactions(transactions: &[Transaction]) -> TransactionSummary { }",
+    "regex_pattern": "pub\\s+fn\\s+process_transactions|pub\\s+struct\\s+Transaction",
+    "type_constraints": {
+      "structs": ["Transaction", "TransactionSummary"],
+      "functions": [
+        {"name": "process_transactions", "return_type": "TransactionSummary"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["Transaction", "TransactionSummary"],
+      "function_names": ["process_transactions"],
+      "variable_patterns": ["amount", "category", "credit", "debit"]
+    },
+    "structural_constraints": {
+      "must_use": ["iterator combinators (map, filter, fold)", "no explicit loops"],
+      "must_not_use": ["for loops", "while loops"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/iterator_chain.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

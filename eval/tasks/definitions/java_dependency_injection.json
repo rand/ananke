@@ -1,0 +1,50 @@
+{
+  "id": "java_004_dependency_injection",
+  "version": "1.0.0",
+  "title": "Simple Dependency Injection Container",
+  "description": "Implement a lightweight dependency injection container with support for singleton and prototype scopes, constructor injection, and interface binding.",
+  "category": "patterns",
+  "language": "java",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Spring IoC Container",
+    "complexity": {
+      "time": "O(d) where d = dependency depth",
+      "space": "O(n) for registered beans"
+    },
+    "tags": [
+      "dependency-injection",
+      "IoC",
+      "reflection",
+      "design-patterns"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'Container'",
+    "Implement register(Class<T> type) for concrete classes",
+    "Implement register(Class<T> iface, Class<? extends T> impl) for interface binding",
+    "Implement resolve(Class<T> type) returning instance",
+    "Support @Singleton annotation for singleton scope",
+    "Default to prototype scope (new instance per resolve)",
+    "Use constructor injection via reflection",
+    "Throw CircularDependencyException for cycles"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/java/DependencyInjection.java",
+  "test_suite_path": "eval/tasks/fixtures/java/DependencyInjectionTest.java",
+  "constraint_path": "eval/tasks/constraints/java_dependency_injection.json",
+  "expected_loc": 85,
+  "few_shot_examples": [
+    {
+      "prompt": "Get constructor parameters and resolve dependencies.",
+      "code": "private Object[] resolveParameters(Constructor<?> ctor, Set<Class<?>> resolving) {\n    Class<?>[] paramTypes = ctor.getParameterTypes();\n    Object[] params = new Object[paramTypes.length];\n    for (int i = 0; i < paramTypes.length; i++) {\n        params[i] = resolveInternal(paramTypes[i], resolving);\n    }\n    return params;\n}"
+    },
+    {
+      "prompt": "Check for circular dependencies.",
+      "code": "private <T> T resolveInternal(Class<T> type, Set<Class<?>> resolving) {\n    if (resolving.contains(type)) {\n        throw new CircularDependencyException(\n            \"Circular dependency detected for: \" + type.getName());\n    }\n    resolving.add(type);\n    try {\n        // ... resolve logic\n    } finally {\n        resolving.remove(type);\n    }\n}"
+    }
+  ]
+}

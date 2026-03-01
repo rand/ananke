@@ -1,0 +1,31 @@
+{
+  "task_id": "java_builder_pattern",
+  "constraints": {
+    "grammar": "public class HttpRequest {\n    private HttpRequest(Builder builder) { }\n    public static class Builder {\n        public Builder method(String method) { }\n        public Builder url(String url) { }\n        public Builder header(String key, String value) { }\n        public Builder body(String body) { }\n        public HttpRequest build() { }\n    }\n}",
+    "regex_pattern": "public\\s+class\\s+HttpRequest\\s*\\{",
+    "type_constraints": {
+      "outer_class": "HttpRequest",
+      "builder_class": "Builder",
+      "methods": [
+        {"name": "method", "return_type": "Builder"},
+        {"name": "url", "return_type": "Builder"},
+        {"name": "header", "return_type": "Builder"},
+        {"name": "body", "return_type": "Builder"},
+        {"name": "build", "return_type": "HttpRequest"}
+      ],
+      "constructor_visibility": "private"
+    },
+    "naming_constraints": {
+      "class_name": "HttpRequest",
+      "builder_name": "Builder",
+      "variable_patterns": ["method", "url", "headers", "body"]
+    },
+    "structural_constraints": {
+      "must_use": ["static inner class", "fluent interface", "immutable outer class"],
+      "must_not_use": ["public constructor for outer class", "mutable fields"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/java/http_request.java",
+  "extraction_method": "generated",
+  "verified": false
+}

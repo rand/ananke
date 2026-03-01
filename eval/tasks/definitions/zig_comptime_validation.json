@@ -1,0 +1,50 @@
+{
+  "id": "zig_001_comptime_validation",
+  "version": "1.0.0",
+  "title": "Compile-Time Schema Validation",
+  "description": "Implement a compile-time schema validator using Zig's comptime features. Validate struct field types and generate runtime validation code at compile time.",
+  "category": "data_processing",
+  "language": "zig",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Zig comptime metaprogramming",
+    "complexity": {
+      "time": "O(n) runtime, O(f) comptime where f = fields",
+      "space": "O(1)"
+    },
+    "tags": [
+      "comptime",
+      "metaprogramming",
+      "validation",
+      "type-safety"
+    ],
+    "constraint_types": [
+      "type_constraints",
+      "pattern_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'validateStruct'",
+    "Use comptime to iterate over struct fields",
+    "Validate that string fields are non-empty",
+    "Validate that integer fields are within specified bounds",
+    "Validate that optional fields are properly handled",
+    "Return error union with ValidationError type",
+    "Generate helpful error messages including field names",
+    "Support nested struct validation"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/zig/comptime_validation.zig",
+  "test_suite_path": "eval/tasks/fixtures/zig/comptime_validation_test.zig",
+  "constraint_path": "eval/tasks/constraints/zig_comptime_validation.json",
+  "expected_loc": 60,
+  "few_shot_examples": [
+    {
+      "prompt": "Use comptime to get struct field names.",
+      "code": "fn getFieldNames(comptime T: type) []const []const u8 {\n    const fields = @typeInfo(T).@\"struct\".fields;\n    var names: [fields.len][]const u8 = undefined;\n    for (fields, 0..) |field, i| {\n        names[i] = field.name;\n    }\n    return &names;\n}"
+    },
+    {
+      "prompt": "Validate a string field is non-empty at runtime.",
+      "code": "const ValidationError = error{ EmptyString, InvalidLength };\n\nfn validateString(s: []const u8, min_len: usize) ValidationError!void {\n    if (s.len == 0) return error.EmptyString;\n    if (s.len < min_len) return error.InvalidLength;\n}"
+    }
+  ]
+}

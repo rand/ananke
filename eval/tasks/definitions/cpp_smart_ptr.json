@@ -1,0 +1,50 @@
+{
+  "id": "cpp_001_smart_ptr",
+  "version": "1.0.0",
+  "title": "Reference-Counting Smart Pointer",
+  "description": "Implement a reference-counting smart pointer (similar to shared_ptr) with proper copy/move semantics and custom deleter support.",
+  "category": "memory_management",
+  "language": "cpp",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "std::shared_ptr implementation",
+    "complexity": {
+      "time": "O(1) for all operations",
+      "space": "O(1) overhead per pointer"
+    },
+    "tags": [
+      "smart-pointer",
+      "RAII",
+      "reference-counting",
+      "move-semantics"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Template class must be named 'SharedPtr<T>'",
+    "Implement constructor, destructor with proper cleanup",
+    "Implement copy constructor and copy assignment",
+    "Implement move constructor and move assignment",
+    "Support custom deleter as template parameter",
+    "Implement get(), operator*, operator-> for access",
+    "Implement use_count() returning reference count",
+    "Implement reset() and reset(T* ptr) methods"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/cpp/smart_ptr.cpp",
+  "test_suite_path": "eval/tasks/fixtures/cpp/smart_ptr_test.cpp",
+  "constraint_path": "eval/tasks/constraints/cpp_smart_ptr.json",
+  "expected_loc": 80,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a control block for reference counting.",
+      "code": "struct ControlBlock {\n    std::atomic<size_t> ref_count{1};\n    \n    void add_ref() { ++ref_count; }\n    bool release() { return --ref_count == 0; }\n};"
+    },
+    {
+      "prompt": "Implement move assignment for a resource-owning class.",
+      "code": "MyClass& operator=(MyClass&& other) noexcept {\n    if (this != &other) {\n        cleanup();  // Release current resources\n        ptr_ = other.ptr_;\n        control_ = other.control_;\n        other.ptr_ = nullptr;\n        other.control_ = nullptr;\n    }\n    return *this;\n}"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "task_id": "chain_parser_001_line",
+  "constraints": {
+    "grammar": "pub struct LineParser { }\nimpl LineParser {\n  pub fn new() -> Self { }\n  pub fn parse(&self, line: &str) -> Result<Vec<String>, ParseError> { }\n}",
+    "regex_pattern": "pub\\s+struct\\s+LineParser",
+    "type_constraints": {
+      "structs": ["LineParser"],
+      "methods": [
+        {"name": "new", "return_type": "Self"},
+        {"name": "parse", "return_type": "Result<Vec<String>, ParseError>"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["LineParser", "ParseError"],
+      "variable_patterns": ["line", "token", "delimiter"]
+    },
+    "structural_constraints": {
+      "must_use": ["Result type", "iterator methods"],
+      "must_not_use": ["regex crate for simple splitting"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_parser_1.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

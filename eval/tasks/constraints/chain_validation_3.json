@@ -1,0 +1,27 @@
+{
+  "task_id": "chain_validation_003_cross_field",
+  "constraints": {
+    "grammar": "pub trait Validator {\n  fn validate(&self, data: &Data) -> Result<(), Vec<ValidationError>>;\n}\npub struct CrossFieldValidator { }\nimpl CrossFieldValidator {\n  pub fn add_rule(&mut self, rule: impl Fn(&Data) -> bool, message: &str) { }\n}",
+    "regex_pattern": "pub\\s+trait\\s+Validator|pub\\s+struct\\s+CrossFieldValidator",
+    "type_constraints": {
+      "traits": ["Validator"],
+      "structs": ["CrossFieldValidator"],
+      "methods": [
+        {"name": "validate", "return_type": "Result<(), Vec<ValidationError>>"},
+        {"name": "add_rule", "return_type": "()"}
+      ]
+    },
+    "naming_constraints": {
+      "trait_names": ["Validator"],
+      "struct_names": ["CrossFieldValidator"],
+      "variable_patterns": ["rule", "data", "field"]
+    },
+    "structural_constraints": {
+      "must_use": ["trait for validation", "closure-based rules"],
+      "must_not_use": ["global state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_validation_3.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

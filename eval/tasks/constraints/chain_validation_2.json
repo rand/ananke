@@ -1,0 +1,26 @@
+{
+  "task_id": "chain_validation_002_schema",
+  "constraints": {
+    "grammar": "pub struct Schema { }\nimpl Schema {\n  pub fn validate(&self, value: &JsonValue) -> Result<(), Vec<ValidationError>> { }\n}\npub fn string() -> Schema { }\npub fn number() -> Schema { }\npub fn object() -> SchemaBuilder { }",
+    "regex_pattern": "pub\\s+struct\\s+Schema|pub\\s+fn\\s+string\\(\\)|pub\\s+fn\\s+object\\(\\)",
+    "type_constraints": {
+      "structs": ["Schema", "SchemaBuilder"],
+      "functions": [
+        {"name": "string", "return_type": "Schema"},
+        {"name": "number", "return_type": "Schema"},
+        {"name": "object", "return_type": "SchemaBuilder"}
+      ]
+    },
+    "naming_constraints": {
+      "struct_names": ["Schema", "SchemaBuilder"],
+      "variable_patterns": ["schema", "field", "validator"]
+    },
+    "structural_constraints": {
+      "must_use": ["builder pattern", "composable validators"],
+      "must_not_use": ["external schema libraries"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_validation_2.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

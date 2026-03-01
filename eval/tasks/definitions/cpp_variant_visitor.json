@@ -1,0 +1,50 @@
+{
+  "id": "cpp_003_variant_visitor",
+  "version": "1.0.0",
+  "title": "Type-Safe Variant with Visitor Pattern",
+  "description": "Implement a type-safe tagged union (variant) with compile-time checked visitor pattern using modern C++17 features.",
+  "category": "type_system",
+  "language": "cpp",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "std::variant and std::visit",
+    "complexity": {
+      "time": "O(1) access, O(n) visit where n = types",
+      "space": "O(max sizeof types)"
+    },
+    "tags": [
+      "variant",
+      "visitor-pattern",
+      "template-metaprogramming",
+      "type-safety"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Template class must be named 'Variant<Types...>'",
+    "Store value in aligned storage for largest type",
+    "Track active type with index",
+    "Implement visit(visitor) accepting callable with overloads",
+    "Implement get<T>() with exception on type mismatch",
+    "Implement get_if<T>() returning pointer or nullptr",
+    "Implement index() returning current type index",
+    "Properly handle destruction of active type"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/cpp/variant_visitor.cpp",
+  "test_suite_path": "eval/tasks/fixtures/cpp/variant_visitor_test.cpp",
+  "constraint_path": "eval/tasks/constraints/cpp_variant_visitor.json",
+  "expected_loc": 90,
+  "few_shot_examples": [
+    {
+      "prompt": "Calculate aligned storage for multiple types.",
+      "code": "template<typename... Ts>\nstruct MaxSize {\n    static constexpr size_t value = std::max({sizeof(Ts)...});\n};\n\ntemplate<typename... Ts>\nstruct MaxAlign {\n    static constexpr size_t value = std::max({alignof(Ts)...});\n};\n\nusing Storage = std::aligned_storage_t<MaxSize<Ts...>::value, MaxAlign<Ts...>::value>;"
+    },
+    {
+      "prompt": "Get index of type in parameter pack.",
+      "code": "template<typename T, typename... Ts>\nstruct TypeIndex;\n\ntemplate<typename T, typename First, typename... Rest>\nstruct TypeIndex<T, First, Rest...> {\n    static constexpr size_t value = std::is_same_v<T, First> ? 0 : 1 + TypeIndex<T, Rest...>::value;\n};\n\ntemplate<typename T>\nstruct TypeIndex<T> {\n    static constexpr size_t value = 0;  // Will cause compile error if not found\n};"
+    }
+  ]
+}

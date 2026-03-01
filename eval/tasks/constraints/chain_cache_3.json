@@ -1,0 +1,28 @@
+{
+  "task_id": "chain_cache_003_distributed",
+  "constraints": {
+    "grammar": "pub trait CacheBackend {\n  fn get(&self, key: &str) -> Option<Vec<u8>>;\n  fn set(&self, key: &str, value: Vec<u8>, ttl: Duration);\n  fn delete(&self, key: &str);\n}\npub struct DistributedCache { }\nimpl DistributedCache {\n  pub fn new(backends: Vec<Box<dyn CacheBackend>>) -> Self { }\n}",
+    "regex_pattern": "pub\\s+trait\\s+CacheBackend|pub\\s+struct\\s+DistributedCache",
+    "type_constraints": {
+      "traits": ["CacheBackend"],
+      "structs": ["DistributedCache"],
+      "methods": [
+        {"name": "get", "return_type": "Option<Vec<u8>>"},
+        {"name": "set", "return_type": "()"},
+        {"name": "delete", "return_type": "()"}
+      ]
+    },
+    "naming_constraints": {
+      "trait_names": ["CacheBackend"],
+      "struct_names": ["DistributedCache"],
+      "variable_patterns": ["backend", "key", "value", "ttl"]
+    },
+    "structural_constraints": {
+      "must_use": ["trait objects", "Duration", "consistent hashing or similar"],
+      "must_not_use": ["global mutable state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/rust/chain_cache_3.rs",
+  "extraction_method": "generated",
+  "verified": false
+}

@@ -1,0 +1,50 @@
+{
+  "id": "python_003_context_manager",
+  "version": "1.0.0",
+  "title": "Async Context Manager with Resource Pool",
+  "description": "Implement an async context manager that manages a pool of database connections with automatic cleanup and connection limiting.",
+  "category": "async",
+  "language": "python",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "asyncpg connection pools",
+    "complexity": {
+      "time": "O(1) acquire/release",
+      "space": "O(n) where n = pool size"
+    },
+    "tags": [
+      "async",
+      "context-manager",
+      "resource-pool",
+      "concurrency"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'ConnectionPool'",
+    "Implement __aenter__ and __aexit__ for async with",
+    "Accept max_connections parameter",
+    "Implement acquire() returning connection from pool",
+    "Implement release(conn) returning connection to pool",
+    "Block acquire() when pool exhausted (with timeout)",
+    "Implement close() to cleanup all connections",
+    "Use asyncio.Semaphore for connection limiting"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/python/context_manager.py",
+  "test_suite_path": "eval/tasks/fixtures/python/context_manager_test.py",
+  "constraint_path": "eval/tasks/constraints/python_context_manager.json",
+  "expected_loc": 50,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement basic async context manager.",
+      "code": "class AsyncResource:\n    async def __aenter__(self):\n        await self.connect()\n        return self\n    \n    async def __aexit__(self, exc_type, exc_val, exc_tb):\n        await self.disconnect()\n        return False"
+    },
+    {
+      "prompt": "Use semaphore for resource limiting.",
+      "code": "import asyncio\n\nclass LimitedPool:\n    def __init__(self, max_size: int):\n        self._semaphore = asyncio.Semaphore(max_size)\n    \n    async def acquire(self):\n        await self._semaphore.acquire()\n        return self._create_resource()\n    \n    def release(self, resource):\n        self._semaphore.release()"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "java_003_stream_collector",
+  "version": "1.0.0",
+  "title": "Custom Stream Collector",
+  "description": "Implement a custom Collector for Java Streams that groups elements by key and applies a sliding window aggregation.",
+  "category": "data_processing",
+  "language": "java",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Java Stream API",
+    "complexity": {
+      "time": "O(n) for collection",
+      "space": "O(g * w) where g = groups, w = window size"
+    },
+    "tags": [
+      "streams",
+      "collectors",
+      "functional",
+      "aggregation"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Class must be named 'SlidingWindowCollector'",
+    "Implement Collector<T, ?, Map<K, List<R>>> interface",
+    "Accept keyExtractor, windowSize, and aggregator parameters",
+    "Support parallel stream collection (combiner)",
+    "Implement sliding window of configurable size",
+    "Apply aggregation function to each window",
+    "Handle edge cases: empty stream, window > elements",
+    "Finisher should produce immutable result map"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/java/StreamCollector.java",
+  "test_suite_path": "eval/tasks/fixtures/java/StreamCollectorTest.java",
+  "constraint_path": "eval/tasks/constraints/java_stream_collector.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Create a basic custom collector structure.",
+      "code": "public class ToListCollector<T> implements Collector<T, List<T>, List<T>> {\n    @Override\n    public Supplier<List<T>> supplier() {\n        return ArrayList::new;\n    }\n    \n    @Override\n    public BiConsumer<List<T>, T> accumulator() {\n        return List::add;\n    }\n    \n    @Override\n    public BinaryOperator<List<T>> combiner() {\n        return (left, right) -> { left.addAll(right); return left; };\n    }\n    \n    @Override\n    public Function<List<T>, List<T>> finisher() {\n        return Function.identity();\n    }\n    \n    @Override\n    public Set<Characteristics> characteristics() {\n        return Set.of(Characteristics.IDENTITY_FINISH);\n    }\n}"
+    },
+    {
+      "prompt": "Calculate sliding window over a list.",
+      "code": "public static <T, R> List<R> slidingWindow(\n        List<T> items, int windowSize, Function<List<T>, R> aggregator) {\n    List<R> results = new ArrayList<>();\n    for (int i = 0; i <= items.size() - windowSize; i++) {\n        List<T> window = items.subList(i, i + windowSize);\n        results.add(aggregator.apply(window));\n    }\n    return results;\n}"
+    }
+  ]
+}

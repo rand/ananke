@@ -1,0 +1,50 @@
+{
+  "id": "rust_004_state_machine",
+  "version": "1.0.0",
+  "title": "Type-State Pattern State Machine",
+  "description": "Implement a compile-time enforced state machine using Rust's type-state pattern, ensuring invalid state transitions are caught at compile time.",
+  "category": "type_system",
+  "language": "rust",
+  "difficulty": "complex",
+  "metadata": {
+    "benchmark_inspired_by": "Rust type-state pattern",
+    "complexity": {
+      "time": "O(1) transitions",
+      "space": "O(1)"
+    },
+    "tags": [
+      "type-state",
+      "state-machine",
+      "zero-cost-abstractions",
+      "compile-time"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Model a TCP connection: Closed -> Listen -> Established -> Closed",
+    "Use zero-sized types for states",
+    "Transition methods consume self and return new state",
+    "Invalid transitions should fail at compile time",
+    "Implement data that persists across state transitions",
+    "Use PhantomData if needed for state markers",
+    "Implement methods only available in specific states",
+    "Support state-specific behavior (e.g., send only when Established)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/rust/state_machine.rs",
+  "test_suite_path": "eval/tasks/fixtures/rust/state_machine_test.rs",
+  "constraint_path": "eval/tasks/constraints/rust_state_machine.json",
+  "expected_loc": 70,
+  "few_shot_examples": [
+    {
+      "prompt": "Define states as zero-sized types.",
+      "code": "pub struct Closed;\npub struct Listen;\npub struct Established;\n\npub struct TcpConnection<State> {\n    buffer_size: usize,\n    _state: std::marker::PhantomData<State>,\n}\n\nimpl TcpConnection<Closed> {\n    pub fn new(buffer_size: usize) -> Self {\n        TcpConnection {\n            buffer_size,\n            _state: std::marker::PhantomData,\n        }\n    }\n}"
+    },
+    {
+      "prompt": "State transition consuming self.",
+      "code": "impl TcpConnection<Closed> {\n    pub fn listen(self, port: u16) -> TcpConnection<Listen> {\n        println!(\"Listening on port {}\", port);\n        TcpConnection {\n            buffer_size: self.buffer_size,\n            _state: std::marker::PhantomData,\n        }\n    }\n}\n\nimpl TcpConnection<Listen> {\n    pub fn accept(self) -> TcpConnection<Established> {\n        TcpConnection {\n            buffer_size: self.buffer_size,\n            _state: std::marker::PhantomData,\n        }\n    }\n}"
+    }
+  ]
+}

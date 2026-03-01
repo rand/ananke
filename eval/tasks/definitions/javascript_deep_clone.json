@@ -1,0 +1,50 @@
+{
+  "id": "javascript_004_deep_clone",
+  "version": "1.0.0",
+  "title": "Deep Clone with Circular Reference Handling",
+  "description": "Implement a deep clone function that handles nested objects, arrays, dates, maps, sets, and circular references.",
+  "category": "data_processing",
+  "language": "javascript",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "structuredClone and lodash.cloneDeep",
+    "complexity": {
+      "time": "O(n) where n = total properties",
+      "space": "O(n)"
+    },
+    "tags": [
+      "recursion",
+      "object-manipulation",
+      "circular-references",
+      "type-checking"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Function must be named 'deepClone'",
+    "Clone primitive values directly",
+    "Clone objects and arrays recursively",
+    "Clone Date objects preserving time",
+    "Clone Map and Set objects",
+    "Handle circular references without infinite loop",
+    "Clone RegExp objects preserving flags",
+    "Return undefined for functions (or optionally reference them)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/javascript/deep_clone.js",
+  "test_suite_path": "eval/tasks/fixtures/javascript/deep_clone_test.js",
+  "constraint_path": "eval/tasks/constraints/javascript_deep_clone.json",
+  "expected_loc": 45,
+  "few_shot_examples": [
+    {
+      "prompt": "Implement a shallow clone function.",
+      "code": "function shallowClone(obj) {\n  if (Array.isArray(obj)) return [...obj];\n  if (obj && typeof obj === 'object') return { ...obj };\n  return obj;\n}"
+    },
+    {
+      "prompt": "Check the type of a value in JavaScript.",
+      "code": "function getType(value) {\n  if (value === null) return 'null';\n  if (Array.isArray(value)) return 'array';\n  if (value instanceof Date) return 'date';\n  if (value instanceof Map) return 'map';\n  if (value instanceof Set) return 'set';\n  if (value instanceof RegExp) return 'regexp';\n  return typeof value;\n}"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "chain_cache_002_lru",
+  "version": "1.0.0",
+  "title": "LRU Cache with Capacity",
+  "description": "Extend memoization to an LRU cache with capacity limits and eviction policy.",
+  "category": "caching",
+  "language": "rust",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "HumanEval Pro progressive difficulty",
+    "complexity": {
+      "time": "O(1) get/put",
+      "space": "O(capacity)"
+    },
+    "tags": [
+      "LRU",
+      "caching",
+      "eviction"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ],
+    "difficulty_chain": "cache",
+    "chain_position": 2
+  },
+  "requirements": [
+    "Build on chain_cache_001 concepts",
+    "Struct must be named 'LruCache<K, V>'",
+    "Accept capacity in constructor",
+    "Implement get(&mut self, key: &K) -> Option<&V>",
+    "Implement put(&mut self, key: K, value: V)",
+    "Evict least recently used on capacity overflow",
+    "get() updates recency (counts as use)",
+    "Use LinkedHashMap or custom doubly-linked list"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/rust/chain_cache_2.rs",
+  "test_suite_path": "eval/tasks/fixtures/rust/chain_cache_2_test.rs",
+  "constraint_path": "eval/tasks/constraints/chain_cache_2.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "LRU cache with HashMap and order tracking.",
+      "code": "use std::collections::HashMap;\n\nstruct Node<K, V> {\n    key: K,\n    value: V,\n    prev: Option<*mut Node<K, V>>,\n    next: Option<*mut Node<K, V>>,\n}\n\npub struct LruCache<K, V> {\n    capacity: usize,\n    map: HashMap<K, Box<Node<K, V>>>,\n    head: Option<*mut Node<K, V>>,  // most recent\n    tail: Option<*mut Node<K, V>>,  // least recent\n}"
+    },
+    {
+      "prompt": "Move node to front of LRU list.",
+      "code": "fn move_to_front(&mut self, node: *mut Node<K, V>) {\n    unsafe {\n        // Remove from current position\n        if let Some(prev) = (*node).prev {\n            (*prev).next = (*node).next;\n        }\n        if let Some(next) = (*node).next {\n            (*next).prev = (*node).prev;\n        }\n        if self.tail == Some(node) {\n            self.tail = (*node).prev;\n        }\n        // Add to front\n        (*node).prev = None;\n        (*node).next = self.head;\n        if let Some(head) = self.head {\n            (*head).prev = Some(node);\n        }\n        self.head = Some(node);\n    }\n}"
+    }
+  ]
+}

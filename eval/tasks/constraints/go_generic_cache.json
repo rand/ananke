@@ -1,0 +1,27 @@
+{
+  "task_id": "go_003_generic_cache",
+  "constraints": {
+    "grammar": "type Cache[K comparable, V any] struct { }\nfunc NewCache[K comparable, V any](ttl time.Duration) *Cache[K, V] { }\nfunc (c *Cache[K, V]) Get(key K) (V, bool) { }\nfunc (c *Cache[K, V]) Set(key K, value V) { }\nfunc (c *Cache[K, V]) Delete(key K) { }",
+    "regex_pattern": "type\\s+Cache\\[K\\s+comparable,\\s*V\\s+any\\]\\s+struct",
+    "type_constraints": {
+      "generic_struct": {"name": "Cache", "type_params": ["K comparable", "V any"]},
+      "functions": [
+        {"name": "NewCache", "return_type": "*Cache[K, V]"},
+        {"name": "Get", "return_type": "(V, bool)"},
+        {"name": "Set", "return_type": ""},
+        {"name": "Delete", "return_type": ""}
+      ]
+    },
+    "naming_constraints": {
+      "type_names": ["Cache"],
+      "variable_patterns": ["items", "ttl", "mu", "expiry"]
+    },
+    "structural_constraints": {
+      "must_use": ["Go generics", "sync.RWMutex", "time.Duration"],
+      "must_not_use": ["interface{} for type safety"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/go/generic_cache.go",
+  "extraction_method": "generated",
+  "verified": false
+}

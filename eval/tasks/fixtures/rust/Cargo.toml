@@ -1,0 +1,32 @@
+[package]
+name = "rust_fixtures"
+version = "0.1.0"
+edition = "2021"
+
+[[test]]
+name = "result_handling"
+path = "result_handling_test.rs"
+
+[[test]]
+name = "iterator_chain"
+path = "iterator_chain_test.rs"
+
+[[test]]
+name = "actor_model"
+path = "actor_model_test.rs"
+
+[[test]]
+name = "state_machine"
+path = "state_machine_test.rs"
+
+[[test]]
+name = "chain_cache_1"
+path = "chain_cache_1_test.rs"
+
+[[test]]
+name = "chain_cache_2"
+path = "chain_cache_2_test.rs"
+
+[[test]]
+name = "chain_cache_3"
+path = "chain_cache_3_test.rs"

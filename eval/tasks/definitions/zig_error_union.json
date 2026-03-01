@@ -1,0 +1,50 @@
+{
+  "id": "zig_003_error_union",
+  "version": "1.0.0",
+  "title": "Error Set Composition and Handling",
+  "description": "Implement a file parser that demonstrates Zig's error set composition, error union types, and idiomatic error handling patterns.",
+  "category": "error_handling",
+  "language": "zig",
+  "difficulty": "moderate",
+  "metadata": {
+    "benchmark_inspired_by": "Zig error handling documentation",
+    "complexity": {
+      "time": "O(n) where n = file size",
+      "space": "O(n)"
+    },
+    "tags": [
+      "error-handling",
+      "error-sets",
+      "parsing",
+      "idiomatic"
+    ],
+    "constraint_types": [
+      "pattern_constraints",
+      "type_constraints"
+    ]
+  },
+  "requirements": [
+    "Define custom error sets: ParseError, FileError, ValidationError",
+    "Compose error sets using || operator",
+    "Implement parseConfig(reader) returning Config!ComposedError",
+    "Use errdefer for cleanup on error paths",
+    "Implement error payloads using error.* pattern",
+    "Use catch to convert errors appropriately",
+    "Implement try for error propagation",
+    "Handle all errors explicitly (no catch unreachable)"
+  ],
+  "reference_impl_path": "eval/tasks/fixtures/zig/error_union.zig",
+  "test_suite_path": "eval/tasks/fixtures/zig/error_union_test.zig",
+  "constraint_path": "eval/tasks/constraints/zig_error_union.json",
+  "expected_loc": 55,
+  "few_shot_examples": [
+    {
+      "prompt": "Define and compose error sets.",
+      "code": "const ParseError = error{\n    InvalidSyntax,\n    UnexpectedToken,\n    UnterminatedString,\n};\n\nconst FileError = error{\n    FileNotFound,\n    PermissionDenied,\n    EndOfStream,\n};\n\nconst ConfigError = ParseError || FileError || error{\n    MissingRequiredField,\n    InvalidValue,\n};"
+    },
+    {
+      "prompt": "Use errdefer for cleanup on error.",
+      "code": "fn parseConfig(allocator: std.mem.Allocator, reader: anytype) ConfigError!Config {\n    var buffer = try allocator.alloc(u8, 4096);\n    errdefer allocator.free(buffer);\n    \n    const bytes_read = try reader.read(buffer);\n    if (bytes_read == 0) return error.EndOfStream;\n    \n    return parseBuffer(buffer[0..bytes_read]);\n}"
+    }
+  ]
+}

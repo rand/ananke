@@ -1,0 +1,26 @@
+{
+  "task_id": "cpp_001_smart_ptr",
+  "constraints": {
+    "grammar": "template<typename T>\nclass SharedPtr {\npublic:\n  SharedPtr();\n  explicit SharedPtr(T* ptr);\n  SharedPtr(const SharedPtr& other);\n  SharedPtr(SharedPtr&& other) noexcept;\n  ~SharedPtr();\n  SharedPtr& operator=(const SharedPtr& other);\n  SharedPtr& operator=(SharedPtr&& other) noexcept;\n  T* get() const;\n  T& operator*() const;\n  T* operator->() const;\n  size_t use_count() const;\n  void reset();\n};",
+    "regex_pattern": "template\\s*<.*>\\s*class\\s+SharedPtr",
+    "type_constraints": {
+      "templates": [{"name": "SharedPtr", "params": ["T"]}],
+      "methods": [
+        {"name": "get", "return_type": "T*"},
+        {"name": "use_count", "return_type": "size_t"},
+        {"name": "reset", "return_type": "void"}
+      ]
+    },
+    "naming_constraints": {
+      "class_names": ["SharedPtr"],
+      "variable_patterns": ["ptr", "control", "ref_count"]
+    },
+    "structural_constraints": {
+      "must_use": ["atomic reference count", "control block", "move semantics"],
+      "must_not_use": ["std::shared_ptr"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/cpp/smart_ptr.cpp",
+  "extraction_method": "generated",
+  "verified": false
+}

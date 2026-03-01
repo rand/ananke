@@ -1,0 +1,28 @@
+{
+  "task_id": "c_003_memory_pool",
+  "constraints": {
+    "grammar": "typedef struct memory_pool pool_t;\npool_t* pool_create(size_t block_size, size_t num_blocks);\nvoid pool_destroy(pool_t* pool);\nvoid* pool_alloc(pool_t* pool);\nvoid pool_free(pool_t* pool, void* ptr);",
+    "regex_pattern": "typedef\\s+struct\\s+memory_pool\\s+pool_t|struct\\s+memory_pool",
+    "type_constraints": {
+      "structs": ["pool_t"],
+      "functions": [
+        {"name": "pool_create", "return_type": "pool_t*"},
+        {"name": "pool_destroy", "return_type": "void"},
+        {"name": "pool_alloc", "return_type": "void*"},
+        {"name": "pool_free", "return_type": "void"}
+      ]
+    },
+    "naming_constraints": {
+      "type_names": ["pool_t"],
+      "function_prefixes": ["pool_"],
+      "variable_patterns": ["block", "free_list", "pool", "size"]
+    },
+    "structural_constraints": {
+      "must_use": ["free list pattern", "block alignment"],
+      "must_not_use": ["global state"]
+    }
+  },
+  "extracted_from": "eval/tasks/fixtures/c/memory_pool.c",
+  "extraction_method": "generated",
+  "verified": false
+}
