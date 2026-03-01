@@ -20,8 +20,8 @@ fn create_test_constraint(name: &str) -> ConstraintIR {
         token_masks: None,
         priority: 1,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+        feasibility_score: 0.0,
+        is_feasible: true,
     }
 }
 

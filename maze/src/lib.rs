@@ -53,20 +53,21 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+pub use adaptive_selector::{
+    AdaptiveConfig, AdaptiveStrategySelector, SelectionDecision, Strategy,
+};
 pub use diffusion::{DiffusionConfig, DiffusionGenerator, DiffusionResult, NoiseSchedule};
 pub use ffi::{ConstraintIR, FillConstraint, GenerationResult, HoleSpec, Intent};
 pub use modal_client::{
     EnsembleClient, EnsembleConfig, EnsembleMetrics, InferenceRequest, InferenceResponse,
-    ModelMetrics, ModalClient, ModalConfig, StreamChunk, StreamingResult,
+    ModalClient, ModalConfig, ModelMetrics, StreamChunk, StreamingResult,
 };
 pub use model_router::{ModelCapability, ModelEndpoint, ModelRouter, RoutingDecision};
 pub use model_selector::{ModelChoice, ModelSelector};
 pub use progressive_refinement::{
-    FailureStrategy, HoleState, HoleStatus, ProgressiveRefiner, RefinementConfig,
-    RefinementResult,
+    FailureStrategy, HoleState, HoleStatus, ProgressiveRefiner, RefinementConfig, RefinementResult,
 };
-pub use adaptive_selector::{AdaptiveConfig, AdaptiveStrategySelector, Strategy, SelectionDecision};
-pub use strategy_stats::{StatsKey, StrategyStats, StrategyStatsStore, StatsSummary};
+pub use strategy_stats::{StatsKey, StatsSummary, StrategyStats, StrategyStatsStore};
 pub use telemetry::{FillOutcome, TelemetryStore};
 
 /// Main orchestrator for constrained code generation

@@ -26,9 +26,9 @@ pub fn simple_constraint(name: &str, priority: u32) -> ConstraintIR {
         token_masks: None,
         priority,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }
 }
 
@@ -45,9 +45,9 @@ pub fn regex_constraint(name: &str, pattern: &str, priority: u32) -> ConstraintI
         token_masks: None,
         priority,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }
 }
 
@@ -71,9 +71,9 @@ pub fn json_schema_constraint(
         token_masks: None,
         priority,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }
 }
 
@@ -95,9 +95,9 @@ pub fn grammar_constraint(
         token_masks: None,
         priority,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }
 }
 
@@ -119,9 +119,9 @@ pub fn token_mask_constraint(
         }),
         priority,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }
 }
 

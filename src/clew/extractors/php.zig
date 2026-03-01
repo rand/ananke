@@ -205,7 +205,7 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
 
     const is_public = std.mem.indexOf(u8, line[0..func_pos], "public ") != null or
         (std.mem.indexOf(u8, line[0..func_pos], "private ") == null and
-        std.mem.indexOf(u8, line[0..func_pos], "protected ") == null);
+            std.mem.indexOf(u8, line[0..func_pos], "protected ") == null);
 
     const is_static = std.mem.indexOf(u8, line[0..func_pos], "static ") != null;
     _ = is_static;

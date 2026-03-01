@@ -166,16 +166,9 @@ impl StrategyStatsStore {
 
     /// Update stats with a fill outcome
     pub fn record(&mut self, outcome: &FillOutcome) {
-        let key = StatsKey::new(
-            &outcome.hole_scale,
-            &outcome.hole_origin,
-            &outcome.strategy,
-        );
+        let key = StatsKey::new(&outcome.hole_scale, &outcome.hole_origin, &outcome.strategy);
 
-        self.stats
-            .entry(key)
-            .or_default()
-            .update(outcome);
+        self.stats.entry(key).or_default().update(outcome);
 
         self.global.update(outcome);
         self.total_outcomes += 1;
@@ -306,10 +299,20 @@ mod tests {
 
         // LLM: 10 successes, 3 failures = 77% success rate
         for _ in 0..10 {
-            store.record(&make_outcome("statement", "user_marked", "llm_complete", true));
+            store.record(&make_outcome(
+                "statement",
+                "user_marked",
+                "llm_complete",
+                true,
+            ));
         }
         for _ in 0..3 {
-            store.record(&make_outcome("statement", "user_marked", "llm_complete", false));
+            store.record(&make_outcome(
+                "statement",
+                "user_marked",
+                "llm_complete",
+                false,
+            ));
         }
 
         // Decompose: 3 successes, 2 failures = 60% success rate (5 samples total to hit minimum)
@@ -317,7 +320,12 @@ mod tests {
             store.record(&make_outcome("statement", "user_marked", "decompose", true));
         }
         for _ in 0..2 {
-            store.record(&make_outcome("statement", "user_marked", "decompose", false));
+            store.record(&make_outcome(
+                "statement",
+                "user_marked",
+                "decompose",
+                false,
+            ));
         }
 
         // LLM should win with 77% vs 60%

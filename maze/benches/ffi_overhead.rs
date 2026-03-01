@@ -38,8 +38,8 @@ fn create_test_constraint(id: usize) -> ConstraintIR {
         }),
         priority: 1,
         rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+        feasibility_score: 0.0,
+        is_feasible: true,
     }
 }
 

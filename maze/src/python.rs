@@ -3,17 +3,16 @@
 //! Exposes Rust types and functions to Python via PyO3.
 //! Provides async/await support through pyo3-async-runtimes.
 
-use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3_async_runtimes::tokio::future_into_py;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
-    MazeOrchestrator, MazeConfig, ModalConfig,
-    GenerationRequest, GenerationResponse, GenerationContext,
-    ffi::ConstraintIR,
+    ffi::ConstraintIR, GenerationContext, GenerationRequest, GenerationResponse, MazeConfig,
+    MazeOrchestrator, ModalConfig,
 };
 
 /// Python wrapper for ModalConfig
@@ -49,7 +48,9 @@ impl PyModalConfig {
     fn from_env() -> PyResult<Self> {
         ModalConfig::from_env()
             .map(|inner| Self { inner })
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to load config from environment: {}", e)))
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to load config from environment: {}", e))
+            })
     }
 
     fn __repr__(&self) -> String {
@@ -213,7 +214,9 @@ impl PyProvenance {
     fn __repr__(&self) -> String {
         format!(
             "PyProvenance(model='{}', timestamp={}, constraints={})",
-            self.model, self.timestamp, self.constraints_applied.len()
+            self.model,
+            self.timestamp,
+            self.constraints_applied.len()
         )
     }
 }
@@ -237,7 +240,9 @@ impl PyValidationResult {
     fn __repr__(&self) -> String {
         format!(
             "PyValidationResult(all_satisfied={}, satisfied={}, violated={})",
-            self.all_satisfied, self.satisfied.len(), self.violated.len()
+            self.all_satisfied,
+            self.satisfied.len(),
+            self.violated.len()
         )
     }
 }
@@ -365,10 +370,14 @@ impl Ananke {
             timeout_secs,
         };
 
-        let orchestrator = MazeOrchestrator::with_config(modal_config, maze_config)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to initialize Maze orchestrator: {}", e)))?;
+        let orchestrator =
+            MazeOrchestrator::with_config(modal_config, maze_config).map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to initialize Maze orchestrator: {}", e))
+            })?;
 
-        Ok(Self { orchestrator: Arc::new(orchestrator) })
+        Ok(Self {
+            orchestrator: Arc::new(orchestrator),
+        })
     }
 
     /// Create Ananke from environment variables.
@@ -400,8 +409,12 @@ impl Ananke {
     ///     ```
     #[staticmethod]
     fn from_env() -> PyResult<Self> {
-        let modal_config = ModalConfig::from_env()
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to load Modal config from environment: {}", e)))?;
+        let modal_config = ModalConfig::from_env().map_err(|e| {
+            PyRuntimeError::new_err(format!(
+                "Failed to load Modal config from environment: {}",
+                e
+            ))
+        })?;
 
         let cache_size = std::env::var("ANANKE_CACHE_SIZE")
             .ok()
@@ -416,10 +429,14 @@ impl Ananke {
             timeout_secs: modal_config.timeout_secs,
         };
 
-        let orchestrator = MazeOrchestrator::with_config(modal_config, maze_config)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to initialize orchestrator: {}", e)))?;
+        let orchestrator =
+            MazeOrchestrator::with_config(modal_config, maze_config).map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to initialize orchestrator: {}", e))
+            })?;
 
-        Ok(Self { orchestrator: Arc::new(orchestrator) })
+        Ok(Self {
+            orchestrator: Arc::new(orchestrator),
+        })
     }
 
     /// Generate code with constraints using the Modal inference service.
@@ -478,7 +495,9 @@ impl Ananke {
 
         // Return a Python coroutine
         future_into_py(py, async move {
-            let result = orch.generate(rust_request).await
+            let result = orch
+                .generate(rust_request)
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Generation failed: {}", e)))?;
 
             // Convert Rust response to Python response
@@ -514,16 +533,20 @@ impl Ananke {
                 type_inhabitation: None,
                 priority: 2,
                 rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                feasibility_score: 0.0,
+                is_feasible: true,
             })
             .collect();
 
         let orch = self.orchestrator.clone();
 
         future_into_py(py, async move {
-            let compiled = orch.compile_constraints(&rust_constraints).await
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to compile constraints: {}", e)))?;
+            let compiled = orch
+                .compile_constraints(&rust_constraints)
+                .await
+                .map_err(|e| {
+                    PyRuntimeError::new_err(format!("Failed to compile constraints: {}", e))
+                })?;
 
             //  Return as Python dict
             let result = Python::attach(|py| -> PyResult<Py<PyAny>> {
@@ -564,7 +587,8 @@ impl Ananke {
         let orch = self.orchestrator.clone();
 
         future_into_py(py, async move {
-            orch.clear_cache().await
+            orch.clear_cache()
+                .await
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to clear cache: {}", e)))?;
             Ok(())
         })
@@ -599,35 +623,38 @@ impl Ananke {
 // Helper functions for type conversion
 
 fn python_request_to_rust(py_req: PyGenerationRequest) -> PyResult<GenerationRequest> {
-    let constraints_ir: Vec<ConstraintIR> = py_req.constraints_ir
+    let constraints_ir: Vec<ConstraintIR> = py_req
+        .constraints_ir
         .iter()
         .map(|py_c| {
             // Parse JSON schema from Python string if provided
             let json_schema = py_c.json_schema.as_ref().and_then(|schema_str| {
                 serde_json::from_str::<serde_json::Value>(schema_str)
                     .ok()
-                    .map(|value| {
-                        crate::ffi::JsonSchema {
-                            schema_type: value.get("type")
-                                .and_then(|t| t.as_str())
-                                .unwrap_or("object")
-                                .to_string(),
-                            properties: value.get("properties")
-                                .and_then(|p| p.as_object())
-                                .map(|obj| obj.iter()
-                                    .map(|(k, v)| (k.clone(), v.clone()))
-                                    .collect())
-                                .unwrap_or_default(),
-                            required: value.get("required")
-                                .and_then(|r| r.as_array())
-                                .map(|arr| arr.iter()
+                    .map(|value| crate::ffi::JsonSchema {
+                        schema_type: value
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("object")
+                            .to_string(),
+                        properties: value
+                            .get("properties")
+                            .and_then(|p| p.as_object())
+                            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                            .unwrap_or_default(),
+                        required: value
+                            .get("required")
+                            .and_then(|r| r.as_array())
+                            .map(|arr| {
+                                arr.iter()
                                     .filter_map(|v| v.as_str().map(String::from))
-                                    .collect())
-                                .unwrap_or_default(),
-                            additional_properties: value.get("additionalProperties")
-                                .and_then(|a| a.as_bool())
-                                .unwrap_or(true),
-                        }
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                        additional_properties: value
+                            .get("additionalProperties")
+                            .and_then(|a| a.as_bool())
+                            .unwrap_or(true),
                     })
             });
 
@@ -637,13 +664,15 @@ fn python_request_to_rust(py_req: PyGenerationRequest) -> PyResult<GenerationReq
                 serde_json::from_str::<serde_json::Value>(grammar_str)
                     .ok()
                     .and_then(|value| {
-                        let rules = value.get("rules")?
+                        let rules = value
+                            .get("rules")?
                             .as_array()?
                             .iter()
                             .filter_map(|rule| {
                                 Some(crate::ffi::GrammarRule {
                                     lhs: rule.get("lhs")?.as_str()?.to_string(),
-                                    rhs: rule.get("rhs")?
+                                    rhs: rule
+                                        .get("rhs")?
                                         .as_array()?
                                         .iter()
                                         .filter_map(|r| r.as_str().map(String::from))
@@ -651,15 +680,17 @@ fn python_request_to_rust(py_req: PyGenerationRequest) -> PyResult<GenerationReq
                                 })
                             })
                             .collect();
-                        let start_symbol = value.get("start_symbol")?
-                            .as_str()?
-                            .to_string();
-                        Some(crate::ffi::Grammar { rules, start_symbol })
+                        let start_symbol = value.get("start_symbol")?.as_str()?.to_string();
+                        Some(crate::ffi::Grammar {
+                            rules,
+                            start_symbol,
+                        })
                     })
             });
 
             // Convert regex patterns from Python strings
-            let regex_patterns: Vec<crate::ffi::RegexPattern> = py_c.regex_patterns
+            let regex_patterns: Vec<crate::ffi::RegexPattern> = py_c
+                .regex_patterns
                 .iter()
                 .map(|pattern| crate::ffi::RegexPattern {
                     pattern: pattern.clone(),
@@ -676,8 +707,8 @@ fn python_request_to_rust(py_req: PyGenerationRequest) -> PyResult<GenerationReq
                 type_inhabitation: None,
                 priority: 2,
                 rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                feasibility_score: 0.0,
+                is_feasible: true,
             }
         })
         .collect();

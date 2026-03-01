@@ -2,10 +2,7 @@
 //!
 //! Tests the complete integration between Rust Maze and Zig Clew/Braid
 
-use maze::ffi::{
-    ConstraintIR, Grammar, GrammarRule, JsonSchema, RegexPattern,
-    TokenMaskRules,
-};
+use maze::ffi::{ConstraintIR, Grammar, GrammarRule, JsonSchema, RegexPattern, TokenMaskRules};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -61,10 +58,10 @@ fn test_zig_ffi_constraint_ir_conversion() {
             forbidden_tokens: Some(vec![666, 999, 1337]),
         }),
         priority: 42,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     // Convert to FFI representation and back
@@ -241,10 +238,10 @@ fn test_ffi_edge_cases() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 0,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = minimal.to_ffi();
@@ -273,10 +270,10 @@ fn test_ffi_edge_cases() {
         }],
         token_masks: None,
         priority: 999,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = large.to_ffi();
@@ -333,10 +330,10 @@ fn test_ffi_complex_grammar() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 10,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();
@@ -376,10 +373,10 @@ fn test_ffi_token_masks_edge_cases() {
             forbidden_tokens: None,
         }),
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = allowed_only.to_ffi();
@@ -402,10 +399,10 @@ fn test_ffi_token_masks_edge_cases() {
             forbidden_tokens: Some(vec![99, 100, 101]),
         }),
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = forbidden_only.to_ffi();
@@ -428,10 +425,10 @@ fn test_ffi_token_masks_edge_cases() {
             forbidden_tokens: Some(vec![]),
         }),
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = empty_masks.to_ffi();
@@ -487,10 +484,10 @@ fn test_ffi_json_schema_complex() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 5,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     };
 
     let ffi = constraint.to_ffi();

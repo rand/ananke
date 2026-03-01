@@ -184,10 +184,7 @@ mod tests {
             },
             ModelEndpoint {
                 name: "quality".to_string(),
-                capabilities: vec![
-                    ModelCapability::HighQuality,
-                    ModelCapability::SecurityAware,
-                ],
+                capabilities: vec![ModelCapability::HighQuality, ModelCapability::SecurityAware],
                 priority: 2,
                 ..Default::default()
             },

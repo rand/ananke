@@ -48,10 +48,10 @@ async fn test_e2e_simple_generation_with_mock() {
         }],
         token_masks: None,
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -213,10 +213,10 @@ async fn test_e2e_python_with_json_schema() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -286,10 +286,10 @@ async fn test_e2e_with_grammar_constraint() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -344,10 +344,10 @@ async fn test_e2e_with_token_masks() {
             forbidden_tokens: Some(vec![1234, 5678]), // Placeholder token IDs
         }),
         priority: 3,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let request = GenerationRequest {
@@ -401,10 +401,10 @@ async fn test_e2e_constraint_caching() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let request1 = GenerationRequest {
@@ -598,10 +598,10 @@ async fn test_e2e_provenance_tracking() {
         regex_patterns: vec![],
         token_masks: None,
         priority: 1,
-            rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
-            type_inhabitation: None,
+        rich_context: None,
+        feasibility_score: 0.0,
+        is_feasible: true,
+        type_inhabitation: None,
     }];
 
     let request = GenerationRequest {

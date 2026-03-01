@@ -571,7 +571,10 @@ pub unsafe extern "C" fn free_constraint_ir_ffi(ptr: *mut ConstraintIRFFI) {
         return;
     }
     if magic != FFI_MAGIC {
-        tracing::warn!("free_constraint_ir_ffi: invalid pointer (magic mismatch: 0x{:x})", magic);
+        tracing::warn!(
+            "free_constraint_ir_ffi: invalid pointer (magic mismatch: 0x{:x})",
+            magic
+        );
         return;
     }
 
@@ -687,7 +690,6 @@ pub struct FillConstraint {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
 }
-
 
 impl HoleSpec {
     /// Create a new hole specification

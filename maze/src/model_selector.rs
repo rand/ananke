@@ -125,8 +125,7 @@ impl ModelSelector {
         }
 
         // Use diffusion if constraints are complex and numerous
-        if constraint_count >= self.constraint_threshold
-            && complexity >= self.complexity_threshold
+        if constraint_count >= self.constraint_threshold && complexity >= self.complexity_threshold
         {
             tracing::debug!(
                 "Selecting diffusion model for hole {} (high constraint count and complexity)",
@@ -238,11 +237,7 @@ impl ModelSelector {
         complexity += (schema.required.len() as f32 / 10.0).min(0.3);
 
         // Nested objects increase complexity
-        let nested_count = schema
-            .properties
-            .values()
-            .filter(|v| v.is_object())
-            .count() as f32;
+        let nested_count = schema.properties.values().filter(|v| v.is_object()).count() as f32;
         complexity += (nested_count / 5.0).min(0.2);
 
         complexity.min(1.0)

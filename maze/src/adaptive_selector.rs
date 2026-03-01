@@ -157,7 +157,9 @@ impl AdaptiveStrategySelector {
     /// Select strategy for a hole
     pub fn select(&mut self, scale: &str, origin: &str) -> Strategy {
         let decision = self.make_decision(scale, origin);
-        let strategy = decision.selected_strategy.parse::<Strategy>()
+        let strategy = decision
+            .selected_strategy
+            .parse::<Strategy>()
             .unwrap_or(Strategy::LlmComplete);
 
         if self.config.log_decisions {
@@ -197,7 +199,10 @@ impl AdaptiveStrategySelector {
         }
 
         // Check if we have enough data
-        if !self.stats.has_enough_data(scale, origin, self.config.min_samples) {
+        if !self
+            .stats
+            .has_enough_data(scale, origin, self.config.min_samples)
+        {
             let strategy = self.heuristic_select(scale, origin);
 
             return SelectionDecision {

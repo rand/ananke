@@ -59,12 +59,7 @@ pub struct FillOutcome {
 
 impl FillOutcome {
     /// Create a new fill outcome
-    pub fn new(
-        hole_id: String,
-        hole_scale: String,
-        hole_origin: String,
-        strategy: String,
-    ) -> Self {
+    pub fn new(hole_id: String, hole_scale: String, hole_origin: String, strategy: String) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())

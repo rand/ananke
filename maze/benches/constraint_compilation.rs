@@ -111,8 +111,8 @@ fn bench_constraint_ir_serialization(c: &mut Criterion) {
                 token_masks: None,
                 priority: 1,
                 rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                feasibility_score: 0.0,
+                is_feasible: true,
             },
             "medium" => ConstraintIR {
                 name: "medium".to_string(),
@@ -125,8 +125,8 @@ fn bench_constraint_ir_serialization(c: &mut Criterion) {
                 token_masks: None,
                 priority: 1,
                 rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                feasibility_score: 0.0,
+                is_feasible: true,
             },
             "large" => ConstraintIR {
                 name: "complex".to_string(),
@@ -148,8 +148,8 @@ fn bench_constraint_ir_serialization(c: &mut Criterion) {
                 }),
                 priority: 1,
                 rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                feasibility_score: 0.0,
+                is_feasible: true,
             },
             _ => unreachable!(),
         };
@@ -187,8 +187,8 @@ fn bench_llguidance_conversion(c: &mut Criterion) {
                 token_masks: None,
                 priority: 1,
                 rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                feasibility_score: 0.0,
+                is_feasible: true,
             }],
             "medium" => (0..5)
                 .map(|i| ConstraintIR {
@@ -199,8 +199,8 @@ fn bench_llguidance_conversion(c: &mut Criterion) {
                     token_masks: None,
                     priority: 1,
                     rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                    feasibility_score: 0.0,
+                    is_feasible: true,
                 })
                 .collect(),
             "large" => (0..10)
@@ -215,8 +215,8 @@ fn bench_llguidance_conversion(c: &mut Criterion) {
                     token_masks: None,
                     priority: 1,
                     rich_context: None,
-            feasibility_score: 0.0,
-            is_feasible: true,
+                    feasibility_score: 0.0,
+                    is_feasible: true,
                 })
                 .collect(),
             _ => unreachable!(),

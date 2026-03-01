@@ -20,7 +20,10 @@ async fn main() -> anyhow::Result<()> {
             model: "meta-llama/Llama-3.1-8B-Instruct".to_string(),
             api_key: std::env::var("MODAL_API_KEY").ok(),
             timeout_secs: 60,
-            capabilities: vec![ModelCapability::FastInference, ModelCapability::CodeCompletion],
+            capabilities: vec![
+                ModelCapability::FastInference,
+                ModelCapability::CodeCompletion,
+            ],
             priority: 1,
             cost_per_1k_tokens: 0.001,
         },
@@ -61,7 +64,10 @@ async fn main() -> anyhow::Result<()> {
         max_fallback_attempts: 3,
     };
 
-    println!("Creating ensemble client with {} models", config.endpoints.len());
+    println!(
+        "Creating ensemble client with {} models",
+        config.endpoints.len()
+    );
     let ensemble = EnsembleClient::from_config(config)?;
 
     // Example 1: Simple hole - should route to fast model
@@ -132,7 +138,9 @@ async fn main() -> anyhow::Result<()> {
         type_inhabitation: None,
     }];
 
-    let routing = ensemble.router().route(&security_hole, &security_constraints);
+    let routing = ensemble
+        .router()
+        .route(&security_hole, &security_constraints);
     println!("Routing decision for security hole:");
     println!("  Primary model: {}", routing.primary_model);
     println!("  Reason: {}", routing.reason);
@@ -171,7 +179,10 @@ async fn main() -> anyhow::Result<()> {
         println!("    Requests: {}", model_metrics.requests);
         println!("    Successes: {}", model_metrics.successes);
         println!("    Failures: {}", model_metrics.failures);
-        println!("    Success rate: {:.2}%", model_metrics.success_rate() * 100.0);
+        println!(
+            "    Success rate: {:.2}%",
+            model_metrics.success_rate() * 100.0
+        );
         println!("    Avg latency: {}ms", model_metrics.avg_latency_ms());
         println!("    Avg confidence: {:.2}", model_metrics.avg_confidence);
     }

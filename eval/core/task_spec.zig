@@ -5,7 +5,7 @@ const Allocator = std.mem.Allocator;
 pub const TaskCategory = enum {
     algorithms,
     api,
-    @"async",
+    async,
     caching,
     concurrency,
     data_processing,
@@ -32,7 +32,7 @@ pub const TaskCategory = enum {
         return switch (self) {
             .algorithms => "algorithms",
             .api => "api",
-            .@"async" => "async",
+            .async => "async",
             .caching => "caching",
             .concurrency => "concurrency",
             .data_processing => "data_processing",
@@ -60,7 +60,7 @@ pub const TaskCategory = enum {
     pub fn fromString(s: []const u8) ?TaskCategory {
         if (std.mem.eql(u8, s, "algorithms")) return .algorithms;
         if (std.mem.eql(u8, s, "api")) return .api;
-        if (std.mem.eql(u8, s, "async")) return .@"async";
+        if (std.mem.eql(u8, s, "async")) return .async;
         if (std.mem.eql(u8, s, "caching")) return .caching;
         if (std.mem.eql(u8, s, "concurrency")) return .concurrency;
         if (std.mem.eql(u8, s, "data_processing")) return .data_processing;

@@ -426,16 +426,16 @@ pub fn extractFunctions(allocator: Allocator, root: Node) ![]Node {
 
     // Common function declaration node types across languages
     const function_types = [_][]const u8{
-        "function_declaration",  // C, Go, JavaScript, Kotlin, Swift
-        "function_definition",   // C++, PHP
-        "function_item",         // Rust
-        "method_declaration",    // Java, C#, PHP
-        "fn_decl",               // Zig
-        "function",              // Python (can be function_definition in some grammars)
-        "arrow_function",        // JavaScript/TypeScript
-        "method_definition",     // JavaScript/TypeScript classes
-        "method",                // Ruby
-        "singleton_method",      // Ruby class methods (def self.foo)
+        "function_declaration", // C, Go, JavaScript, Kotlin, Swift
+        "function_definition", // C++, PHP
+        "function_item", // Rust
+        "method_declaration", // Java, C#, PHP
+        "fn_decl", // Zig
+        "function", // Python (can be function_definition in some grammars)
+        "arrow_function", // JavaScript/TypeScript
+        "method_definition", // JavaScript/TypeScript classes
+        "method", // Ruby
+        "singleton_method", // Ruby class methods (def self.foo)
         "protocol_function_declaration", // Swift protocol methods
     };
 
@@ -456,20 +456,20 @@ pub fn extractTypes(allocator: Allocator, root: Node) ![]Node {
     const t = Traversal.init(allocator);
 
     const type_node_types = [_][]const u8{
-        "interface_declaration",  // TypeScript, Java, C#, PHP
+        "interface_declaration", // TypeScript, Java, C#, PHP
         "type_alias_declaration", // TypeScript
-        "class_declaration",      // TypeScript, Java, C++, Kotlin, C#, PHP, Swift
-        "class_definition",       // Python
-        "struct_item",            // Rust
-        "struct_declaration",     // C, Go, C#, Swift
-        "enum_declaration",       // Many languages (Java, C#, PHP, Swift)
-        "trait_item",             // Rust
-        "class",                  // Ruby
-        "module",                 // Ruby
-        "object_declaration",     // Kotlin (singleton objects)
-        "record_declaration",     // C#
-        "trait_declaration",      // PHP
-        "protocol_declaration",   // Swift
+        "class_declaration", // TypeScript, Java, C++, Kotlin, C#, PHP, Swift
+        "class_definition", // Python
+        "struct_item", // Rust
+        "struct_declaration", // C, Go, C#, Swift
+        "enum_declaration", // Many languages (Java, C#, PHP, Swift)
+        "trait_item", // Rust
+        "class", // Ruby
+        "module", // Ruby
+        "object_declaration", // Kotlin (singleton objects)
+        "record_declaration", // C#
+        "trait_declaration", // PHP
+        "protocol_declaration", // Swift
     };
 
     var results = std.ArrayList(Node){};
@@ -489,18 +489,18 @@ pub fn extractImports(allocator: Allocator, root: Node) ![]Node {
     const t = Traversal.init(allocator);
 
     const import_types = [_][]const u8{
-        "import_statement",          // Python (import x)
-        "import_from_statement",     // Python (from x import y)
-        "import_declaration",        // JavaScript/TypeScript, Swift
-        "use_declaration",           // Rust
-        "import_spec",               // Go
-        "include",                   // C/C++
-        "import_header",             // Kotlin
-        "import_list",               // Kotlin
-        "using_directive",           // C#
+        "import_statement", // Python (import x)
+        "import_from_statement", // Python (from x import y)
+        "import_declaration", // JavaScript/TypeScript, Swift
+        "use_declaration", // Rust
+        "import_spec", // Go
+        "include", // C/C++
+        "import_header", // Kotlin
+        "import_list", // Kotlin
+        "using_directive", // C#
         "namespace_use_declaration", // PHP
-        "require_expression",        // PHP
-        "require_once_expression",   // PHP
+        "require_expression", // PHP
+        "require_once_expression", // PHP
     };
 
     var results = std.ArrayList(Node){};
@@ -589,18 +589,18 @@ fn extractIdentifierName(allocator: Allocator, node: Node, source: []const u8) !
         // Type declarations use type_identifier for their name
         identifier_types = &[_][]const u8{
             "type_identifier", // The actual name of the type
-            "identifier",      // Fallback for some languages
-            "constant",        // Ruby class/module names
-            "name",            // Generic fallback
+            "identifier", // Fallback for some languages
+            "constant", // Ruby class/module names
+            "name", // Generic fallback
             "simple_identifier", // Swift identifiers
         };
     } else {
         // Functions and other declarations use identifier for their name
         identifier_types = &[_][]const u8{
-            "identifier",        // The actual name of the function/variable
-            "type_identifier",   // Fallback for rare cases
+            "identifier", // The actual name of the function/variable
+            "type_identifier", // Fallback for rare cases
             "simple_identifier", // Swift identifiers
-            "name",              // Generic fallback
+            "name", // Generic fallback
         };
     }
 

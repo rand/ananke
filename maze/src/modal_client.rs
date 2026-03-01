@@ -726,10 +726,7 @@ impl EnsembleClient {
         let mut metrics = self.metrics.lock().await;
         metrics.total_requests += 1;
 
-        let model_metrics = metrics
-            .per_model
-            .entry(model.to_string())
-            .or_default();
+        let model_metrics = metrics.per_model.entry(model.to_string()).or_default();
         model_metrics.requests += 1;
         model_metrics.successes += 1;
         model_metrics.total_latency_ms += latency_ms;
@@ -744,10 +741,7 @@ impl EnsembleClient {
         let mut metrics = self.metrics.lock().await;
         metrics.total_requests += 1;
 
-        let model_metrics = metrics
-            .per_model
-            .entry(model.to_string())
-            .or_default();
+        let model_metrics = metrics.per_model.entry(model.to_string()).or_default();
         model_metrics.requests += 1;
         model_metrics.failures += 1;
     }

@@ -358,10 +358,8 @@ impl ProgressiveRefiner {
 
         // Add constraints from the hole state
         for constraint_str in &hole.constraints {
-            let constraint = crate::ffi::FillConstraint::new(
-                "generic".to_string(),
-                constraint_str.clone(),
-            );
+            let constraint =
+                crate::ffi::FillConstraint::new("generic".to_string(), constraint_str.clone());
             spec.fill_constraints.push(constraint);
         }
 
@@ -424,7 +422,11 @@ impl ProgressiveRefiner {
 
         // Iterative refinement loop
         for iteration in 0..self.config.max_iterations {
-            tracing::debug!("Refinement iteration {}/{}", iteration + 1, self.config.max_iterations);
+            tracing::debug!(
+                "Refinement iteration {}/{}",
+                iteration + 1,
+                self.config.max_iterations
+            );
 
             // Get temperature for this iteration
             let temperature = self.get_temperature_for_iteration(iteration);
@@ -437,7 +439,9 @@ impl ProgressiveRefiner {
                     tracing::info!("All holes resolved successfully");
                     break;
                 } else {
-                    tracing::warn!("No ready holes but refinement incomplete - possible dependency cycle");
+                    tracing::warn!(
+                        "No ready holes but refinement incomplete - possible dependency cycle"
+                    );
                     break;
                 }
             }
@@ -489,13 +493,10 @@ impl ProgressiveRefiner {
             0.0
         };
 
-        metadata.iterations = self.config.max_iterations.min(
-            holes
-                .iter()
-                .map(|h| h.attempts.len())
-                .max()
-                .unwrap_or(0),
-        );
+        metadata.iterations = self
+            .config
+            .max_iterations
+            .min(holes.iter().map(|h| h.attempts.len()).max().unwrap_or(0));
 
         Ok(RefinementResult {
             code: current_code,
@@ -524,9 +525,17 @@ impl ProgressiveRefiner {
                 HoleStatus::PendingChildren => {
                     // A parent is resolved when all its children are resolved
                     hole.child_ids.iter().all(|child_id| {
-                        states.get(child_id).map(|child| {
-                            matches!(child.status, HoleStatus::Filled | HoleStatus::Skipped | HoleStatus::NeedsHuman)
-                        }).unwrap_or(false)
+                        states
+                            .get(child_id)
+                            .map(|child| {
+                                matches!(
+                                    child.status,
+                                    HoleStatus::Filled
+                                        | HoleStatus::Skipped
+                                        | HoleStatus::NeedsHuman
+                                )
+                            })
+                            .unwrap_or(false)
                     })
                 }
                 _ => false,
@@ -546,11 +555,7 @@ impl ProgressiveRefiner {
     /// - meso: block level -> decompose to micro (statements)
     /// - micro: statement level -> decompose to nano (expressions)
     /// - nano: expression level -> cannot decompose further
-    fn decompose_hole(
-        &self,
-        hole: &HoleState,
-        states: &mut HashMap<u64, HoleState>,
-    ) -> Vec<u64> {
+    fn decompose_hole(&self, hole: &HoleState, states: &mut HashMap<u64, HoleState>) -> Vec<u64> {
         let child_scale = match hole.scale.as_str() {
             "macro" => "meso",
             "meso" => "micro",
@@ -578,12 +583,8 @@ impl ProgressiveRefiner {
             let child_id = base_id + i as u64;
             let child_origin = format!("{}:child_{}", hole.origin, i);
 
-            let mut child = HoleState::new_child(
-                child_id,
-                hole,
-                child_scale.to_string(),
-                child_origin,
-            );
+            let mut child =
+                HoleState::new_child(child_id, hole, child_scale.to_string(), child_origin);
 
             // Later children depend on earlier children (sequential decomposition)
             if i > 0 {
@@ -605,7 +606,6 @@ impl ProgressiveRefiner {
 
         child_ids
     }
-
 
     /// Get temperature for a given iteration based on schedule
     fn get_temperature_for_iteration(&self, iteration: usize) -> f32 {
@@ -955,7 +955,12 @@ mod tests {
     #[test]
     fn test_hole_state_new_child() {
         let parent = HoleState::new(1, "macro".to_string(), "test.rs:1:1".to_string());
-        let child = HoleState::new_child(2, &parent, "meso".to_string(), "test.rs:1:1:child_0".to_string());
+        let child = HoleState::new_child(
+            2,
+            &parent,
+            "meso".to_string(),
+            "test.rs:1:1:child_0".to_string(),
+        );
 
         assert_eq!(child.id, 2);
         assert_eq!(child.scale, "meso");
@@ -976,9 +981,9 @@ mod tests {
         // Verify that macro -> meso -> micro -> nano is the expected hierarchy
         // This test documents the expected behavior of decompose_hole
         let scales = vec![
-            ("macro", "meso", 3),   // macro decomposes to 3 meso
-            ("meso", "micro", 2),   // meso decomposes to 2 micro
-            ("micro", "nano", 2),   // micro decomposes to 2 nano
+            ("macro", "meso", 3), // macro decomposes to 3 meso
+            ("meso", "micro", 2), // meso decomposes to 2 micro
+            ("micro", "nano", 2), // micro decomposes to 2 nano
         ];
 
         for (parent_scale, expected_child_scale, expected_count) in scales {
@@ -995,8 +1000,16 @@ mod tests {
                 _ => "micro",
             };
 
-            assert_eq!(child_scale, expected_child_scale, "Scale {} should decompose to {}", parent_scale, expected_child_scale);
-            assert_eq!(num_children, expected_count, "Scale {} should create {} children", parent_scale, expected_count);
+            assert_eq!(
+                child_scale, expected_child_scale,
+                "Scale {} should decompose to {}",
+                parent_scale, expected_child_scale
+            );
+            assert_eq!(
+                num_children, expected_count,
+                "Scale {} should create {} children",
+                parent_scale, expected_count
+            );
         }
     }
 }
