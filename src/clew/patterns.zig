@@ -1735,6 +1735,763 @@ pub const java_patterns = LanguagePatterns{
 };
 
 // ============================================================================
+// Kotlin Patterns
+// ============================================================================
+
+const kotlin_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "suspend fun",
+        .constraint_kind = .semantic,
+        .description = "Suspend function",
+    },
+    .{
+        .pattern = "fun ",
+        .constraint_kind = .syntactic,
+        .description = "Function definition",
+    },
+};
+
+const kotlin_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "?",
+        .constraint_kind = .type_safety,
+        .description = "Nullable type",
+    },
+    .{
+        .pattern = "<",
+        .constraint_kind = .type_safety,
+        .description = "Generic type",
+    },
+    .{
+        .pattern = "sealed class",
+        .constraint_kind = .type_safety,
+        .description = "Sealed class",
+    },
+    .{
+        .pattern = "data class",
+        .constraint_kind = .type_safety,
+        .description = "Data class",
+    },
+};
+
+const kotlin_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "suspend ",
+        .constraint_kind = .semantic,
+        .description = "Suspend modifier",
+    },
+    .{
+        .pattern = "launch",
+        .constraint_kind = .semantic,
+        .description = "Coroutine launch",
+    },
+    .{
+        .pattern = "async",
+        .constraint_kind = .semantic,
+        .description = "Async builder",
+    },
+    .{
+        .pattern = "Flow<",
+        .constraint_kind = .semantic,
+        .description = "Flow type",
+    },
+    .{
+        .pattern = "Deferred<",
+        .constraint_kind = .semantic,
+        .description = "Deferred type",
+    },
+};
+
+const kotlin_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "try {",
+        .constraint_kind = .semantic,
+        .description = "Try block",
+    },
+    .{
+        .pattern = "catch (",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "finally {",
+        .constraint_kind = .semantic,
+        .description = "Finally block",
+    },
+    .{
+        .pattern = "runCatching",
+        .constraint_kind = .semantic,
+        .description = "RunCatching call",
+    },
+};
+
+const kotlin_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "import ",
+        .constraint_kind = .architectural,
+        .description = "Import statement",
+    },
+    .{
+        .pattern = "package ",
+        .constraint_kind = .architectural,
+        .description = "Package declaration",
+    },
+};
+
+const kotlin_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "data class",
+        .constraint_kind = .syntactic,
+        .description = "Data class definition",
+    },
+    .{
+        .pattern = "sealed class",
+        .constraint_kind = .syntactic,
+        .description = "Sealed class definition",
+    },
+    .{
+        .pattern = "object ",
+        .constraint_kind = .syntactic,
+        .description = "Object declaration",
+    },
+    .{
+        .pattern = "interface ",
+        .constraint_kind = .syntactic,
+        .description = "Interface definition",
+    },
+    .{
+        .pattern = "enum class",
+        .constraint_kind = .syntactic,
+        .description = "Enum class definition",
+    },
+};
+
+const kotlin_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "@",
+        .constraint_kind = .syntactic,
+        .description = "Annotation",
+    },
+    .{
+        .pattern = "annotation class",
+        .constraint_kind = .syntactic,
+        .description = "Annotation class",
+    },
+};
+
+const kotlin_memory_patterns = [_]PatternRule{};
+
+pub const kotlin_patterns = LanguagePatterns{
+    .function_decl = &kotlin_function_patterns,
+    .type_annotation = &kotlin_type_patterns,
+    .async_pattern = &kotlin_async_patterns,
+    .error_handling = &kotlin_error_patterns,
+    .imports = &kotlin_import_patterns,
+    .class_struct = &kotlin_class_patterns,
+    .metadata = &kotlin_metadata_patterns,
+    .memory_management = &kotlin_memory_patterns,
+};
+
+// ============================================================================
+// C# Patterns
+// ============================================================================
+
+const csharp_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "async ",
+        .constraint_kind = .semantic,
+        .description = "Async method",
+    },
+    .{
+        .pattern = "static ",
+        .constraint_kind = .syntactic,
+        .description = "Static member",
+    },
+    .{
+        .pattern = "virtual ",
+        .constraint_kind = .syntactic,
+        .description = "Virtual method",
+    },
+    .{
+        .pattern = "override ",
+        .constraint_kind = .syntactic,
+        .description = "Override method",
+    },
+};
+
+const csharp_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "?",
+        .constraint_kind = .type_safety,
+        .description = "Nullable type",
+    },
+    .{
+        .pattern = "<",
+        .constraint_kind = .type_safety,
+        .description = "Generic type",
+    },
+    .{
+        .pattern = "Task<",
+        .constraint_kind = .type_safety,
+        .description = "Task generic type",
+    },
+};
+
+const csharp_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "async ",
+        .constraint_kind = .semantic,
+        .description = "Async keyword",
+    },
+    .{
+        .pattern = "await ",
+        .constraint_kind = .semantic,
+        .description = "Await keyword",
+    },
+    .{
+        .pattern = "Task<",
+        .constraint_kind = .semantic,
+        .description = "Task type",
+    },
+    .{
+        .pattern = "ValueTask",
+        .constraint_kind = .semantic,
+        .description = "ValueTask type",
+    },
+};
+
+const csharp_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "try {",
+        .constraint_kind = .semantic,
+        .description = "Try block",
+    },
+    .{
+        .pattern = "catch (",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "finally {",
+        .constraint_kind = .semantic,
+        .description = "Finally block",
+    },
+    .{
+        .pattern = "throw ",
+        .constraint_kind = .semantic,
+        .description = "Throw statement",
+    },
+};
+
+const csharp_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "using ",
+        .constraint_kind = .architectural,
+        .description = "Using directive",
+    },
+    .{
+        .pattern = "namespace ",
+        .constraint_kind = .architectural,
+        .description = "Namespace declaration",
+    },
+};
+
+const csharp_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "struct ",
+        .constraint_kind = .syntactic,
+        .description = "Struct definition",
+    },
+    .{
+        .pattern = "interface ",
+        .constraint_kind = .syntactic,
+        .description = "Interface definition",
+    },
+    .{
+        .pattern = "enum ",
+        .constraint_kind = .syntactic,
+        .description = "Enum definition",
+    },
+    .{
+        .pattern = "record ",
+        .constraint_kind = .syntactic,
+        .description = "Record definition",
+    },
+};
+
+const csharp_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "[",
+        .constraint_kind = .syntactic,
+        .description = "Attribute",
+    },
+};
+
+const csharp_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "using(",
+        .constraint_kind = .operational,
+        .description = "Using statement",
+    },
+    .{
+        .pattern = "Dispose()",
+        .constraint_kind = .operational,
+        .description = "Dispose call",
+    },
+    .{
+        .pattern = "IDisposable",
+        .constraint_kind = .operational,
+        .description = "IDisposable interface",
+    },
+};
+
+pub const csharp_patterns = LanguagePatterns{
+    .function_decl = &csharp_function_patterns,
+    .type_annotation = &csharp_type_patterns,
+    .async_pattern = &csharp_async_patterns,
+    .error_handling = &csharp_error_patterns,
+    .imports = &csharp_import_patterns,
+    .class_struct = &csharp_class_patterns,
+    .metadata = &csharp_metadata_patterns,
+    .memory_management = &csharp_memory_patterns,
+};
+
+// ============================================================================
+// Ruby Patterns
+// ============================================================================
+
+const ruby_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "def self.",
+        .constraint_kind = .syntactic,
+        .description = "Class method definition",
+    },
+    .{
+        .pattern = "def ",
+        .constraint_kind = .syntactic,
+        .description = "Method definition",
+    },
+};
+
+const ruby_type_patterns = [_]PatternRule{};
+
+const ruby_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "Fiber",
+        .constraint_kind = .semantic,
+        .description = "Fiber usage",
+    },
+    .{
+        .pattern = "Thread.new",
+        .constraint_kind = .semantic,
+        .description = "Thread creation",
+    },
+};
+
+const ruby_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "begin",
+        .constraint_kind = .semantic,
+        .description = "Begin block",
+    },
+    .{
+        .pattern = "rescue ",
+        .constraint_kind = .semantic,
+        .description = "Rescue block",
+    },
+    .{
+        .pattern = "ensure",
+        .constraint_kind = .semantic,
+        .description = "Ensure block",
+    },
+    .{
+        .pattern = "raise ",
+        .constraint_kind = .semantic,
+        .description = "Raise exception",
+    },
+};
+
+const ruby_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "require ",
+        .constraint_kind = .architectural,
+        .description = "Require statement",
+    },
+    .{
+        .pattern = "require_relative ",
+        .constraint_kind = .architectural,
+        .description = "Require relative",
+    },
+    .{
+        .pattern = "include ",
+        .constraint_kind = .architectural,
+        .description = "Module include",
+    },
+    .{
+        .pattern = "extend ",
+        .constraint_kind = .architectural,
+        .description = "Module extend",
+    },
+};
+
+const ruby_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "module ",
+        .constraint_kind = .syntactic,
+        .description = "Module definition",
+    },
+    .{
+        .pattern = "Struct.new",
+        .constraint_kind = .syntactic,
+        .description = "Struct creation",
+    },
+};
+
+const ruby_metadata_patterns = [_]PatternRule{};
+
+const ruby_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "GC.start",
+        .constraint_kind = .operational,
+        .description = "GC trigger",
+    },
+};
+
+pub const ruby_patterns = LanguagePatterns{
+    .function_decl = &ruby_function_patterns,
+    .type_annotation = &ruby_type_patterns,
+    .async_pattern = &ruby_async_patterns,
+    .error_handling = &ruby_error_patterns,
+    .imports = &ruby_import_patterns,
+    .class_struct = &ruby_class_patterns,
+    .metadata = &ruby_metadata_patterns,
+    .memory_management = &ruby_memory_patterns,
+};
+
+// ============================================================================
+// PHP Patterns
+// ============================================================================
+
+const php_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "function ",
+        .constraint_kind = .syntactic,
+        .description = "Function definition",
+    },
+    .{
+        .pattern = "fn ",
+        .constraint_kind = .syntactic,
+        .description = "Arrow function",
+    },
+};
+
+const php_type_patterns = [_]PatternRule{
+    .{
+        .pattern = ": int",
+        .constraint_kind = .type_safety,
+        .description = "Int type hint",
+    },
+    .{
+        .pattern = ": string",
+        .constraint_kind = .type_safety,
+        .description = "String type hint",
+    },
+    .{
+        .pattern = "?",
+        .constraint_kind = .type_safety,
+        .description = "Nullable type",
+    },
+};
+
+const php_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "Fiber",
+        .constraint_kind = .semantic,
+        .description = "Fiber usage",
+    },
+    .{
+        .pattern = "yield",
+        .constraint_kind = .semantic,
+        .description = "Generator yield",
+    },
+};
+
+const php_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "try {",
+        .constraint_kind = .semantic,
+        .description = "Try block",
+    },
+    .{
+        .pattern = "catch (",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "finally {",
+        .constraint_kind = .semantic,
+        .description = "Finally block",
+    },
+    .{
+        .pattern = "throw ",
+        .constraint_kind = .semantic,
+        .description = "Throw statement",
+    },
+};
+
+const php_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "use ",
+        .constraint_kind = .architectural,
+        .description = "Use statement",
+    },
+    .{
+        .pattern = "require ",
+        .constraint_kind = .architectural,
+        .description = "Require statement",
+    },
+    .{
+        .pattern = "include ",
+        .constraint_kind = .architectural,
+        .description = "Include statement",
+    },
+    .{
+        .pattern = "namespace ",
+        .constraint_kind = .architectural,
+        .description = "Namespace declaration",
+    },
+};
+
+const php_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "interface ",
+        .constraint_kind = .syntactic,
+        .description = "Interface definition",
+    },
+    .{
+        .pattern = "trait ",
+        .constraint_kind = .syntactic,
+        .description = "Trait definition",
+    },
+    .{
+        .pattern = "enum ",
+        .constraint_kind = .syntactic,
+        .description = "Enum definition",
+    },
+};
+
+const php_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "#[",
+        .constraint_kind = .syntactic,
+        .description = "PHP attribute",
+    },
+};
+
+const php_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "unset(",
+        .constraint_kind = .operational,
+        .description = "Unset call",
+    },
+    .{
+        .pattern = "__destruct",
+        .constraint_kind = .operational,
+        .description = "Destructor method",
+    },
+};
+
+pub const php_patterns = LanguagePatterns{
+    .function_decl = &php_function_patterns,
+    .type_annotation = &php_type_patterns,
+    .async_pattern = &php_async_patterns,
+    .error_handling = &php_error_patterns,
+    .imports = &php_import_patterns,
+    .class_struct = &php_class_patterns,
+    .metadata = &php_metadata_patterns,
+    .memory_management = &php_memory_patterns,
+};
+
+// ============================================================================
+// Swift Patterns
+// ============================================================================
+
+const swift_function_patterns = [_]PatternRule{
+    .{
+        .pattern = "func ",
+        .constraint_kind = .syntactic,
+        .description = "Function definition",
+    },
+    .{
+        .pattern = "async func",
+        .constraint_kind = .semantic,
+        .description = "Async function",
+    },
+};
+
+const swift_type_patterns = [_]PatternRule{
+    .{
+        .pattern = "->",
+        .constraint_kind = .type_safety,
+        .description = "Return type annotation",
+    },
+    .{
+        .pattern = "Optional",
+        .constraint_kind = .type_safety,
+        .description = "Optional type",
+    },
+    .{
+        .pattern = "?",
+        .constraint_kind = .type_safety,
+        .description = "Optional shorthand",
+    },
+};
+
+const swift_async_patterns = [_]PatternRule{
+    .{
+        .pattern = "async ",
+        .constraint_kind = .semantic,
+        .description = "Async keyword",
+    },
+    .{
+        .pattern = "await ",
+        .constraint_kind = .semantic,
+        .description = "Await keyword",
+    },
+    .{
+        .pattern = "Task {",
+        .constraint_kind = .semantic,
+        .description = "Task block",
+    },
+    .{
+        .pattern = "actor ",
+        .constraint_kind = .semantic,
+        .description = "Actor type",
+    },
+};
+
+const swift_error_patterns = [_]PatternRule{
+    .{
+        .pattern = "do {",
+        .constraint_kind = .semantic,
+        .description = "Do block",
+    },
+    .{
+        .pattern = "catch ",
+        .constraint_kind = .semantic,
+        .description = "Catch block",
+    },
+    .{
+        .pattern = "throw ",
+        .constraint_kind = .semantic,
+        .description = "Throw statement",
+    },
+    .{
+        .pattern = "try ",
+        .constraint_kind = .semantic,
+        .description = "Try expression",
+    },
+};
+
+const swift_import_patterns = [_]PatternRule{
+    .{
+        .pattern = "import ",
+        .constraint_kind = .architectural,
+        .description = "Import statement",
+    },
+};
+
+const swift_class_patterns = [_]PatternRule{
+    .{
+        .pattern = "class ",
+        .constraint_kind = .syntactic,
+        .description = "Class definition",
+    },
+    .{
+        .pattern = "struct ",
+        .constraint_kind = .syntactic,
+        .description = "Struct definition",
+    },
+    .{
+        .pattern = "enum ",
+        .constraint_kind = .syntactic,
+        .description = "Enum definition",
+    },
+    .{
+        .pattern = "protocol ",
+        .constraint_kind = .syntactic,
+        .description = "Protocol definition",
+    },
+    .{
+        .pattern = "extension ",
+        .constraint_kind = .syntactic,
+        .description = "Extension definition",
+    },
+};
+
+const swift_metadata_patterns = [_]PatternRule{
+    .{
+        .pattern = "@objc",
+        .constraint_kind = .syntactic,
+        .description = "Objective-C attribute",
+    },
+    .{
+        .pattern = "@available",
+        .constraint_kind = .syntactic,
+        .description = "Availability attribute",
+    },
+};
+
+const swift_memory_patterns = [_]PatternRule{
+    .{
+        .pattern = "weak ",
+        .constraint_kind = .operational,
+        .description = "Weak reference",
+    },
+    .{
+        .pattern = "unowned ",
+        .constraint_kind = .operational,
+        .description = "Unowned reference",
+    },
+    .{
+        .pattern = "deinit",
+        .constraint_kind = .operational,
+        .description = "Deinitializer",
+    },
+};
+
+pub const swift_patterns = LanguagePatterns{
+    .function_decl = &swift_function_patterns,
+    .type_annotation = &swift_type_patterns,
+    .async_pattern = &swift_async_patterns,
+    .error_handling = &swift_error_patterns,
+    .imports = &swift_import_patterns,
+    .class_struct = &swift_class_patterns,
+    .metadata = &swift_metadata_patterns,
+    .memory_management = &swift_memory_patterns,
+};
+
+// ============================================================================
 // Pattern Selection
 // ============================================================================
 
@@ -1758,6 +2515,16 @@ pub fn getPatternsForLanguage(language: []const u8) ?LanguagePatterns {
         return cpp_patterns;
     } else if (std.mem.eql(u8, language, "java")) {
         return java_patterns;
+    } else if (std.mem.eql(u8, language, "kotlin") or std.mem.eql(u8, language, "kt")) {
+        return kotlin_patterns;
+    } else if (std.mem.eql(u8, language, "csharp") or std.mem.eql(u8, language, "cs") or std.mem.eql(u8, language, "c#")) {
+        return csharp_patterns;
+    } else if (std.mem.eql(u8, language, "ruby") or std.mem.eql(u8, language, "rb")) {
+        return ruby_patterns;
+    } else if (std.mem.eql(u8, language, "php")) {
+        return php_patterns;
+    } else if (std.mem.eql(u8, language, "swift")) {
+        return swift_patterns;
     }
     return null;
 }

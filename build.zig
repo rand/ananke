@@ -242,11 +242,98 @@ pub fn build(b: *std.Build) void {
         .flags = getCFlags(optimize, false, cpu_native), // Disable LTO for parsers
     });
 
+    // Kotlin parser
+    const kotlin_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-kotlin",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    kotlin_parser_lib.addIncludePath(b.path("vendor/tree-sitter-kotlin/src"));
+    kotlin_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-kotlin/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = getCFlags(optimize, false, cpu_native),
+    });
+
+    // C# parser
+    const csharp_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-c-sharp",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    csharp_parser_lib.addIncludePath(b.path("vendor/tree-sitter-c-sharp/src"));
+    csharp_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-c-sharp/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = getCFlags(optimize, false, cpu_native),
+    });
+
+    // Ruby parser
+    const ruby_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-ruby",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    ruby_parser_lib.addIncludePath(b.path("vendor/tree-sitter-ruby/src"));
+    ruby_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-ruby/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = getCFlags(optimize, false, cpu_native),
+    });
+
+    // PHP parser (nested php/src/ structure)
+    const php_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-php",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    php_parser_lib.addIncludePath(b.path("vendor/tree-sitter-php/php/src"));
+    php_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-php/php/src"),
+        .files = &.{ "parser.c", "scanner.c" },
+        .flags = getCFlags(optimize, false, cpu_native),
+    });
+
+    // Swift parser
+    const swift_parser_lib = b.addLibrary(.{
+        .name = "tree-sitter-swift",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    swift_parser_lib.addIncludePath(b.path("vendor/tree-sitter-swift/src"));
+    swift_parser_lib.addCSourceFiles(.{
+        .root = b.path("vendor/tree-sitter-swift/src"),
+        .files = &.{"parser.c"},
+        .flags = getCFlags(optimize, false, cpu_native),
+    });
+
     // All tree-sitter parser libraries as a tuple for DRY linkage
     const parser_libs = .{
-        ts_parser_lib,  py_parser_lib,    js_parser_lib,
-        rust_parser_lib, go_parser_lib,   zig_parser_lib,
-        c_parser_lib,   cpp_parser_lib,   java_parser_lib,
+        ts_parser_lib,      py_parser_lib,      js_parser_lib,
+        rust_parser_lib,    go_parser_lib,      zig_parser_lib,
+        c_parser_lib,       cpp_parser_lib,     java_parser_lib,
+        kotlin_parser_lib,  csharp_parser_lib,  ruby_parser_lib,
+        php_parser_lib,     swift_parser_lib,
     };
 
     // Install all tree-sitter parser libraries so they can be used by examples and other dependents

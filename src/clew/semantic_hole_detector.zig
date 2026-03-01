@@ -317,7 +317,7 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
             },
-            .java => {
+            .java, .kotlin, .csharp => {
                 // Look for throw new UnsupportedOperationException or RuntimeException
                 const throw_stmts = try t.findByType(root, "throw_statement");
                 defer self.allocator.free(throw_stmts);
@@ -326,6 +326,7 @@ pub const SemanticHoleDetector = struct {
                     const throw_text = t.getNodeText(throw_node, source);
                     if (std.mem.indexOf(u8, throw_text, "UnsupportedOperationException") != null or
                         std.mem.indexOf(u8, throw_text, "RuntimeException") != null or
+                        std.mem.indexOf(u8, throw_text, "NotImplementedException") != null or
                         std.mem.indexOf(u8, throw_text, "TODO") != null)
                     {
                         const location = nodeToLocation(throw_node, "");
@@ -341,6 +342,7 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
             },
+            .ruby, .php, .swift => {},
         }
 
         return try holes.toOwnedSlice(self.allocator);
@@ -480,15 +482,18 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
             },
-            .c, .cpp, .java => {
-                // C/C++/Java switch statements
+            .c, .cpp, .java, .kotlin, .csharp, .php, .swift => {
+                // C/C++/Java/Kotlin/C#/PHP/Swift switch statements
                 const switch_stmts = try t.findByType(root, "switch_statement");
                 defer self.allocator.free(switch_stmts);
 
                 for (switch_stmts) |switch_node| {
                     const switch_text = t.getNodeText(switch_node, source);
                     // Check for default case
-                    if (std.mem.indexOf(u8, switch_text, "default:") == null) {
+                    if (std.mem.indexOf(u8, switch_text, "default:") == null and
+                        std.mem.indexOf(u8, switch_text, "default ->") == null and
+                        std.mem.indexOf(u8, switch_text, "else ->") == null)
+                    {
                         const location = nodeToLocation(switch_node, "");
                         const context = try self.allocator.dupe(u8, "Switch without default case");
 
@@ -502,6 +507,7 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
             },
+            .ruby => {},
         }
 
         return try holes.toOwnedSlice(self.allocator);
@@ -678,7 +684,7 @@ pub const SemanticHoleDetector = struct {
                     std.mem.indexOf(u8, trimmed, "abort()") != null or
                     std.mem.indexOf(u8, trimmed, "assert(false)") != null;
             },
-            .java => {
+            .java, .kotlin, .csharp, .php, .swift => {
                 // Check for empty block or throw
                 if (std.mem.startsWith(u8, trimmed, "{")) {
                     trimmed = std.mem.trim(u8, trimmed[1..], &std.ascii.whitespace);
@@ -687,7 +693,11 @@ pub const SemanticHoleDetector = struct {
                     }
                 }
                 return trimmed.len == 0 or
-                    std.mem.indexOf(u8, trimmed, "UnsupportedOperationException") != null;
+                    std.mem.indexOf(u8, trimmed, "UnsupportedOperationException") != null or
+                    std.mem.indexOf(u8, trimmed, "NotImplementedException") != null;
+            },
+            .ruby => {
+                return trimmed.len == 0 or std.mem.eql(u8, trimmed, "end");
             },
         }
     }
@@ -706,7 +716,11 @@ fn getFunctionNodeTypes(language: Language) []const []const u8 {
         .go => &[_][]const u8{ "function_declaration", "method_declaration" },
         .c => &[_][]const u8{"function_definition"},
         .cpp => &[_][]const u8{ "function_definition", "template_declaration" },
-        .java => &[_][]const u8{ "method_declaration", "constructor_declaration" },
+        .java, .kotlin => &[_][]const u8{ "method_declaration", "constructor_declaration" },
+        .csharp => &[_][]const u8{ "method_declaration", "constructor_declaration" },
+        .ruby => &[_][]const u8{"method"},
+        .php => &[_][]const u8{ "method_declaration", "function_definition" },
+        .swift => &[_][]const u8{ "function_declaration", "init_declaration" },
     };
 }
 

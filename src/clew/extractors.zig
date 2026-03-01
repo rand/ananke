@@ -11,6 +11,11 @@ pub const zig_lang = @import("extractors/zig_lang.zig");
 pub const c = @import("extractors/c.zig");
 pub const cpp = @import("extractors/cpp.zig");
 pub const java = @import("extractors/java.zig");
+pub const kotlin = @import("extractors/kotlin.zig");
+pub const csharp = @import("extractors/csharp.zig");
+pub const ruby = @import("extractors/ruby.zig");
+pub const php = @import("extractors/php.zig");
+pub const swift = @import("extractors/swift.zig");
 
 const HybridExtractor = @import("hybrid_extractor.zig").HybridExtractor;
 const ExtractionStrategy = @import("hybrid_extractor.zig").ExtractionStrategy;
@@ -40,6 +45,16 @@ pub fn extractSyntaxStructure(
         return try cpp.parse(allocator, source)
     else if (std.mem.eql(u8, language, "java"))
         return try java.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "kotlin") or std.mem.eql(u8, language, "kt"))
+        return try kotlin.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "csharp") or std.mem.eql(u8, language, "cs") or std.mem.eql(u8, language, "c#"))
+        return try csharp.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "ruby") or std.mem.eql(u8, language, "rb"))
+        return try ruby.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "php"))
+        return try php.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "swift"))
+        return try swift.parse(allocator, source)
     else
         return base.SyntaxStructure.init(allocator);
 }
@@ -65,7 +80,16 @@ pub fn extract(
         std.mem.eql(u8, language, "c") or
         std.mem.eql(u8, language, "cpp") or
         std.mem.eql(u8, language, "c++") or
-        std.mem.eql(u8, language, "java");
+        std.mem.eql(u8, language, "java") or
+        std.mem.eql(u8, language, "kotlin") or
+        std.mem.eql(u8, language, "kt") or
+        std.mem.eql(u8, language, "csharp") or
+        std.mem.eql(u8, language, "cs") or
+        std.mem.eql(u8, language, "c#") or
+        std.mem.eql(u8, language, "ruby") or
+        std.mem.eql(u8, language, "rb") or
+        std.mem.eql(u8, language, "php") or
+        std.mem.eql(u8, language, "swift");
 
     if (use_hybrid) {
         return try extractHybrid(allocator, constraint_allocator, source, language);
@@ -102,6 +126,12 @@ fn extractHybrid(
         "rust"
     else if (std.mem.eql(u8, language, "c++"))
         "cpp"
+    else if (std.mem.eql(u8, language, "kt"))
+        "kotlin"
+    else if (std.mem.eql(u8, language, "cs") or std.mem.eql(u8, language, "c#"))
+        "csharp"
+    else if (std.mem.eql(u8, language, "rb"))
+        "ruby"
     else
         language;
 
@@ -144,6 +174,16 @@ fn extractHybrid(
         try cpp.parse(allocator, source)
     else if (std.mem.eql(u8, language, "java"))
         try java.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "kotlin") or std.mem.eql(u8, language, "kt"))
+        try kotlin.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "csharp") or std.mem.eql(u8, language, "cs") or std.mem.eql(u8, language, "c#"))
+        try csharp.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "ruby") or std.mem.eql(u8, language, "rb"))
+        try ruby.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "php"))
+        try php.parse(allocator, source)
+    else if (std.mem.eql(u8, language, "swift"))
+        try swift.parse(allocator, source)
     else
         base.SyntaxStructure.init(allocator);
 

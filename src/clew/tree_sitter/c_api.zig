@@ -91,6 +91,11 @@ pub extern "c" fn tree_sitter_zig() ?*const TSLanguage;
 pub extern "c" fn tree_sitter_c() ?*const TSLanguage;
 pub extern "c" fn tree_sitter_cpp() ?*const TSLanguage;
 pub extern "c" fn tree_sitter_java() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_kotlin() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_c_sharp() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_ruby() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_php() ?*const TSLanguage;
+pub extern "c" fn tree_sitter_swift() ?*const TSLanguage;
 
 // Helper to check if a pointer is null
 pub fn isNull(ptr: anytype) bool {
@@ -133,6 +138,16 @@ pub fn isLanguageAvailable(language: []const u8) bool {
         return tree_sitter_cpp() != null;
     } else if (std.mem.eql(u8, language, "java")) {
         return tree_sitter_java() != null;
+    } else if (std.mem.eql(u8, language, "kotlin")) {
+        return tree_sitter_kotlin() != null;
+    } else if (std.mem.eql(u8, language, "csharp")) {
+        return tree_sitter_c_sharp() != null;
+    } else if (std.mem.eql(u8, language, "ruby")) {
+        return tree_sitter_ruby() != null;
+    } else if (std.mem.eql(u8, language, "php")) {
+        return tree_sitter_php() != null;
+    } else if (std.mem.eql(u8, language, "swift")) {
+        return tree_sitter_swift() != null;
     }
     return false;
 }

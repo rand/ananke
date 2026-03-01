@@ -458,5 +458,10 @@ fn languageFromName(name: []const u8) ?Language {
     if (std.mem.eql(u8, name, "c")) return .c;
     if (std.mem.eql(u8, name, "cpp")) return .cpp;
     if (std.mem.eql(u8, name, "java")) return .java;
+    if (std.mem.eql(u8, name, "kotlin")) return .kotlin;
+    if (std.mem.eql(u8, name, "csharp")) return .csharp;
+    if (std.mem.eql(u8, name, "ruby")) return .ruby;
+    if (std.mem.eql(u8, name, "php")) return .php;
+    if (std.mem.eql(u8, name, "swift")) return .swift;
     return null;
 }

@@ -71,7 +71,7 @@ test "HybridExtractor: tree_sitter_only strategy fails gracefully for unsupporte
 
     var extractor = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer extractor.deinit();
-    var result = try extractor.extract(unsupported_language_sample, "kotlin");
+    var result = try extractor.extract(unsupported_language_sample, "cobol");
     defer result.deinitFull(allocator);
 
     // Should report language not supported

@@ -228,19 +228,19 @@ test "Strategy Comparison: Confidence score distribution" {
 // Fallback Behavior
 test "Strategy: Fallback for unsupported language" {
     const allocator = testing.allocator;
-    const kotlin_code = "fun main() { println(\"Hello\") }";
-    std.debug.print("\n=== Fallback Behavior (Kotlin) ===\n", .{});
+    const cobol_code = "IDENTIFICATION DIVISION. PROGRAM-ID. HELLO.";
+    std.debug.print("\n=== Fallback Behavior (COBOL) ===\n", .{});
     // tree_sitter_only should fail gracefully
     var ts_only = try HybridExtractor.init(allocator, .tree_sitter_only);
     defer ts_only.deinit();
-    var ts_result = try ts_only.extract(kotlin_code, "kotlin");
+    var ts_result = try ts_only.extract(cobol_code, "cobol");
     defer ts_result.deinitFull(allocator);
     std.debug.print("tree_sitter_only - Available: {}, Count: {}\n", .{ ts_result.tree_sitter_available, ts_result.constraints.len });
     try testing.expect(!ts_result.tree_sitter_available);
     // tree_sitter_with_fallback should fall back to patterns
     var with_fallback = try HybridExtractor.init(allocator, .tree_sitter_with_fallback);
     defer with_fallback.deinit();
-    var fallback_result = try with_fallback.extract(kotlin_code, "kotlin");
+    var fallback_result = try with_fallback.extract(cobol_code, "cobol");
     defer fallback_result.deinitFull(allocator);
     std.debug.print("tree_sitter_with_fallback - Available: {}, Count: {}\n", .{ fallback_result.tree_sitter_available, fallback_result.constraints.len });
     try testing.expect(!fallback_result.tree_sitter_available);

@@ -13,6 +13,11 @@ pub const Language = enum {
     c,
     cpp,
     java,
+    kotlin,
+    csharp,
+    ruby,
+    php,
+    swift,
 
     pub fn getParser(self: Language) !*const c_api.TSLanguage {
         const maybe_parser = switch (self) {
@@ -25,6 +30,11 @@ pub const Language = enum {
             .c => c_api.tree_sitter_c(),
             .cpp => c_api.tree_sitter_cpp(),
             .java => c_api.tree_sitter_java(),
+            .kotlin => c_api.tree_sitter_kotlin(),
+            .csharp => c_api.tree_sitter_c_sharp(),
+            .ruby => c_api.tree_sitter_ruby(),
+            .php => c_api.tree_sitter_php(),
+            .swift => c_api.tree_sitter_swift(),
         };
 
         if (maybe_parser) |parser| {
@@ -49,6 +59,14 @@ pub const Language = enum {
         if (std.mem.eql(u8, ext, ".cc")) return .cpp;
         if (std.mem.eql(u8, ext, ".hpp")) return .cpp;
         if (std.mem.eql(u8, ext, ".java")) return .java;
+        if (std.mem.eql(u8, ext, ".kt")) return .kotlin;
+        if (std.mem.eql(u8, ext, ".kts")) return .kotlin;
+        if (std.mem.eql(u8, ext, ".cs")) return .csharp;
+        if (std.mem.eql(u8, ext, ".rb")) return .ruby;
+        if (std.mem.eql(u8, ext, ".rake")) return .ruby;
+        if (std.mem.eql(u8, ext, ".gemspec")) return .ruby;
+        if (std.mem.eql(u8, ext, ".php")) return .php;
+        if (std.mem.eql(u8, ext, ".swift")) return .swift;
         return null;
     }
 };
