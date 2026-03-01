@@ -843,3 +843,4 @@ fn countPatternOccurrences(matches: []const patterns.PatternMatch, keyword: []co
 // Export hole detectors
 pub const HoleDetector = @import("hole_detector.zig").HoleDetector;
 pub const SemanticHoleDetector = @import("semantic_hole_detector.zig").SemanticHoleDetector;
+

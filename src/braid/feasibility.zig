@@ -226,6 +226,182 @@ fn estimateValidOutputs(tightness: f32) u64 {
     return @intFromFloat(@min(result, 1e15));
 }
 
+// ---- Community-Aware Feasibility (Homer Integration) ----
+
+/// Community membership of a code entity from Homer's Louvain analysis.
+pub const EntityCommunity = struct {
+    /// File path or entity identifier
+    path: []const u8,
+    /// Louvain community ID
+    community_id: u32,
+};
+
+/// Coupling strength between two communities.
+pub const CommunityCoupling = struct {
+    community_a: u32,
+    community_b: u32,
+    /// Historical coupling strength (0.0 = independent, 1.0 = tightly coupled)
+    coupling_strength: f32,
+};
+
+/// Community context from Homer's graph analysis.
+pub const CommunityContext = struct {
+    /// Community assignments for entities referenced by constraints
+    entities: []const EntityCommunity,
+    /// Inter-community coupling strengths
+    couplings: []const CommunityCoupling,
+};
+
+/// A tension detected when constraints force coupling across communities.
+pub const CommunityTension = struct {
+    constraint_id: ConstraintID,
+    source_community: u32,
+    target_community: u32,
+    coupling_strength: f32,
+    description: []const u8,
+};
+
+/// Which constraint to relax first when the constraint set is infeasible.
+/// Lower number = relax first. Import constraints relax before type constraints,
+/// which relax before security constraints.
+pub const RelaxationPriority = struct {
+    constraint_id: ConstraintID,
+    priority: u8,
+    reason: []const u8,
+
+    /// Lower priority = relax first
+    pub fn lessThan(_: void, a: RelaxationPriority, b: RelaxationPriority) bool {
+        return a.priority < b.priority;
+    }
+};
+
+/// Result of community-aware feasibility analysis.
+pub const CommunityFeasibilityResult = struct {
+    /// Base feasibility result
+    base: FeasibilityResult,
+    /// Cross-community tensions detected
+    tensions: []const CommunityTension,
+    /// Suggested relaxation order (import → type → semantic → security)
+    relaxation_order: []const RelaxationPriority,
+};
+
+/// Analyze constraints with community context from Homer.
+/// Detects cross-community coupling tensions and provides relaxation ordering.
+pub fn analyzeWithCommunities(
+    allocator: std.mem.Allocator,
+    constraints: []const Constraint,
+    community: CommunityContext,
+) CommunityFeasibilityResult {
+    var analyzer = FeasibilityAnalyzer.init(allocator);
+    defer analyzer.deinit();
+
+    const base = analyzer.analyze(constraints);
+
+    var tensions = std.ArrayList(CommunityTension){};
+    var relaxation = std.ArrayList(RelaxationPriority){};
+
+    // Check each constraint for cross-community coupling
+    for (constraints) |c| {
+        const source = findCommunity(community.entities, c.name);
+        const target = findCommunityFromDescription(community.entities, c.description);
+
+        if (source != null and target != null and source.? != target.?) {
+            const coupling = lookupCoupling(
+                community.couplings,
+                source.?,
+                target.?,
+            );
+
+            // Low coupling across communities = architectural tension
+            if (coupling < 0.3) {
+                tensions.append(allocator, CommunityTension{
+                    .constraint_id = c.id,
+                    .source_community = source.?,
+                    .target_community = target.?,
+                    .coupling_strength = coupling,
+                    .description = "Cross-community constraint with low historical coupling",
+                }) catch {};
+            }
+        }
+
+        // Build relaxation priority based on kind
+        const priority: u8 = switch (c.kind) {
+            .syntactic => 20, // Cosmetic — relax early
+            .type_safety => 50, // Important — relax reluctantly
+            .semantic => 40, // Behavioral — moderate
+            .architectural => 30, // Structural — relax before types
+            .operational => 35, // Operational — moderate
+            .security => 90, // Safety — relax last
+        };
+
+        // Cross-community import tensions lower the priority (relax sooner)
+        var adjusted_priority = priority;
+        if (source != null and target != null and source.? != target.?) {
+            const coupling = lookupCoupling(community.couplings, source.?, target.?);
+            if (coupling < 0.3 and c.kind == .architectural) {
+                adjusted_priority = 10; // Relax first when crossing low-coupling communities
+            }
+        }
+
+        relaxation.append(allocator, RelaxationPriority{
+            .constraint_id = c.id,
+            .priority = adjusted_priority,
+            .reason = switch (c.kind) {
+                .syntactic => "cosmetic constraint",
+                .type_safety => "type safety constraint",
+                .semantic => "behavioral constraint",
+                .architectural => if (adjusted_priority == 10) "low-coupling cross-community import" else "structural constraint",
+                .operational => "operational constraint",
+                .security => "security constraint",
+            },
+        }) catch {};
+    }
+
+    // Sort relaxation order
+    const owned_relaxation = relaxation.toOwnedSlice(allocator) catch &.{};
+    std.mem.sort(RelaxationPriority, @constCast(owned_relaxation), {}, RelaxationPriority.lessThan);
+
+    return CommunityFeasibilityResult{
+        .base = base,
+        .tensions = tensions.toOwnedSlice(allocator) catch &.{},
+        .relaxation_order = owned_relaxation,
+    };
+}
+
+/// Find the community ID for an entity by path prefix match.
+fn findCommunity(entities: []const EntityCommunity, name: []const u8) ?u32 {
+    for (entities) |e| {
+        if (std.mem.indexOf(u8, name, e.path) != null or
+            std.mem.indexOf(u8, e.path, name) != null)
+        {
+            return e.community_id;
+        }
+    }
+    return null;
+}
+
+/// Find community referenced in a constraint description.
+fn findCommunityFromDescription(entities: []const EntityCommunity, description: []const u8) ?u32 {
+    for (entities) |e| {
+        if (std.mem.indexOf(u8, description, e.path) != null) {
+            return e.community_id;
+        }
+    }
+    return null;
+}
+
+/// Look up coupling strength between two communities.
+fn lookupCoupling(couplings: []const CommunityCoupling, a: u32, b: u32) f32 {
+    for (couplings) |c| {
+        if ((c.community_a == a and c.community_b == b) or
+            (c.community_a == b and c.community_b == a))
+        {
+            return c.coupling_strength;
+        }
+    }
+    return 0.0; // No recorded coupling = independent
+}
+
 /// Convenience function to analyze and log warnings
 pub fn analyzeAndWarn(allocator: std.mem.Allocator, constraints: []const Constraint) FeasibilityResult {
     var analyzer = FeasibilityAnalyzer.init(allocator);
@@ -323,6 +499,124 @@ test "tightness increases with more constraints" {
     const result_multiple = analyzer.analyze(&multiple);
 
     try std.testing.expect(result_multiple.tightness_score > result_single.tightness_score);
+}
+
+test "community-aware: cross-community tension detected" {
+    const entities = [_]EntityCommunity{
+        .{ .path = "auth", .community_id = 1 },
+        .{ .path = "billing", .community_id = 2 },
+    };
+    const couplings = [_]CommunityCoupling{
+        .{ .community_a = 1, .community_b = 2, .coupling_strength = 0.1 },
+    };
+    const community = CommunityContext{
+        .entities = &entities,
+        .couplings = &couplings,
+    };
+
+    const constraints = [_]Constraint{
+        Constraint{
+            .id = 1,
+            .name = "auth",
+            .description = "must import billing module",
+            .kind = .architectural,
+        },
+    };
+
+    const result = analyzeWithCommunities(std.testing.allocator, &constraints, community);
+    defer {
+        std.testing.allocator.free(result.tensions);
+        std.testing.allocator.free(result.relaxation_order);
+        if (result.base.conflicts.len > 0) std.testing.allocator.free(result.base.conflicts);
+        if (result.base.warnings.len > 0) std.testing.allocator.free(result.base.warnings);
+    }
+
+    try std.testing.expect(result.tensions.len == 1);
+    try std.testing.expect(result.tensions[0].coupling_strength < 0.3);
+    try std.testing.expectEqual(@as(u32, 1), result.tensions[0].source_community);
+    try std.testing.expectEqual(@as(u32, 2), result.tensions[0].target_community);
+}
+
+test "community-aware: relaxation prefers imports over types" {
+    const entities = [_]EntityCommunity{
+        .{ .path = "api", .community_id = 1 },
+        .{ .path = "db", .community_id = 2 },
+    };
+    const couplings = [_]CommunityCoupling{
+        .{ .community_a = 1, .community_b = 2, .coupling_strength = 0.1 },
+    };
+    const community = CommunityContext{
+        .entities = &entities,
+        .couplings = &couplings,
+    };
+
+    const constraints = [_]Constraint{
+        Constraint{
+            .id = 1,
+            .name = "api",
+            .description = "must import db connection pool",
+            .kind = .architectural,
+        },
+        Constraint{
+            .id = 2,
+            .name = "api",
+            .description = "return type must be Result<T, Error>",
+            .kind = .type_safety,
+        },
+        Constraint{
+            .id = 3,
+            .name = "api",
+            .description = "must validate auth token",
+            .kind = .security,
+        },
+    };
+
+    const result = analyzeWithCommunities(std.testing.allocator, &constraints, community);
+    defer {
+        std.testing.allocator.free(result.tensions);
+        std.testing.allocator.free(result.relaxation_order);
+        if (result.base.conflicts.len > 0) std.testing.allocator.free(result.base.conflicts);
+        if (result.base.warnings.len > 0) std.testing.allocator.free(result.base.warnings);
+    }
+
+    // Relaxation order: architectural import (10) < type_safety (50) < security (90)
+    try std.testing.expect(result.relaxation_order.len == 3);
+    try std.testing.expect(result.relaxation_order[0].priority < result.relaxation_order[1].priority);
+    try std.testing.expect(result.relaxation_order[1].priority < result.relaxation_order[2].priority);
+    // First to relax should be the cross-community import
+    try std.testing.expectEqual(@as(u8, 10), result.relaxation_order[0].priority);
+}
+
+test "community-aware: tightly coupled communities don't flag tension" {
+    const entities = [_]EntityCommunity{
+        .{ .path = "models", .community_id = 1 },
+        .{ .path = "views", .community_id = 1 }, // Same community
+    };
+    const couplings = [_]CommunityCoupling{};
+    const community = CommunityContext{
+        .entities = &entities,
+        .couplings = &couplings,
+    };
+
+    const constraints = [_]Constraint{
+        Constraint{
+            .id = 1,
+            .name = "models",
+            .description = "must import views renderer",
+            .kind = .architectural,
+        },
+    };
+
+    const result = analyzeWithCommunities(std.testing.allocator, &constraints, community);
+    defer {
+        std.testing.allocator.free(result.tensions);
+        std.testing.allocator.free(result.relaxation_order);
+        if (result.base.conflicts.len > 0) std.testing.allocator.free(result.base.conflicts);
+        if (result.base.warnings.len > 0) std.testing.allocator.free(result.base.warnings);
+    }
+
+    // Same community = no tension
+    try std.testing.expect(result.tensions.len == 0);
 }
 
 test "security constraints are tighter than syntactic" {

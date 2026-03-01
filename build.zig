@@ -1285,34 +1285,46 @@ pub fn build(b: *std.Build) void {
 
     const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
 
-    // Braid module inline tests (temporal, salience, feasibility, regex_analyzer)
-    // Tests the module root directly so inline tests in all subfiles are discovered.
-    const braid_inline_tests = b.addTest(.{
+    // Braid submodule inline tests.
+    // These files are tested standalone because braid.zig's test root creates
+    // a circular module dependency (braid.zig → ananke → braid).
+    // feasibility.zig requires `ananke` and is tested via integration tests.
+    const salience_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/braid/braid.zig"),
+            .root_source_file = b.path("src/braid/salience.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{
-                .{ .name = "ananke", .module = ananke_mod },
-                .{ .name = "http", .module = http_mod },
-                .{ .name = "claude", .module = claude_mod },
-            },
         }),
     });
+    const run_salience_tests = b.addRunArtifact(salience_tests);
 
-    const run_braid_inline_tests = b.addRunArtifact(braid_inline_tests);
+    const temporal_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/braid/temporal.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_temporal_tests = b.addRunArtifact(temporal_tests);
+
+    const regex_analyzer_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/braid/regex_analyzer.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_regex_analyzer_tests = b.addRunArtifact(regex_analyzer_tests);
 
     // Clew conventions inline tests (convention mining → soft constraints)
-    // Standalone file — no tree-sitter dependency.
-    const conventions_inline_tests = b.addTest(.{
+    const conventions_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/clew/conventions.zig"),
             .target = target,
             .optimize = optimize,
         }),
     });
-
-    const run_conventions_inline_tests = b.addRunArtifact(conventions_inline_tests);
+    const run_conventions_tests = b.addRunArtifact(conventions_tests);
 
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
@@ -1350,8 +1362,10 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_semantic_hole_detector_tests.step);
     test_step.dependOn(&run_hole_compiler_tests.step);
     test_step.dependOn(&run_fuzz_tests.step);
-    test_step.dependOn(&run_braid_inline_tests.step);
-    test_step.dependOn(&run_conventions_inline_tests.step);
+    test_step.dependOn(&run_salience_tests.step);
+    test_step.dependOn(&run_temporal_tests.step);
+    test_step.dependOn(&run_regex_analyzer_tests.step);
+    test_step.dependOn(&run_conventions_tests.step);
 
     // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
     const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");
