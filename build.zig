@@ -323,7 +323,7 @@ pub fn build(b: *std.Build) void {
     swift_parser_lib.addIncludePath(b.path("vendor/tree-sitter-swift/src"));
     swift_parser_lib.addCSourceFiles(.{
         .root = b.path("vendor/tree-sitter-swift/src"),
-        .files = &.{"parser.c"},
+        .files = &.{ "parser.c", "scanner.c" },
         .flags = getCFlags(optimize, false, cpu_native),
     });
 
@@ -1066,6 +1066,25 @@ pub fn build(b: *std.Build) void {
 
     const run_phase2_constraint_quality_tests = b.addRunArtifact(phase2_constraint_quality_tests);
 
+    // Phase 6 E2E tests: New language validation (Kotlin, C#, Ruby, PHP, Swift)
+    const phase6_new_languages_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/e2e/phase6/new_languages_validation_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "clew", .module = clew_mod },
+                .{ .name = "tree_sitter", .module = tree_sitter_mod },
+            },
+        }),
+    });
+    phase6_new_languages_tests.linkSystemLibrary("tree-sitter");
+    inline for (parser_libs) |pl| phase6_new_languages_tests.linkLibrary(pl);
+
+    const run_phase6_new_languages_tests = b.addRunArtifact(phase6_new_languages_tests);
+
     // CLI tests
     const cli_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1337,6 +1356,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_domain_fusion_tests.step);
     test_step.dependOn(&run_fim_tests.step);
     test_step.dependOn(&run_call_graph_context_tests.step);
+    test_step.dependOn(&run_phase6_new_languages_tests.step);
 
     // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
     const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");
@@ -1388,6 +1408,7 @@ pub fn build(b: *std.Build) void {
     e2e_test_step.dependOn(&run_phase2_multi_language_tests.step);
     e2e_test_step.dependOn(&run_phase2_strategy_comparison_tests.step);
     e2e_test_step.dependOn(&run_phase2_constraint_quality_tests.step);
+    e2e_test_step.dependOn(&run_phase6_new_languages_tests.step);
     e2e_test_step.dependOn(&run_typescript_pipeline_tests.step);
     e2e_test_step.dependOn(&run_python_pipeline_tests.step);
 

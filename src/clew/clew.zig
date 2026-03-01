@@ -14,10 +14,10 @@ const Severity = root.types.constraint.Severity;
 const claude_api = @import("claude");
 
 // Import pattern matching module
-const patterns = @import("patterns.zig");
+pub const patterns = @import("patterns.zig");
 
 // Import structural extractors (pure Zig AST-like parsing)
-const extractors = @import("extractors.zig");
+pub const extractors = @import("extractors.zig");
 
 // Import test assertion parser
 const test_assertions = @import("parsers/test_assertions.zig");
