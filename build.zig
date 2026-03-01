@@ -1217,6 +1217,21 @@ pub fn build(b: *std.Build) void {
 
     const run_hole_compiler_tests = b.addRunArtifact(hole_compiler_tests);
 
+    // Type inhabitation tests
+    const type_inhabitation_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/braid/type_inhabitation_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_mod },
+                .{ .name = "braid", .module = braid_mod },
+            },
+        }),
+    });
+
+    const run_type_inhabitation_tests = b.addRunArtifact(type_inhabitation_tests);
+
     // Property-based fuzz tests
     const fuzz_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1347,6 +1362,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_hole_detector_tests.step);
     test_step.dependOn(&run_semantic_hole_detector_tests.step);
     test_step.dependOn(&run_hole_compiler_tests.step);
+    test_step.dependOn(&run_type_inhabitation_tests.step);
     test_step.dependOn(&run_fuzz_tests.step);
     test_step.dependOn(&run_salience_tests.step);
     test_step.dependOn(&run_temporal_tests.step);

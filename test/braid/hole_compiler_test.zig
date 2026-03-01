@@ -35,16 +35,16 @@ test "HoleCompiler compiles holes to ConstraintIR" {
     try hole_set.add(test_hole);
 
     var compiler = HoleCompiler.init(testing.allocator);
-    const ir = try compiler.compile(&hole_set);
-    defer {
-        if (ir.hole_specs.len > 0) {
-            testing.allocator.free(ir.hole_specs);
-        }
-    }
+    var ir = try compiler.compile(&hole_set);
+    defer ir.deinit(testing.allocator);
 
     try testing.expectEqual(@as(usize, 1), ir.hole_specs.len);
     try testing.expect(ir.supports_refinement);
     try testing.expectEqual(@as(u64, 1), ir.hole_specs[0].hole_id);
+
+    // Verify type inhabitation was generated from expected_type
+    try testing.expect(ir.type_inhabitation != null);
+    try testing.expectEqualStrings("int", ir.type_inhabitation.?.goal_type);
 }
 
 test "HoleCompiler handles empty HoleSet" {
@@ -52,12 +52,8 @@ test "HoleCompiler handles empty HoleSet" {
     defer hole_set.deinit();
 
     var compiler = HoleCompiler.init(testing.allocator);
-    const ir = try compiler.compile(&hole_set);
-    defer {
-        if (ir.hole_specs.len > 0) {
-            testing.allocator.free(ir.hole_specs);
-        }
-    }
+    var ir = try compiler.compile(&hole_set);
+    defer ir.deinit(testing.allocator);
 
     try testing.expectEqual(@as(usize, 0), ir.hole_specs.len);
     try testing.expect(ir.supports_refinement);
@@ -107,12 +103,8 @@ test "HoleCompiler compiles multiple holes" {
     try hole_set.add(hole2);
 
     var compiler = HoleCompiler.init(testing.allocator);
-    const ir = try compiler.compile(&hole_set);
-    defer {
-        if (ir.hole_specs.len > 0) {
-            testing.allocator.free(ir.hole_specs);
-        }
-    }
+    var ir = try compiler.compile(&hole_set);
+    defer ir.deinit(testing.allocator);
 
     try testing.expectEqual(@as(usize, 2), ir.hole_specs.len);
     try testing.expectEqual(@as(u64, 1), ir.hole_specs[0].hole_id);

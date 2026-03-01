@@ -87,6 +87,10 @@ pub struct ConstraintIR {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_masks: Option<TokenMaskRules>,
 
+    /// Type inhabitation data for type-constrained generation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub type_inhabitation: Option<TypeInhabitationData>,
+
     /// Priority for conflict resolution
     #[serde(default)]
     pub priority: u32,
@@ -146,6 +150,58 @@ pub struct TokenMaskRules {
     pub allowed_tokens: Option<Vec<u32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forbidden_tokens: Option<Vec<u32>>,
+}
+
+/// Supported languages for type inhabitation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TypeLanguage {
+    TypeScript,
+    JavaScript,
+    Python,
+    Rust,
+    Go,
+    Java,
+    Cpp,
+    CSharp,
+    Kotlin,
+    Zig,
+}
+
+impl Default for TypeLanguage {
+    fn default() -> Self {
+        TypeLanguage::TypeScript
+    }
+}
+
+/// A type binding (variable name -> type signature)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeBinding {
+    pub name: String,
+    pub type_sig: String,
+}
+
+/// Type inhabitation data for constrained generation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeInhabitationData {
+    /// Goal type that the generated expression must have
+    pub goal_type: String,
+
+    /// Current type of partially generated expression (if any)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_type: Option<String>,
+
+    /// Available bindings in scope
+    #[serde(default)]
+    pub bindings: Vec<TypeBinding>,
+
+    /// Pre-computed token mask (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_mask: Option<TokenMaskRules>,
+
+    /// Programming language for type parsing
+    #[serde(default)]
+    pub language: TypeLanguage,
 }
 
 /// C-compatible Intent structure
@@ -331,6 +387,7 @@ impl ConstraintIR {
             grammar,
             regex_patterns,
             token_masks,
+            type_inhabitation: None, // Type inhabitation comes via JSON, not FFI struct
             priority: ffi_ref.priority,
             rich_context: None, // Rich context is passed via JSON, not FFI
             feasibility_score: 0.0,
@@ -701,6 +758,7 @@ mod tests {
                 flags: "g".to_string(),
             }],
             token_masks: None,
+            type_inhabitation: None,
             priority: 1,
             rich_context: None,
             feasibility_score: 0.0,

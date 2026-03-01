@@ -920,6 +920,9 @@ pub const Braid = struct {
         defer self.allocator.free(type_constraints);
         if (type_constraints.len > 0) {
             ir.json_schema = try self.buildJsonSchema(type_constraints);
+
+            // Build type inhabitation data for semantic type checking
+            ir.type_inhabitation = try self.buildTypeInhabitation(type_constraints);
         }
 
         // Build grammar from syntactic constraints
@@ -957,6 +960,65 @@ pub const Braid = struct {
             }
         }
         return try constraints.toOwnedSlice(self.allocator);
+    }
+
+    /// Build type inhabitation data from type safety constraints
+    fn buildTypeInhabitation(
+        self: *Braid,
+        type_constraints: []const Constraint,
+    ) !?root.types.constraint.TypeInhabitationData {
+        if (type_constraints.len == 0) return null;
+
+        // Extract the primary type constraint (goal type)
+        var goal_type: ?[]const u8 = null;
+        var bindings = std.ArrayList(root.types.constraint.TypeBinding){};
+        defer bindings.deinit(self.allocator);
+
+        for (type_constraints) |constraint| {
+            // Parse constraint description for type information
+            // Format: "must return type: <type>" or "parameter <name> has type: <type>"
+            const desc = constraint.description;
+
+            if (std.mem.indexOf(u8, desc, "must return type:")) |idx| {
+                const type_start = idx + "must return type:".len;
+                var type_end = type_start;
+                while (type_end < desc.len and desc[type_end] != '\n' and desc[type_end] != ',') {
+                    type_end += 1;
+                }
+                goal_type = std.mem.trim(u8, desc[type_start..type_end], " ");
+            } else if (std.mem.indexOf(u8, desc, "expected type:")) |idx| {
+                const type_start = idx + "expected type:".len;
+                var type_end = type_start;
+                while (type_end < desc.len and desc[type_end] != '\n' and desc[type_end] != ',') {
+                    type_end += 1;
+                }
+                goal_type = std.mem.trim(u8, desc[type_start..type_end], " ");
+            } else if (std.mem.indexOf(u8, desc, "parameter ")) |param_idx| {
+                // Extract parameter binding: "parameter <name> has type: <type>"
+                const name_start = param_idx + "parameter ".len;
+                if (std.mem.indexOf(u8, desc[name_start..], " has type:")) |type_offset| {
+                    const name = desc[name_start .. name_start + type_offset];
+                    const type_start = name_start + type_offset + " has type:".len;
+                    var type_end = type_start;
+                    while (type_end < desc.len and desc[type_end] != '\n' and desc[type_end] != ',') {
+                        type_end += 1;
+                    }
+                    const type_sig = std.mem.trim(u8, desc[type_start..type_end], " ");
+                    try bindings.append(self.allocator, .{
+                        .name = name,
+                        .type_sig = type_sig,
+                    });
+                }
+            }
+        }
+
+        if (goal_type == null) return null;
+
+        return root.types.constraint.TypeInhabitationData{
+            .goal_type = goal_type.?,
+            .bindings = try bindings.toOwnedSlice(self.allocator),
+            .language = .typescript, // Default; could be detected from constraints
+        };
     }
 
     fn extractTypeConstraints(
@@ -2735,3 +2797,6 @@ fn hashUsize(hasher: *std.hash.Wyhash, value: usize) void {
 
 // Export hole compiler
 pub const HoleCompiler = @import("hole_compiler.zig").HoleCompiler;
+
+// Export type inhabitation module
+pub const types = @import("types/types.zig");

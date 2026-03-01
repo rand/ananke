@@ -242,6 +242,9 @@ pub const ConstraintIR = struct {
     /// Direct token masking rules
     token_masks: ?TokenMaskRules = null,
 
+    /// Type inhabitation data for progressive typed generation
+    type_inhabitation: ?TypeInhabitationData = null,
+
     /// Priority for conflict resolution
     priority: u32 = 0,
 
@@ -333,6 +336,23 @@ pub const ConstraintIR = struct {
             if (masks.forbidden_tokens) |tokens| {
                 allocator.free(tokens);
             }
+        }
+
+        // Free type inhabitation if present
+        if (self.type_inhabitation) |ti| {
+            if (ti.bindings.len > 0) {
+                allocator.free(ti.bindings);
+            }
+        }
+
+        // Free hole specs if present
+        for (self.hole_specs) |spec| {
+            if (spec.fill_constraints.len > 0) {
+                allocator.free(spec.fill_constraints);
+            }
+        }
+        if (self.hole_specs.len > 0) {
+            allocator.free(self.hole_specs);
         }
 
         // Free rich context if present
@@ -675,6 +695,70 @@ pub const TokenMaskRules = struct {
                 }
             }
         }
+    }
+};
+
+/// Language enum for type inhabitation
+pub const TypeLanguage = enum {
+    typescript,
+    javascript,
+    python,
+    rust,
+    go,
+    java,
+    cpp,
+    csharp,
+    kotlin,
+    zig_lang,
+};
+
+/// Binding information for type inhabitation
+pub const TypeBinding = struct {
+    name: []const u8,
+    type_sig: []const u8,
+};
+
+/// Type inhabitation data for progressive typed generation.
+/// This allows constrained generation to ensure expressions match expected types.
+pub const TypeInhabitationData = struct {
+    /// The goal type that generated code must satisfy
+    goal_type: []const u8,
+
+    /// Current partial type (updated during generation)
+    current_type: ?[]const u8 = null,
+
+    /// Available bindings in scope
+    bindings: []const TypeBinding = &.{},
+
+    /// Pre-computed token mask for current state
+    token_mask: ?TokenMaskRules = null,
+
+    /// Language for type syntax interpretation
+    language: TypeLanguage = .typescript,
+
+    /// Serialize to JSON for FFI transmission
+    pub fn toJson(self: *const TypeInhabitationData, allocator: std.mem.Allocator) ![]u8 {
+        var json = std.ArrayList(u8).init(allocator);
+        const writer = json.writer();
+
+        try writer.writeAll("{");
+        try writer.print("\"goal_type\":\"{s}\"", .{self.goal_type});
+
+        if (self.current_type) |ct| {
+            try writer.print(",\"current_type\":\"{s}\"", .{ct});
+        }
+
+        try writer.writeAll(",\"bindings\":[");
+        for (self.bindings, 0..) |binding, i| {
+            if (i > 0) try writer.writeAll(",");
+            try writer.print("{{\"name\":\"{s}\",\"type\":\"{s}\"}}", .{ binding.name, binding.type_sig });
+        }
+        try writer.writeAll("]");
+
+        try writer.print(",\"language\":\"{s}\"", .{@tagName(self.language)});
+        try writer.writeAll("}");
+
+        return json.toOwnedSlice();
     }
 };
 
