@@ -329,11 +329,11 @@ pub fn build(b: *std.Build) void {
 
     // All tree-sitter parser libraries as a tuple for DRY linkage
     const parser_libs = .{
-        ts_parser_lib,      py_parser_lib,      js_parser_lib,
-        rust_parser_lib,    go_parser_lib,      zig_parser_lib,
-        c_parser_lib,       cpp_parser_lib,     java_parser_lib,
-        kotlin_parser_lib,  csharp_parser_lib,  ruby_parser_lib,
-        php_parser_lib,     swift_parser_lib,
+        ts_parser_lib,     py_parser_lib,     js_parser_lib,
+        rust_parser_lib,   go_parser_lib,     zig_parser_lib,
+        c_parser_lib,      cpp_parser_lib,    java_parser_lib,
+        kotlin_parser_lib, csharp_parser_lib, ruby_parser_lib,
+        php_parser_lib,    swift_parser_lib,
     };
 
     // Install all tree-sitter parser libraries so they can be used by examples and other dependents
