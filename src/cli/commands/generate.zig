@@ -46,6 +46,15 @@ pub const usage =
     \\  ananke generate "add validation" --context src/models/user.py --backend sglang
     \\  ananke generate "implement binary search" --language rust
     \\  ananke generate "add tests" --backend modal --endpoint https://custom.modal.run
+    \\  ananke generate --fim --prefix "fn foo() {" --suffix "}" --language zig --backend sglang
+    \\
+    \\FIM Mode (fill-in-the-middle):
+    \\  --fim                   Enable fill-in-the-middle mode for IDE completions
+    \\  --prefix <code>         Code before the hole (required in FIM mode)
+    \\  --suffix <code>         Code after the hole (required in FIM mode)
+    \\  --hole-scale <scale>    Hole scale: expression, statement, block, function, module
+    \\  --cursor-line <n>       Cursor line in original file (for context)
+    \\  --cursor-column <n>     Cursor column in original file
     \\
     \\Backends:
     \\  sglang   Connects to sglang server with --grammar-backend ananke.
@@ -74,6 +83,19 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     const temperature = try parsed_args.getFlagFloat("temperature", f32) orelse config.temperature;
     const verbose = parsed_args.hasFlag("verbose") or parsed_args.hasFlag("v");
     const model_name = parsed_args.getFlag("model");
+
+    // FIM mode flags
+    const fim_mode = parsed_args.hasFlag("fim");
+    const fim_prefix = parsed_args.getFlag("prefix");
+    const fim_suffix = parsed_args.getFlag("suffix");
+    const fim_hole_scale_str = parsed_args.getFlag("hole-scale");
+    const fim_cursor_line = try parsed_args.getFlagInt("cursor-line", u32);
+    const fim_cursor_col = try parsed_args.getFlagInt("cursor-column", u32);
+
+    if (fim_mode and (fim_prefix == null or fim_suffix == null)) {
+        cli_error.printError("FIM mode requires both --prefix and --suffix arguments", .{});
+        return error.MissingArgument;
+    }
 
     // Determine backend
     const backend = blk: {
@@ -172,6 +194,41 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
     }
     defer if (rich_context) |*rc| rc.deinit(allocator);
 
+    // FIM constraint analysis (when --fim is active)
+    const braid = @import("ananke").braid;
+    var fim_constraints_json: ?[]u8 = null;
+    if (fim_mode) {
+        const hole_scale: braid.fim.HoleScale = if (fim_hole_scale_str) |s| blk: {
+            if (std.mem.eql(u8, s, "expression")) break :blk .expression;
+            if (std.mem.eql(u8, s, "statement")) break :blk .statement;
+            if (std.mem.eql(u8, s, "block")) break :blk .block;
+            if (std.mem.eql(u8, s, "function")) break :blk .function;
+            if (std.mem.eql(u8, s, "module")) break :blk .module;
+            cli_error.printError("Unknown hole scale: \"{s}\". Use: expression, statement, block, function, module", .{s});
+            return error.InvalidHoleScale;
+        } else .statement;
+
+        const fim_ctx = braid.fim.FimContext{
+            .prefix = fim_prefix.?,
+            .suffix = fim_suffix.?,
+            .language = language,
+            .hole_scale = hole_scale,
+            .file_path = context_file,
+            .cursor_line = fim_cursor_line,
+            .cursor_column = fim_cursor_col,
+        };
+
+        const constraints = braid.fim.analyzeContext(fim_ctx);
+        fim_constraints_json = braid.fim.serializeToJson(allocator, fim_ctx, constraints) catch null;
+
+        if (verbose) {
+            cli_error.printInfo("FIM mode: hole_scale={s}, prefix_len={d}, suffix_len={d}", .{
+                @tagName(hole_scale), fim_prefix.?.len, fim_suffix.?.len,
+            });
+        }
+    }
+    defer if (fim_constraints_json) |j| allocator.free(j);
+
     // Call the appropriate backend
     const generated_code = switch (backend) {
         .sglang => try callSglangInference(
@@ -181,6 +238,7 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
             language,
             constraint_ir,
             if (rich_context) |*rc| rc else null,
+            fim_constraints_json,
             max_tokens,
             temperature,
             model_name,
@@ -222,6 +280,7 @@ fn callSglangInference(
     language: []const u8,
     constraint_ir: ?[]const u8,
     rich_context: ?*const @import("ananke").types.constraint.RichContext,
+    fim_constraints_json: ?[]const u8,
     max_tokens: u32,
     temperature: f32,
     model_name: ?[]const u8,
@@ -340,6 +399,11 @@ fn callSglangInference(
                 rc.call_graph_json != null,
             });
         }
+    }
+
+    // FIM constraints (fill-in-the-middle context for grammar quotienting)
+    if (fim_constraints_json) |fim_json| {
+        try writer.print(",\"fim\":{s}", .{fim_json});
     }
 
     try writer.writeAll("}"); // close constraint_spec
