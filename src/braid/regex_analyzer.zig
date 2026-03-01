@@ -138,20 +138,20 @@ pub const RegexAnalyzer = struct {
 
         // Patterns that match too easily
         const trivial_patterns = [_][]const u8{
-            ".*",       // Matches anything (including empty)
-            ".+",       // Matches any non-empty
-            "\\w*",     // Matches words or empty
-            "\\W*",     // Matches non-words or empty
-            "\\s*",     // Matches whitespace or empty
-            "\\S*",     // Matches non-whitespace or empty
-            "[a-z]*",   // Matches lowercase or empty
-            "[A-Z]*",   // Matches uppercase or empty
+            ".*", // Matches anything (including empty)
+            ".+", // Matches any non-empty
+            "\\w*", // Matches words or empty
+            "\\W*", // Matches non-words or empty
+            "\\s*", // Matches whitespace or empty
+            "\\S*", // Matches non-whitespace or empty
+            "[a-z]*", // Matches lowercase or empty
+            "[A-Z]*", // Matches uppercase or empty
             "[a-zA-Z]*", // Matches letters or empty
-            "[0-9]*",   // Matches digits or empty
-            "\\d*",     // Matches digits or empty
-            "^$",       // Matches only empty string
-            "^.*$",     // Matches any single line
-            ".{0,}",    // Same as .*
+            "[0-9]*", // Matches digits or empty
+            "\\d*", // Matches digits or empty
+            "^$", // Matches only empty string
+            "^.*$", // Matches any single line
+            ".{0,}", // Same as .*
         };
 
         for (trivial_patterns) |trivial| {
@@ -178,19 +178,19 @@ pub const RegexAnalyzer = struct {
 
         // Known dangerous patterns that cause exponential backtracking
         const dangerous_patterns = [_][]const u8{
-            "(.*)+",           // Nested quantifiers on greedy match
-            "(.+)+",           // Nested quantifiers
-            "(\\w*)*",         // Nested word quantifiers
-            "(a|a)*",          // Alternation of identical patterns
-            "(.*?)+",          // Nested non-greedy
-            "(.+?)+",          // Nested non-greedy
-            "(a+)+",           // Nested plus quantifiers
-            "([a-z]+)+",       // Character class with nested quantifiers
-            "(\\d+)+",         // Digit with nested quantifiers
-            ".*.*.*",          // Multiple greedy quantifiers
-            ".+.+.+",          // Multiple greedy plus
-            "(x+x+)+",         // Classic ReDoS pattern
-            "([^\\n]+)+",      // Negated class with nested quantifier
+            "(.*)+", // Nested quantifiers on greedy match
+            "(.+)+", // Nested quantifiers
+            "(\\w*)*", // Nested word quantifiers
+            "(a|a)*", // Alternation of identical patterns
+            "(.*?)+", // Nested non-greedy
+            "(.+?)+", // Nested non-greedy
+            "(a+)+", // Nested plus quantifiers
+            "([a-z]+)+", // Character class with nested quantifiers
+            "(\\d+)+", // Digit with nested quantifiers
+            ".*.*.*", // Multiple greedy quantifiers
+            ".+.+.+", // Multiple greedy plus
+            "(x+x+)+", // Classic ReDoS pattern
+            "([^\\n]+)+", // Negated class with nested quantifier
         };
 
         for (dangerous_patterns) |dangerous| {

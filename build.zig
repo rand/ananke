@@ -1326,6 +1326,16 @@ pub fn build(b: *std.Build) void {
     });
     const run_conventions_tests = b.addRunArtifact(conventions_tests);
 
+    // Clew scope context inline tests (cross-file bindings from Homer)
+    const scope_context_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/clew/scope_context.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_scope_context_tests = b.addRunArtifact(scope_context_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -1366,6 +1376,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_temporal_tests.step);
     test_step.dependOn(&run_regex_analyzer_tests.step);
     test_step.dependOn(&run_conventions_tests.step);
+    test_step.dependOn(&run_scope_context_tests.step);
 
     // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
     const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");

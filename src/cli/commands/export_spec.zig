@@ -126,6 +126,10 @@ pub fn run(allocator: std.mem.Allocator, parsed_args: args_mod.Args, config: con
         try writer.writeAll(",\n  \"semantic_constraints\": ");
         try writer.writeAll(sc);
     }
+    if (rich_context.scope_bindings_json) |sb| {
+        try writer.writeAll(",\n  \"scope_bindings\": ");
+        try writer.writeAll(sb);
+    }
 
     try writer.writeAll("\n}\n");
 

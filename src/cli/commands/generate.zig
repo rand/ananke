@@ -324,12 +324,16 @@ fn callSglangInference(
         if (rc.semantic_constraints_json) |sc| {
             try writer.print(",\"semantic_constraints\":{s}", .{sc});
         }
+        if (rc.scope_bindings_json) |sb| {
+            try writer.print(",\"scope_bindings\":{s}", .{sb});
+        }
         if (verbose) {
-            cli_error.printInfo("Rich context attached: functions={}, types={}, classes={}, imports={}", .{
+            cli_error.printInfo("Rich context attached: functions={}, types={}, classes={}, imports={}, scope={}", .{
                 rc.function_signatures_json != null,
                 rc.type_bindings_json != null,
                 rc.class_definitions_json != null,
                 rc.imports_json != null,
+                rc.scope_bindings_json != null,
             });
         }
     }

@@ -299,6 +299,9 @@ pub fn formatIRJson(
         if (rc.semantic_constraints_json) |sc| {
             try writer.print("    \"semantic_constraints\": {s},\n", .{sc});
         }
+        if (rc.scope_bindings_json) |sb| {
+            try writer.print("    \"scope_bindings\": {s},\n", .{sb});
+        }
         try writer.writeAll("    \"_populated\": true\n");
         try writer.writeAll("  }\n");
     } else {

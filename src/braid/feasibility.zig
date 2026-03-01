@@ -177,10 +177,10 @@ pub const FeasibilityAnalyzer = struct {
     /// Check if two constraint descriptions refer to the same target
     fn referToSameTarget(desc_a: []const u8, desc_b: []const u8) bool {
         const keywords = [_][]const u8{
-            "async",  "await",     "return",    "throw",
-            "try",    "catch",     "finally",   "class",
-            "function", "const",   "let",       "var",
-            "null",   "undefined", "error",     "Result",
+            "async",    "await",     "return",  "throw",
+            "try",      "catch",     "finally", "class",
+            "function", "const",     "let",     "var",
+            "null",     "undefined", "error",   "Result",
             "Option",
         };
 

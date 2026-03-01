@@ -31,6 +31,9 @@ pub const hybrid_extractor = @import("hybrid_extractor.zig");
 // Convention mining → soft constraints (CLaSH soft-tier)
 pub const conventions = @import("conventions.zig");
 
+// Scope-graph-informed name resolution (cross-file bindings from Homer)
+pub const scope_context = @import("scope_context.zig");
+
 // Structural parsing enabled (pure Zig implementation, no tree-sitter dependency)
 const structural_parsing_enabled = true;
 
@@ -843,4 +846,3 @@ fn countPatternOccurrences(matches: []const patterns.PatternMatch, keyword: []co
 // Export hole detectors
 pub const HoleDetector = @import("hole_detector.zig").HoleDetector;
 pub const SemanticHoleDetector = @import("semantic_hole_detector.zig").SemanticHoleDetector;
-

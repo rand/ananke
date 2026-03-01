@@ -182,6 +182,10 @@ pub const RichContext = struct {
     control_flow_json: ?[]const u8 = null,
     /// JSON array of semantic constraints: [{kind, expression, source}]
     semantic_constraints_json: ?[]const u8 = null,
+    /// JSON object with cross-file scope bindings from Homer's scope graph:
+    /// {bindings: [{name, kind, qualified_type, definition_file}],
+    ///  enclosing_scope: {name, kind, file}, canonical_imports: [...]}
+    scope_bindings_json: ?[]const u8 = null,
 
     pub fn deinit(self: *RichContext, allocator: std.mem.Allocator) void {
         if (self.function_signatures_json) |s| allocator.free(s);
@@ -190,6 +194,7 @@ pub const RichContext = struct {
         if (self.imports_json) |s| allocator.free(s);
         if (self.control_flow_json) |s| allocator.free(s);
         if (self.semantic_constraints_json) |s| allocator.free(s);
+        if (self.scope_bindings_json) |s| allocator.free(s);
     }
 
     pub fn clone(self: *const RichContext, allocator: std.mem.Allocator) !RichContext {
@@ -200,6 +205,7 @@ pub const RichContext = struct {
             .imports_json = if (self.imports_json) |s| try allocator.dupe(u8, s) else null,
             .control_flow_json = if (self.control_flow_json) |s| try allocator.dupe(u8, s) else null,
             .semantic_constraints_json = if (self.semantic_constraints_json) |s| try allocator.dupe(u8, s) else null,
+            .scope_bindings_json = if (self.scope_bindings_json) |s| try allocator.dupe(u8, s) else null,
         };
     }
 
@@ -210,7 +216,8 @@ pub const RichContext = struct {
             self.class_definitions_json != null or
             self.imports_json != null or
             self.control_flow_json != null or
-            self.semantic_constraints_json != null;
+            self.semantic_constraints_json != null or
+            self.scope_bindings_json != null;
     }
 };
 
@@ -763,5 +770,4 @@ pub const ConstraintSet = struct {
 
         return cloned;
     }
-
 };
