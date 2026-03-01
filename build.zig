@@ -1326,6 +1326,16 @@ pub fn build(b: *std.Build) void {
     });
     const run_domain_fusion_tests = b.addRunArtifact(domain_fusion_tests);
 
+    // Braid FIM inline tests (fill-in-the-middle constrained decoding)
+    const fim_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/braid/fim.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    const run_fim_tests = b.addRunArtifact(fim_tests);
+
     // Clew conventions inline tests (convention mining → soft constraints)
     const conventions_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1388,6 +1398,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_conventions_tests.step);
     test_step.dependOn(&run_scope_context_tests.step);
     test_step.dependOn(&run_domain_fusion_tests.step);
+    test_step.dependOn(&run_fim_tests.step);
 
     // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
     const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");

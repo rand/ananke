@@ -44,6 +44,9 @@ pub const temporal = @import("temporal.zig");
 // Import domain fusion for multi-domain composition
 pub const domain_fusion = @import("domain_fusion.zig");
 
+// Import FIM support for fill-in-the-middle constrained decoding
+pub const fim = @import("fim.zig");
+
 /// Set of changes between constraint compilations
 pub const ChangeSet = struct {
     added: std.ArrayList(usize),
