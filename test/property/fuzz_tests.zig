@@ -180,7 +180,8 @@ test "fuzz: constraint extraction roundtrip" {
             const lang_byte = consumeByte(&input) orelse return;
             const languages = [_][]const u8{
                 "python", "javascript", "typescript", "rust",
-                "go", "zig", "c", "cpp", "java", "unknown",
+                "go",     "zig",        "c",          "cpp",
+                "java",   "unknown",
             };
             const language = languages[lang_byte % languages.len];
 
@@ -268,7 +269,7 @@ test "fuzz: JSON schema and grammar builder properties" {
                 try testing.expect(schema.type.len > 0);
 
                 const valid_types = [_][]const u8{
-                    "object", "array", "string", "number",
+                    "object",  "array",   "string", "number",
                     "integer", "boolean", "null",
                 };
                 var type_is_valid = false;
@@ -296,11 +297,77 @@ test "fuzz: JSON schema and grammar builder properties" {
             &[_]u8{
                 2, // count -> (2 % 8) + 1 = 3
                 // Constraint 1: kind=type_safety
-                1, 0, 1, 1, 200, 5, 'n', 'a', 'm', 'e', '1',
-                'n', 'a', 'm', 'e', ':', ' ', 's', 't', 'r', 'i', 'n', 'g',
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                1,
+                0,
+                1,
+                1,
+                200,
+                5,
+                'n',
+                'a',
+                'm',
+                'e',
+                '1',
+                'n',
+                'a',
+                'm',
+                'e',
+                ':',
+                ' ',
+                's',
+                't',
+                'r',
+                'i',
+                'n',
+                'g',
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
             },
         },
     });
@@ -565,7 +632,7 @@ test "fuzz: ConstraintIR clone preserves priority and original survives" {
             // Optionally add a json_schema if we have enough bytes.
             if (consumeByte(&input)) |type_byte| {
                 const type_names = [_][]const u8{
-                    "object", "array", "string", "number",
+                    "object",  "array",   "string", "number",
                     "integer", "boolean", "null",
                 };
                 const chosen = type_names[type_byte % type_names.len];
