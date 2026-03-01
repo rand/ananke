@@ -29,6 +29,15 @@ const RegexPatternPool = string_interner.RegexPatternPool;
 // Import sanitizer for security
 const sanitizer = @import("sanitizer.zig");
 
+// Import feasibility analyzer for constraint set validation
+pub const feasibility = @import("feasibility.zig");
+
+// Import regex analyzer for pattern pathology detection
+pub const regex_analyzer = @import("regex_analyzer.zig");
+
+// Import salience module for priority adjustments
+pub const salience = @import("salience.zig");
+
 /// Set of changes between constraint compilations
 pub const ChangeSet = struct {
     added: std.ArrayList(usize),
@@ -886,6 +895,16 @@ pub const Braid = struct {
     fn compileToIR(self: *Braid, graph: *const ConstraintGraph) !ConstraintIR {
         var ir = ConstraintIR{};
 
+        // Run feasibility analysis on enabled constraints
+        const enabled_constraints = try self.extractEnabledConstraints(graph);
+        defer self.allocator.free(enabled_constraints);
+
+        var analyzer = feasibility.FeasibilityAnalyzer.init(self.allocator);
+        defer analyzer.deinit();
+        const feas_result = analyzer.analyze(enabled_constraints);
+        ir.feasibility_score = feas_result.tightness_score;
+        ir.is_feasible = feas_result.is_feasible;
+
         // Build JSON schema from type constraints
         const type_constraints = try self.extractTypeConstraints(graph);
         defer self.allocator.free(type_constraints);
@@ -900,7 +919,7 @@ pub const Braid = struct {
             ir.grammar = try self.buildGrammar(syntax_constraints);
         }
 
-        // Extract regex patterns
+        // Extract regex patterns (with pathology filtering)
         ir.regex_patterns = try self.extractRegexPatterns(graph);
 
         // Build token masks for security constraints
@@ -914,6 +933,20 @@ pub const Braid = struct {
         ir.priority = graph.getMaxPriority();
 
         return ir;
+    }
+
+    /// Extract all enabled constraints from the graph
+    fn extractEnabledConstraints(
+        self: *Braid,
+        graph: *const ConstraintGraph,
+    ) ![]const Constraint {
+        var constraints = std.ArrayList(Constraint){};
+        for (graph.nodes.items) |node| {
+            if (node.enabled) {
+                try constraints.append(self.allocator, node.constraint);
+            }
+        }
+        return try constraints.toOwnedSlice(self.allocator);
     }
 
     fn extractTypeConstraints(
@@ -1061,7 +1094,29 @@ pub const Braid = struct {
             }
         }
 
-        return try patterns.toOwnedSlice(self.allocator);
+        // Validate patterns: filter out pathological regex patterns
+        var safe_patterns = std.ArrayList(root.types.constraint.Regex){};
+        var ra = regex_analyzer.RegexAnalyzer.init(self.allocator);
+        defer ra.deinit();
+
+        for (patterns.items) |pattern| {
+            const analysis = ra.analyze(pattern.pattern);
+            if (analysis.is_safe) {
+                try safe_patterns.append(self.allocator, pattern);
+            } else {
+                // Log and skip pathological patterns; free non-static ones
+                std.log.warn("Skipping pathological regex: {s} ({s})", .{
+                    pattern.pattern,
+                    analysis.recommendation,
+                });
+                if (!pattern.is_static) {
+                    self.allocator.free(pattern.pattern);
+                }
+            }
+        }
+        patterns.deinit(self.allocator);
+
+        return try safe_patterns.toOwnedSlice(self.allocator);
     }
 
     fn buildJsonSchema(

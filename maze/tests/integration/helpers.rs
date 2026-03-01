@@ -26,6 +26,8 @@ pub fn simple_constraint(name: &str, priority: u32) -> ConstraintIR {
         token_masks: None,
         priority,
         rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     }
 }
 
@@ -42,6 +44,8 @@ pub fn regex_constraint(name: &str, pattern: &str, priority: u32) -> ConstraintI
         token_masks: None,
         priority,
         rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     }
 }
 
@@ -65,6 +69,8 @@ pub fn json_schema_constraint(
         token_masks: None,
         priority,
         rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     }
 }
 
@@ -86,6 +92,8 @@ pub fn grammar_constraint(
         token_masks: None,
         priority,
         rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     }
 }
 
@@ -107,6 +115,8 @@ pub fn token_mask_constraint(
         }),
         priority,
         rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     }
 }
 

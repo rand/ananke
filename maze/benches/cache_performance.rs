@@ -27,6 +27,8 @@ fn create_constraint_variant(id: usize) -> ConstraintIR {
         token_masks: None,
         priority: 1,
         rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     }
 }
 

@@ -96,6 +96,18 @@ pub struct ConstraintIR {
     /// class_definitions, imports, control_flow, semantic_constraints
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rich_context: Option<serde_json::Value>,
+
+    /// Feasibility score (0.0 = loose, 1.0 = very tight)
+    #[serde(default)]
+    pub feasibility_score: f32,
+
+    /// Whether the constraint set is feasible (no conflicts detected)
+    #[serde(default = "default_true")]
+    pub is_feasible: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -321,6 +333,8 @@ impl ConstraintIR {
             token_masks,
             priority: ffi_ref.priority,
             rich_context: None, // Rich context is passed via JSON, not FFI
+            feasibility_score: 0.0,
+            is_feasible: true,
         })
     }
 
@@ -689,6 +703,8 @@ mod tests {
             token_masks: None,
             priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         };
 
         let ffi = constraint.to_ffi();

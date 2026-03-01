@@ -62,6 +62,8 @@ fn test_zig_ffi_constraint_ir_conversion() {
         }),
         priority: 42,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     // Convert to FFI representation and back
@@ -135,6 +137,8 @@ fn test_ffi_memory_ownership() {
             token_masks: None,
             priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
         ConstraintIR {
             name: "constraint_2".to_string(),
@@ -147,6 +151,8 @@ fn test_ffi_memory_ownership() {
             token_masks: None,
             priority: 2,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
         ConstraintIR {
             name: "constraint_3".to_string(),
@@ -168,6 +174,8 @@ fn test_ffi_memory_ownership() {
             }),
             priority: 3,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
     ];
 
@@ -230,6 +238,8 @@ fn test_ffi_edge_cases() {
         token_masks: None,
         priority: 0,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = minimal.to_ffi();
@@ -259,6 +269,8 @@ fn test_ffi_edge_cases() {
         token_masks: None,
         priority: 999,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = large.to_ffi();
@@ -316,6 +328,8 @@ fn test_ffi_complex_grammar() {
         token_masks: None,
         priority: 10,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -356,6 +370,8 @@ fn test_ffi_token_masks_edge_cases() {
         }),
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = allowed_only.to_ffi();
@@ -379,6 +395,8 @@ fn test_ffi_token_masks_edge_cases() {
         }),
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = forbidden_only.to_ffi();
@@ -402,6 +420,8 @@ fn test_ffi_token_masks_edge_cases() {
         }),
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = empty_masks.to_ffi();
@@ -458,6 +478,8 @@ fn test_ffi_json_schema_complex() {
         token_masks: None,
         priority: 5,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -507,6 +529,8 @@ fn test_ffi_roundtrip_stress() {
             },
             priority: i as u32,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         };
 
         let ffi = constraint.to_ffi();

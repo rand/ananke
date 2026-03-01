@@ -18,6 +18,8 @@ fn test_constraint_ir_ffi_roundtrip_simple() {
         token_masks: None,
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -50,6 +52,8 @@ fn test_constraint_ir_ffi_with_regex() {
         token_masks: None,
         priority: 2,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -92,6 +96,8 @@ fn test_constraint_ir_ffi_with_json_schema() {
         token_masks: None,
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -130,6 +136,8 @@ fn test_constraint_ir_ffi_with_grammar() {
         token_masks: None,
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -158,6 +166,8 @@ fn test_constraint_ir_ffi_with_token_masks() {
         }),
         priority: 3,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -197,6 +207,8 @@ fn test_constraint_ir_ffi_complex() {
         }),
         priority: 5,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     let ffi = constraint.to_ffi();
@@ -319,6 +331,8 @@ fn test_multiple_constraints_array() {
             token_masks: None,
             priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
         ConstraintIR {
             name: "constraint2".to_string(),
@@ -328,6 +342,8 @@ fn test_multiple_constraints_array() {
             token_masks: None,
             priority: 2,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
         ConstraintIR {
             name: "constraint3".to_string(),
@@ -337,6 +353,8 @@ fn test_multiple_constraints_array() {
             token_masks: None,
             priority: 3,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
     ];
 
@@ -371,6 +389,8 @@ fn test_constraint_ir_serialization() {
         token_masks: None,
         priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
     };
 
     // Test JSON serialization

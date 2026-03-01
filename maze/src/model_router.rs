@@ -239,6 +239,8 @@ mod tests {
             }),
             priority: 0,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         }];
 
         let routing = router.route(&spec, &constraints);
@@ -308,6 +310,8 @@ mod tests {
             }),
             priority: 0,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         }];
 
         let routing = router.route(&spec, &constraints);

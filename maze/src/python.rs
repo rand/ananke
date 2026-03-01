@@ -513,6 +513,8 @@ impl Ananke {
                 token_masks: None,
                 priority: 2,
                 rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
             })
             .collect();
 
@@ -672,6 +674,8 @@ fn python_request_to_rust(py_req: PyGenerationRequest) -> PyResult<GenerationReq
                 token_masks: None,
                 priority: 2,
                 rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
             }
         })
         .collect();

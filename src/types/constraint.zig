@@ -243,6 +243,12 @@ pub const ConstraintIR = struct {
     /// Rich context for multi-domain constrained decoding (sglang)
     rich_context: ?RichContext = null,
 
+    /// Feasibility score (0.0 = loose, 1.0 = very tight). Set by Braid during compilation.
+    feasibility_score: f32 = 0.0,
+
+    /// Whether the constraint set was found to be feasible during compilation.
+    is_feasible: bool = true,
+
     /// Free all allocated memory in this ConstraintIR
     pub fn deinit(self: *ConstraintIR, allocator: std.mem.Allocator) void {
         // Free json_schema if present
@@ -328,6 +334,8 @@ pub const ConstraintIR = struct {
         var cloned = ConstraintIR{
             .priority = self.priority,
             .owns_grammar_strings = true, // cloned IR owns its own strings
+            .feasibility_score = self.feasibility_score,
+            .is_feasible = self.is_feasible,
         };
 
         // Clone json_schema if present

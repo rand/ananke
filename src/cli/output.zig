@@ -225,6 +225,8 @@ pub fn formatIRJson(
 
     try writer.writeAll("{\n");
     try writer.print("  \"priority\": {d},\n", .{ir.priority});
+    try writer.print("  \"feasibility_score\": {d:.2},\n", .{ir.feasibility_score});
+    try writer.print("  \"is_feasible\": {s},\n", .{if (ir.is_feasible) "true" else "false"});
 
     // JSON Schema
     if (ir.json_schema) |schema| {

@@ -117,6 +117,8 @@ fn test_generation_request_with_constraints() {
             token_masks: None,
             priority: 1,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
         ConstraintIR {
             name: "documentation".to_string(),
@@ -129,6 +131,8 @@ fn test_generation_request_with_constraints() {
             token_masks: None,
             priority: 0,
             rich_context: None,
+            feasibility_score: 0.0,
+            is_feasible: true,
         },
     ];
 
