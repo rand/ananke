@@ -209,3 +209,51 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         .has_error_handling = false,
     };
 }
+
+test "c: parse function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "int main(int argc, char** argv) {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("main", s.functions.items[0].name);
+}
+
+test "c: parse function return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "char* get_name(void) {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("get_name", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("char*", s.functions.items[0].return_type.?);
+}
+
+test "c: parse struct" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "struct Point {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Point", s.types.items[0].name);
+}
+
+test "c: parse include" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "#include <stdio.h>");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("stdio.h", s.imports.items[0].module);
+}
+
+test "c: parse typedef" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "typedef struct node Node;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Node", s.types.items[0].name);
+}
+
+test "c: skip comment line" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// int fake_func() {}");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}

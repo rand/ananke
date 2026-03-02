@@ -212,3 +212,61 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         .has_error_handling = has_error_handling,
     };
 }
+
+test "rust: parse basic function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "fn main() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("main", s.functions.items[0].name);
+}
+
+test "rust: parse function with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub fn get_name() -> String {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("get_name", s.functions.items[0].name);
+    try std.testing.expect(s.functions.items[0].is_public);
+    try std.testing.expectEqualStrings("String", s.functions.items[0].return_type.?);
+}
+
+test "rust: parse struct" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub struct MyStruct {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("MyStruct", s.types.items[0].name);
+}
+
+test "rust: parse use statement" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "use std::collections::HashMap;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("std::collections::HashMap", s.imports.items[0].module);
+}
+
+test "rust: parse async function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub async fn fetch_data() -> Result<String, Error> {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_async);
+    try std.testing.expect(s.functions.items[0].has_error_handling);
+}
+
+test "rust: parse trait" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub trait Display {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Display", s.types.items[0].name);
+}
+
+test "rust: skip commented function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// fn commented_out() {}");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}

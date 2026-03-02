@@ -2537,61 +2537,381 @@ pub const PatternMatch = struct {
     context: []const u8, // Surrounding code context
 };
 
-/// Find all pattern matches in source code
+/// Per-language comment and string delimiter rules for context-aware matching.
+/// Used by findPatternMatches to skip patterns inside comments and strings.
+pub const ContextRules = struct {
+    line_comment: []const u8, // e.g. "//" or "#"
+    block_comment_open: []const u8, // e.g. "/*"
+    block_comment_close: []const u8, // e.g. "*/"
+    has_triple_quote: bool, // Python/Kotlin triple-quoted strings
+    has_backtick_string: bool, // JS/TS/Go template literals
+    has_raw_string: bool, // Rust r"..." raw strings
+
+    pub fn forLanguage(language: []const u8) ContextRules {
+        if (std.mem.eql(u8, language, "python") or std.mem.eql(u8, language, "py")) {
+            return .{
+                .line_comment = "#",
+                .block_comment_open = "",
+                .block_comment_close = "",
+                .has_triple_quote = true,
+                .has_backtick_string = false,
+                .has_raw_string = false,
+            };
+        }
+        if (std.mem.eql(u8, language, "ruby") or std.mem.eql(u8, language, "rb")) {
+            return .{
+                .line_comment = "#",
+                .block_comment_open = "=begin",
+                .block_comment_close = "=end",
+                .has_triple_quote = false,
+                .has_backtick_string = false,
+                .has_raw_string = false,
+            };
+        }
+        // JS/TS have backtick template literals
+        if (std.mem.eql(u8, language, "javascript") or std.mem.eql(u8, language, "js") or
+            std.mem.eql(u8, language, "typescript") or std.mem.eql(u8, language, "ts"))
+        {
+            return .{
+                .line_comment = "//",
+                .block_comment_open = "/*",
+                .block_comment_close = "*/",
+                .has_triple_quote = false,
+                .has_backtick_string = true,
+                .has_raw_string = false,
+            };
+        }
+        // Go has backtick raw strings
+        if (std.mem.eql(u8, language, "go")) {
+            return .{
+                .line_comment = "//",
+                .block_comment_open = "/*",
+                .block_comment_close = "*/",
+                .has_triple_quote = false,
+                .has_backtick_string = true,
+                .has_raw_string = false,
+            };
+        }
+        // Rust has r"..." and r#"..."# raw strings
+        if (std.mem.eql(u8, language, "rust") or std.mem.eql(u8, language, "rs")) {
+            return .{
+                .line_comment = "//",
+                .block_comment_open = "/*",
+                .block_comment_close = "*/",
+                .has_triple_quote = false,
+                .has_backtick_string = false,
+                .has_raw_string = true,
+            };
+        }
+        // Kotlin has triple-quoted strings
+        if (std.mem.eql(u8, language, "kotlin") or std.mem.eql(u8, language, "kt")) {
+            return .{
+                .line_comment = "//",
+                .block_comment_open = "/*",
+                .block_comment_close = "*/",
+                .has_triple_quote = true,
+                .has_backtick_string = false,
+                .has_raw_string = false,
+            };
+        }
+        // PHP uses // and /* */ and # for comments
+        if (std.mem.eql(u8, language, "php")) {
+            return .{
+                .line_comment = "//",
+                .block_comment_open = "/*",
+                .block_comment_close = "*/",
+                .has_triple_quote = false,
+                .has_backtick_string = false,
+                .has_raw_string = false,
+            };
+        }
+        // Default: C-family style (C, C++, Java, C#, Zig, Swift)
+        return .{
+            .line_comment = "//",
+            .block_comment_open = "/*",
+            .block_comment_close = "*/",
+            .has_triple_quote = false,
+            .has_backtick_string = false,
+            .has_raw_string = false,
+        };
+    }
+};
+
+/// Lexer state for tracking context (inside comments, strings, etc.)
+const LexerState = enum {
+    code,
+    line_comment,
+    block_comment,
+    double_string,
+    single_string,
+    backtick_string,
+    triple_string,
+    raw_string,
+};
+
+/// Check if source at position starts with the given prefix
+fn startsWithAt(source: []const u8, pos: usize, prefix: []const u8) bool {
+    if (prefix.len == 0) return false;
+    if (pos + prefix.len > source.len) return false;
+    return std.mem.eql(u8, source[pos .. pos + prefix.len], prefix);
+}
+
+/// Find all pattern matches in source code, skipping matches inside
+/// comments and string literals.
 pub fn findPatternMatches(
     allocator: std.mem.Allocator,
     source: []const u8,
-    patterns: LanguagePatterns,
+    lang_patterns: LanguagePatterns,
+    language: []const u8,
 ) ![]PatternMatch {
     var matches = std.ArrayList(PatternMatch){};
     errdefer matches.deinit(allocator);
 
+    const rules = ContextRules.forLanguage(language);
+
     // Combine all pattern categories
     const all_patterns = [_][]const PatternRule{
-        patterns.function_decl,
-        patterns.type_annotation,
-        patterns.async_pattern,
-        patterns.error_handling,
-        patterns.imports,
-        patterns.class_struct,
-        patterns.metadata,
-        patterns.memory_management,
+        lang_patterns.function_decl,
+        lang_patterns.type_annotation,
+        lang_patterns.async_pattern,
+        lang_patterns.error_handling,
+        lang_patterns.imports,
+        lang_patterns.class_struct,
+        lang_patterns.metadata,
+        lang_patterns.memory_management,
     };
 
     var line_num: u32 = 1;
     var line_start: usize = 0;
+    var state: LexerState = .code;
     var i: usize = 0;
 
-    while (i < source.len) : (i += 1) {
+    while (i < source.len) {
+        const c = source[i];
+
         // Track line numbers
-        if (source[i] == '\n') {
+        if (c == '\n') {
+            // Line comments end at newline
+            if (state == .line_comment) {
+                state = .code;
+            }
             line_num += 1;
             line_start = i + 1;
+            i += 1;
             continue;
         }
 
-        // Check all patterns
-        for (all_patterns) |pattern_set| {
-            for (pattern_set) |*pattern| {
-                // Check if pattern matches at current position
-                if (i + pattern.pattern.len <= source.len) {
-                    if (std.mem.eql(u8, source[i .. i + pattern.pattern.len], pattern.pattern)) {
-                        // Extract context (current line)
-                        const line_end = std.mem.indexOfScalarPos(u8, source, i, '\n') orelse source.len;
-                        const context = source[line_start..line_end];
+        // State transitions
+        switch (state) {
+            .code => {
+                // Check for line comment
+                if (rules.line_comment.len > 0 and startsWithAt(source, i, rules.line_comment)) {
+                    state = .line_comment;
+                    i += rules.line_comment.len;
+                    continue;
+                }
 
-                        const match = PatternMatch{
-                            .rule = pattern,
-                            .line = line_num,
-                            .column = @intCast(i - line_start),
-                            .context = context,
-                        };
-                        try matches.append(allocator, match);
+                // Check for block comment open
+                if (rules.block_comment_open.len > 0 and startsWithAt(source, i, rules.block_comment_open)) {
+                    state = .block_comment;
+                    i += rules.block_comment_open.len;
+                    continue;
+                }
+
+                // Check for triple-quoted string (before single/double checks)
+                if (rules.has_triple_quote and startsWithAt(source, i, "\"\"\"")) {
+                    state = .triple_string;
+                    i += 3;
+                    continue;
+                }
+
+                // Check for raw string (Rust: r" or r#")
+                if (rules.has_raw_string and c == 'r' and i + 1 < source.len and
+                    (source[i + 1] == '"' or source[i + 1] == '#'))
+                {
+                    state = .raw_string;
+                    i += 2;
+                    // Skip past r#...#" opener
+                    while (i < source.len and source[i] == '#') i += 1;
+                    if (i < source.len and source[i] == '"') i += 1;
+                    continue;
+                }
+
+                // Check for double-quoted string
+                if (c == '"') {
+                    state = .double_string;
+                    i += 1;
+                    continue;
+                }
+
+                // Check for single-quoted string (skip for Rust lifetimes)
+                if (c == '\'' and !rules.has_raw_string) {
+                    state = .single_string;
+                    i += 1;
+                    continue;
+                }
+
+                // Check for backtick string
+                if (rules.has_backtick_string and c == '`') {
+                    state = .backtick_string;
+                    i += 1;
+                    continue;
+                }
+
+                // In code context: check all patterns
+                for (all_patterns) |pattern_set| {
+                    for (pattern_set) |*pattern| {
+                        if (i + pattern.pattern.len <= source.len) {
+                            if (std.mem.eql(u8, source[i .. i + pattern.pattern.len], pattern.pattern)) {
+                                const line_end = std.mem.indexOfScalarPos(u8, source, i, '\n') orelse source.len;
+                                const context = source[line_start..line_end];
+
+                                const match = PatternMatch{
+                                    .rule = pattern,
+                                    .line = line_num,
+                                    .column = @intCast(i - line_start),
+                                    .context = context,
+                                };
+                                try matches.append(allocator, match);
+                            }
+                        }
                     }
                 }
-            }
+                i += 1;
+            },
+
+            .line_comment => {
+                // Consumed until newline (handled above)
+                i += 1;
+            },
+
+            .block_comment => {
+                if (rules.block_comment_close.len > 0 and startsWithAt(source, i, rules.block_comment_close)) {
+                    state = .code;
+                    i += rules.block_comment_close.len;
+                } else {
+                    i += 1;
+                }
+            },
+
+            .double_string => {
+                if (c == '\\' and i + 1 < source.len) {
+                    i += 2; // Skip escape sequence
+                } else if (c == '"') {
+                    state = .code;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            },
+
+            .single_string => {
+                if (c == '\\' and i + 1 < source.len) {
+                    i += 2;
+                } else if (c == '\'') {
+                    state = .code;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            },
+
+            .backtick_string => {
+                if (c == '\\' and i + 1 < source.len) {
+                    i += 2;
+                } else if (c == '`') {
+                    state = .code;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            },
+
+            .triple_string => {
+                if (startsWithAt(source, i, "\"\"\"")) {
+                    state = .code;
+                    i += 3;
+                } else {
+                    i += 1;
+                }
+            },
+
+            .raw_string => {
+                // Simplified: end at unescaped "
+                if (c == '"') {
+                    state = .code;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            },
         }
     }
 
     return matches.toOwnedSlice(allocator);
+}
+
+test "findPatternMatches: skip patterns in comments" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\// fn commented_out() {}
+        \\fn real_function() {}
+    ;
+    const lang_patterns = getPatternsForLanguage("rust") orelse return error.TestUnexpectedResult;
+    const matches = try findPatternMatches(allocator, source, lang_patterns, "rust");
+    defer allocator.free(matches);
+    // Should only match the real function, not the commented one
+    var fn_count: usize = 0;
+    for (matches) |m| {
+        if (std.mem.eql(u8, m.rule.pattern, "fn ")) fn_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), fn_count);
+}
+
+test "findPatternMatches: skip patterns in strings" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\const s = "fn fake()";
+        \\fn real() {}
+    ;
+    const lang_patterns = getPatternsForLanguage("rust") orelse return error.TestUnexpectedResult;
+    const matches = try findPatternMatches(allocator, source, lang_patterns, "rust");
+    defer allocator.free(matches);
+    var fn_count: usize = 0;
+    for (matches) |m| {
+        if (std.mem.eql(u8, m.rule.pattern, "fn ")) fn_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), fn_count);
+}
+
+test "findPatternMatches: skip patterns in block comments" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\/* fn fake() {} */
+        \\fn real() {}
+    ;
+    const lang_patterns = getPatternsForLanguage("rust") orelse return error.TestUnexpectedResult;
+    const matches = try findPatternMatches(allocator, source, lang_patterns, "rust");
+    defer allocator.free(matches);
+    var fn_count: usize = 0;
+    for (matches) |m| {
+        if (std.mem.eql(u8, m.rule.pattern, "fn ")) fn_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), fn_count);
+}
+
+test "findPatternMatches: python hash comments" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\# def commented():
+        \\def real():
+    ;
+    const lang_patterns = getPatternsForLanguage("python") orelse return error.TestUnexpectedResult;
+    const matches = try findPatternMatches(allocator, source, lang_patterns, "python");
+    defer allocator.free(matches);
+    var def_count: usize = 0;
+    for (matches) |m| {
+        if (std.mem.eql(u8, m.rule.pattern, "def ")) def_count += 1;
+    }
+    try std.testing.expectEqual(@as(usize, 1), def_count);
 }

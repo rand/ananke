@@ -184,3 +184,58 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
 
     return null;
 }
+
+test "python: parse basic function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "def greet(name):");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("greet", s.functions.items[0].name);
+}
+
+test "python: parse function with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "def get_count() -> int:");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("int", s.functions.items[0].return_type.?);
+}
+
+test "python: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "class MyClass:");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("MyClass", s.types.items[0].name);
+}
+
+test "python: parse import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import os");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("os", s.imports.items[0].module);
+}
+
+test "python: parse from import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "from typing import Optional");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("typing", s.imports.items[0].module);
+}
+
+test "python: parse async function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "async def fetch_data() -> str:");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_async);
+}
+
+test "python: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "# def commented_func():");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}

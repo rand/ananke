@@ -102,6 +102,10 @@ pub const InhabitationGraph = struct {
             .csharp => try self.addCSharpEdges(),
             .kotlin => try self.addKotlinEdges(),
             .zig_lang => try self.addZigEdges(),
+            .c => try self.addCEdges(),
+            .ruby => try self.addRubyEdges(),
+            .php => try self.addPhpEdges(),
+            .swift => try self.addSwiftEdges(),
         }
     }
 
@@ -239,6 +243,35 @@ pub const InhabitationGraph = struct {
             .priority = 1,
         });
 
+        // Object utility methods
+        const any_type = try self.arena.primitive(.any);
+        const unknown_type = try self.arena.primitive(.unknown);
+
+        try self.addEdge(any_type, .{
+            .kind = .application,
+            .target_type = str_type,
+            .token_pattern = "JSON.stringify(",
+            .description = "JSON.stringify()",
+        });
+        try self.addEdge(str_type, .{
+            .kind = .application,
+            .target_type = unknown_type,
+            .token_pattern = "JSON.parse(",
+            .description = "JSON.parse()",
+        });
+        try self.addEdge(any_type, .{
+            .kind = .application,
+            .target_type = str_type,
+            .token_pattern = "Object.keys(",
+            .description = "Object.keys()",
+        });
+        try self.addEdge(any_type, .{
+            .kind = .application,
+            .target_type = any_type,
+            .token_pattern = "Object.values(",
+            .description = "Object.values()",
+        });
+
         // Literal constructions
         try self.addConstructionEdges(str_type, "\"");
         try self.addConstructionEdges(str_type, "'");
@@ -348,6 +381,32 @@ pub const InhabitationGraph = struct {
             .description = "format! macro",
         });
 
+        // Smart pointer operations
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "Box::new(",
+            .description = "Box::new()",
+        });
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".as_ref()",
+            .description = ".as_ref()",
+        });
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".clone()",
+            .description = ".clone()",
+        });
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".into()",
+            .description = "Into conversion",
+        });
+
         // Literals
         try self.addConstructionEdges(string_type, "\"");
         try self.addConstructionEdges(i32_type, "0123456789");
@@ -434,6 +493,32 @@ pub const InhabitationGraph = struct {
             .target_type = int_type,
             .token_pattern = ".length()",
             .description = "String.length()",
+        });
+
+        // Stream API operations (all operate on collection types -> collection)
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".stream()",
+            .description = "Collection.stream()",
+        });
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".map(",
+            .description = "Stream.map()",
+        });
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".filter(",
+            .description = "Stream.filter()",
+        });
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".collect(",
+            .description = "Stream.collect()",
         });
 
         // Literals
@@ -608,6 +693,238 @@ pub const InhabitationGraph = struct {
         try self.addConstructionEdges(string_type, "\"");
         try self.addConstructionEdges(i32_type, "0123456789");
         try self.addConstructionEdges(f64_type, "0123456789.");
+        try self.addConstructionEdges(bool_type, "true");
+        try self.addConstructionEdges(bool_type, "false");
+    }
+
+    fn addCEdges(self: *InhabitationGraph) !void {
+        const string_type = try self.arena.primitive(.string);
+        const int_type = try self.arena.primitive(.i32);
+        const double_type = try self.arena.primitive(.f64);
+        const char_type = try self.arena.primitive(.char);
+
+        // int -> string via sprintf
+        try self.addEdge(int_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "sprintf(",
+            .description = "sprintf",
+        });
+
+        // string -> int via atoi
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = int_type,
+            .token_pattern = "atoi(",
+            .description = "atoi",
+        });
+
+        // string -> double via atof
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = double_type,
+            .token_pattern = "atof(",
+            .description = "atof",
+        });
+
+        // char -> int cast
+        try self.addEdge(char_type, .{
+            .kind = .coercion,
+            .target_type = int_type,
+            .token_pattern = "(int)",
+            .description = "char to int cast",
+        });
+
+        // string.strlen
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = try self.arena.primitive(.u64),
+            .token_pattern = "strlen(",
+            .description = "strlen",
+        });
+
+        // Literals
+        try self.addConstructionEdges(string_type, "\"");
+        try self.addConstructionEdges(int_type, "0123456789");
+        try self.addConstructionEdges(double_type, "0123456789.");
+    }
+
+    fn addRubyEdges(self: *InhabitationGraph) !void {
+        const string_type = try self.arena.primitive(.string);
+        const int_type = try self.arena.primitive(.i64);
+        const float_type = try self.arena.primitive(.f64);
+        const bool_type = try self.arena.primitive(.boolean);
+
+        // Integer -> String via .to_s
+        try self.addEdge(int_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".to_s",
+            .description = "Integer#to_s",
+        });
+
+        // String -> Integer via .to_i
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = int_type,
+            .token_pattern = ".to_i",
+            .description = "String#to_i",
+        });
+
+        // String -> Float via .to_f
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = float_type,
+            .token_pattern = ".to_f",
+            .description = "String#to_f",
+        });
+
+        // String.length
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = int_type,
+            .token_pattern = ".length",
+            .description = "String#length",
+        });
+
+        // String interpolation
+        try self.addEdge(int_type, .{
+            .kind = .template,
+            .target_type = string_type,
+            .token_pattern = "\"#{",
+            .description = "string interpolation",
+        });
+
+        // Literals
+        try self.addConstructionEdges(string_type, "\"");
+        try self.addConstructionEdges(string_type, "'");
+        try self.addConstructionEdges(int_type, "0123456789");
+        try self.addConstructionEdges(float_type, "0123456789.");
+        try self.addConstructionEdges(bool_type, "true");
+        try self.addConstructionEdges(bool_type, "false");
+    }
+
+    fn addPhpEdges(self: *InhabitationGraph) !void {
+        const string_type = try self.arena.primitive(.string);
+        const int_type = try self.arena.primitive(.i64);
+        const float_type = try self.arena.primitive(.f64);
+        const bool_type = try self.arena.primitive(.boolean);
+
+        // int -> string via (string) cast
+        try self.addEdge(int_type, .{
+            .kind = .assertion,
+            .target_type = string_type,
+            .token_pattern = "(string)",
+            .description = "(string) cast",
+        });
+
+        // int -> string via strval()
+        try self.addEdge(int_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "strval(",
+            .description = "strval()",
+        });
+
+        // string -> int via (int) cast
+        try self.addEdge(string_type, .{
+            .kind = .assertion,
+            .target_type = int_type,
+            .token_pattern = "(int)",
+            .description = "(int) cast",
+        });
+
+        // string -> int via intval()
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = int_type,
+            .token_pattern = "intval(",
+            .description = "intval()",
+        });
+
+        // string -> float via floatval()
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = float_type,
+            .token_pattern = "floatval(",
+            .description = "floatval()",
+        });
+
+        // strlen
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = int_type,
+            .token_pattern = "strlen(",
+            .description = "strlen()",
+        });
+
+        // Literals
+        try self.addConstructionEdges(string_type, "\"");
+        try self.addConstructionEdges(string_type, "'");
+        try self.addConstructionEdges(int_type, "0123456789");
+        try self.addConstructionEdges(float_type, "0123456789.");
+        try self.addConstructionEdges(bool_type, "true");
+        try self.addConstructionEdges(bool_type, "false");
+    }
+
+    fn addSwiftEdges(self: *InhabitationGraph) !void {
+        const string_type = try self.arena.primitive(.string);
+        const int_type = try self.arena.primitive(.i64);
+        const double_type = try self.arena.primitive(.f64);
+        const bool_type = try self.arena.primitive(.boolean);
+
+        // Int -> String via String()
+        try self.addEdge(int_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "String(",
+            .description = "String(Int)",
+        });
+
+        // Any -> String via .description
+        try self.addEdge(int_type, .{
+            .kind = .property,
+            .target_type = string_type,
+            .token_pattern = ".description",
+            .description = ".description",
+        });
+
+        // String -> Int via Int()
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = int_type,
+            .token_pattern = "Int(",
+            .description = "Int(String)",
+        });
+
+        // String -> Double via Double()
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = double_type,
+            .token_pattern = "Double(",
+            .description = "Double(String)",
+        });
+
+        // String.count
+        try self.addEdge(string_type, .{
+            .kind = .property,
+            .target_type = int_type,
+            .token_pattern = ".count",
+            .description = "String.count",
+        });
+
+        // String interpolation
+        try self.addEdge(int_type, .{
+            .kind = .template,
+            .target_type = string_type,
+            .token_pattern = "\"\\(",
+            .description = "string interpolation",
+        });
+
+        // Literals
+        try self.addConstructionEdges(string_type, "\"");
+        try self.addConstructionEdges(int_type, "0123456789");
+        try self.addConstructionEdges(double_type, "0123456789.");
         try self.addConstructionEdges(bool_type, "true");
         try self.addConstructionEdges(bool_type, "false");
     }

@@ -67,13 +67,26 @@ pub const TypeParser = struct {
             }
         }
 
-        // Check for union type (TypeScript: T | U)
+        // Check for union type (TypeScript: A | B | C | ..., Python: A | B)
         if (self.language == .typescript or self.language == .python) {
             if (self.matchStr(" | ") or self.matchChar('|')) {
                 self.skipWhitespace();
-                const right = try self.parseType();
-                const members = [_]*const Type{ base, right };
-                return self.arena.unionType(&members) catch return ParseError.OutOfMemory;
+                // Collect all union members into a flat list
+                var members_buf: [16]*const Type = undefined;
+                members_buf[0] = base;
+                var count: usize = 1;
+                members_buf[count] = try self.parseBaseType();
+                count += 1;
+                // Continue collecting if more | follow
+                while (count < 16) {
+                    self.skipWhitespace();
+                    if (self.matchStr(" | ") or self.matchChar('|')) {
+                        self.skipWhitespace();
+                        members_buf[count] = try self.parseBaseType();
+                        count += 1;
+                    } else break;
+                }
+                return self.arena.unionType(members_buf[0..count]) catch return ParseError.OutOfMemory;
             }
         }
 
@@ -103,6 +116,10 @@ pub const TypeParser = struct {
             .csharp => self.parseCSharpType(),
             .kotlin => self.parseKotlinType(),
             .zig_lang => self.parseZigType(),
+            .c => self.parseCType(),
+            .ruby => self.parseRubyType(),
+            .php => self.parsePhpType(),
+            .swift => self.parseSwiftType(),
         };
     }
 
@@ -212,6 +229,44 @@ pub const TypeParser = struct {
                 .{ .name = "void", .kind = .void_type },
                 .{ .name = "anytype", .kind = .any },
             }),
+            .c => self.tryParsePrimitiveList(&.{
+                .{ .name = "int", .kind = .i32 },
+                .{ .name = "long", .kind = .i64 },
+                .{ .name = "char", .kind = .char },
+                .{ .name = "float", .kind = .f32 },
+                .{ .name = "double", .kind = .f64 },
+                .{ .name = "void", .kind = .void_type },
+                .{ .name = "_Bool", .kind = .boolean },
+            }),
+            .ruby => self.tryParsePrimitiveList(&.{
+                .{ .name = "String", .kind = .string },
+                .{ .name = "Integer", .kind = .i64 },
+                .{ .name = "Float", .kind = .f64 },
+                .{ .name = "Symbol", .kind = .string },
+                .{ .name = "NilClass", .kind = .null_type },
+                .{ .name = "TrueClass", .kind = .boolean },
+                .{ .name = "FalseClass", .kind = .boolean },
+            }),
+            .php => self.tryParsePrimitiveList(&.{
+                .{ .name = "string", .kind = .string },
+                .{ .name = "int", .kind = .i64 },
+                .{ .name = "float", .kind = .f64 },
+                .{ .name = "bool", .kind = .boolean },
+                .{ .name = "void", .kind = .void_type },
+                .{ .name = "null", .kind = .null_type },
+                .{ .name = "mixed", .kind = .any },
+            }),
+            .swift => self.tryParsePrimitiveList(&.{
+                .{ .name = "String", .kind = .string },
+                .{ .name = "Int", .kind = .i64 },
+                .{ .name = "Int32", .kind = .i32 },
+                .{ .name = "Double", .kind = .f64 },
+                .{ .name = "Float", .kind = .f32 },
+                .{ .name = "Bool", .kind = .boolean },
+                .{ .name = "Void", .kind = .void_type },
+                .{ .name = "Any", .kind = .any },
+                .{ .name = "Character", .kind = .char },
+            }),
         };
     }
 
@@ -241,6 +296,30 @@ pub const TypeParser = struct {
             const base = self.arena.named("Promise", .typescript) catch return ParseError.OutOfMemory;
             const params = [_]*const Type{inner};
             return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+        }
+
+        // Utility types: Record<K,V>, Partial<T>, Required<T>, Readonly<T>, Pick<T,K>, Omit<T,K>
+        inline for (.{ "Record", "Pick", "Omit" }) |name| {
+            if (self.matchStr(name ++ "<")) {
+                const first = try self.parseType();
+                self.skipWhitespace();
+                if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
+                self.skipWhitespace();
+                const second = try self.parseType();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const base = self.arena.named(name, .typescript) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{ first, second };
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+        }
+        inline for (.{ "Partial", "Required", "Readonly" }) |name| {
+            if (self.matchStr(name ++ "<")) {
+                const inner = try self.parseType();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const base = self.arena.named(name, .typescript) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{inner};
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
         }
 
         // Check for function type: (params) => return
@@ -363,6 +442,39 @@ pub const TypeParser = struct {
             return t;
         }
 
+        // Smart pointer types: Box<T>, Rc<T>, Arc<T>
+        inline for (.{ "Box<", "Rc<", "Arc<" }) |prefix| {
+            if (self.matchStr(prefix)) {
+                const inner = try self.parseType();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const name = prefix[0 .. prefix.len - 1];
+                const base = self.arena.named(name, .rust) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{inner};
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+        }
+
+        // HashMap<K, V>
+        if (self.matchStr("HashMap<")) {
+            const key = try self.parseType();
+            self.skipWhitespace();
+            if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
+            self.skipWhitespace();
+            const value = try self.parseType();
+            if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+            const base = self.arena.named("HashMap", .rust) catch return ParseError.OutOfMemory;
+            const params = [_]*const Type{ key, value };
+            return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+        }
+
+        // dyn Trait
+        if (self.matchStr("dyn ")) {
+            const trait_type = try self.parseNamedType();
+            const base = self.arena.named("dyn", .rust) catch return ParseError.OutOfMemory;
+            const params = [_]*const Type{trait_type};
+            return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+        }
+
         // Check for reference types
         if (self.matchChar('&')) {
             const is_mut = self.matchStr("mut ");
@@ -411,18 +523,18 @@ pub const TypeParser = struct {
     fn parseJavaType(self: *TypeParser) ParseError!*Type {
         // Check for List<T>
         if (self.matchStr("List<")) {
-            const elem = try self.parseType();
+            const elem = try self.parseJavaTypeArg();
             if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
             return self.arena.array(elem) catch return ParseError.OutOfMemory;
         }
 
         // Check for Map<K, V>
         if (self.matchStr("Map<")) {
-            const key = try self.parseType();
+            const key = try self.parseJavaTypeArg();
             self.skipWhitespace();
             if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
             self.skipWhitespace();
-            const value = try self.parseType();
+            const value = try self.parseJavaTypeArg();
             if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
             const base = self.arena.named("Map", .java) catch return ParseError.OutOfMemory;
             const params = [_]*const Type{ key, value };
@@ -431,12 +543,42 @@ pub const TypeParser = struct {
 
         // Check for Optional<T>
         if (self.matchStr("Optional<")) {
-            const inner = try self.parseType();
+            const inner = try self.parseJavaTypeArg();
             if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
             return self.arena.optional(inner) catch return ParseError.OutOfMemory;
         }
 
+        // Stream<T>, Set<T>, Queue<T>
+        inline for (.{ "Stream", "Set", "Queue" }) |name| {
+            if (self.matchStr(name ++ "<")) {
+                const elem = try self.parseJavaTypeArg();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const base = self.arena.named(name, .java) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{elem};
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+        }
+
         return self.parseNamedType();
+    }
+
+    /// Parse a Java type argument, handling wildcards (?, ? extends T, ? super T)
+    fn parseJavaTypeArg(self: *TypeParser) ParseError!*Type {
+        self.skipWhitespace();
+        if (self.matchChar('?')) {
+            self.skipWhitespace();
+            if (self.matchStr("extends ")) {
+                self.skipWhitespace();
+                return self.parseType();
+            }
+            if (self.matchStr("super ")) {
+                self.skipWhitespace();
+                return self.parseType();
+            }
+            // Unbounded wildcard: treat as any
+            return self.arena.primitive(.any) catch return ParseError.OutOfMemory;
+        }
+        return self.parseType();
     }
 
     fn parseCppType(self: *TypeParser) ParseError!*Type {
@@ -454,16 +596,44 @@ pub const TypeParser = struct {
             return self.arena.optional(inner) catch return ParseError.OutOfMemory;
         }
 
-        // Check for std::map<K, V>
-        if (self.matchStr("std::map<")) {
-            const key = try self.parseType();
+        // Check for std::map<K, V> and std::unordered_map<K, V>
+        inline for (.{ "std::map<", "std::unordered_map<" }) |prefix| {
+            if (self.matchStr(prefix)) {
+                const key = try self.parseType();
+                self.skipWhitespace();
+                if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
+                self.skipWhitespace();
+                const value = try self.parseType();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const name = prefix[0 .. prefix.len - 1];
+                const base = self.arena.named(name, .cpp) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{ key, value };
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+        }
+
+        // Smart pointers: unique_ptr<T>, shared_ptr<T>
+        inline for (.{ "std::unique_ptr<", "std::shared_ptr<" }) |prefix| {
+            if (self.matchStr(prefix)) {
+                const inner = try self.parseType();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const name = prefix[0 .. prefix.len - 1];
+                const base = self.arena.named(name, .cpp) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{inner};
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+        }
+
+        // std::pair<T, U>
+        if (self.matchStr("std::pair<")) {
+            const first = try self.parseType();
             self.skipWhitespace();
             if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
             self.skipWhitespace();
-            const value = try self.parseType();
+            const second = try self.parseType();
             if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
-            const base = self.arena.named("std::map", .cpp) catch return ParseError.OutOfMemory;
-            const params = [_]*const Type{ key, value };
+            const base = self.arena.named("std::pair", .cpp) catch return ParseError.OutOfMemory;
+            const params = [_]*const Type{ first, second };
             return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
         }
 
@@ -537,6 +707,127 @@ pub const TypeParser = struct {
         }
 
         return self.parseNamedType();
+    }
+
+    fn parseCType(self: *TypeParser) ParseError!*Type {
+        // Check for pointer type (e.g., int*, char*)
+        const base = self.parseNamedType() catch return ParseError.InvalidTypeSyntax;
+        self.skipWhitespace();
+        if (self.matchChar('*')) {
+            const t = self.arena.arena.allocator().create(Type) catch return ParseError.OutOfMemory;
+            t.* = .{ .reference = .{ .pointee = base, .is_mutable = true } };
+            return t;
+        }
+        return base;
+    }
+
+    fn parseRubyType(self: *TypeParser) ParseError!*Type {
+        // Sorbet/RBS Array[T]
+        if (self.matchStr("Array[")) {
+            const elem = try self.parseType();
+            if (!self.matchChar(']')) return ParseError.InvalidTypeSyntax;
+            return self.arena.array(elem) catch return ParseError.OutOfMemory;
+        }
+
+        // Hash[K, V]
+        if (self.matchStr("Hash[")) {
+            const key = try self.parseType();
+            self.skipWhitespace();
+            if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
+            self.skipWhitespace();
+            const value = try self.parseType();
+            if (!self.matchChar(']')) return ParseError.InvalidTypeSyntax;
+            const base = self.arena.named("Hash", .ruby) catch return ParseError.OutOfMemory;
+            const params = [_]*const Type{ key, value };
+            return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+        }
+
+        // T::Nilable (Sorbet nilable sugar)
+        // Fall through to named type
+        return self.parseNamedType();
+    }
+
+    fn parsePhpType(self: *TypeParser) ParseError!*Type {
+        // Nullable ?Type
+        if (self.matchChar('?')) {
+            const inner = try self.parseType();
+            return self.arena.optional(inner) catch return ParseError.OutOfMemory;
+        }
+
+        // array<T> or array<K, V>
+        if (self.matchStr("array<")) {
+            const first = try self.parseType();
+            self.skipWhitespace();
+            if (self.matchChar(',')) {
+                self.skipWhitespace();
+                const value = try self.parseType();
+                if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+                const base = self.arena.named("array", .php) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{ first, value };
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+            if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+            return self.arena.array(first) catch return ParseError.OutOfMemory;
+        }
+
+        // Parse base type then check for union (int|string)
+        const base = try self.parseNamedType();
+        self.skipWhitespace();
+        if (self.matchChar('|')) {
+            self.skipWhitespace();
+            const right = try self.parseType();
+            const members = [_]*const Type{ base, right };
+            return self.arena.unionType(&members) catch return ParseError.OutOfMemory;
+        }
+        return base;
+    }
+
+    fn parseSwiftType(self: *TypeParser) ParseError!*Type {
+        // Array sugar [T]
+        if (self.matchChar('[')) {
+            const elem = try self.parseType();
+            self.skipWhitespace();
+            // Check for Dictionary [K: V]
+            if (self.matchChar(':')) {
+                self.skipWhitespace();
+                const value = try self.parseType();
+                if (!self.matchChar(']')) return ParseError.InvalidTypeSyntax;
+                const base = self.arena.named("Dictionary", .swift) catch return ParseError.OutOfMemory;
+                const params = [_]*const Type{ elem, value };
+                return self.arena.generic(base, &params) catch return ParseError.OutOfMemory;
+            }
+            if (!self.matchChar(']')) return ParseError.InvalidTypeSyntax;
+            return self.arena.array(elem) catch return ParseError.OutOfMemory;
+        }
+
+        // Optional<T>
+        if (self.matchStr("Optional<")) {
+            const inner = try self.parseType();
+            if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+            return self.arena.optional(inner) catch return ParseError.OutOfMemory;
+        }
+
+        // Result<T, E>
+        if (self.matchStr("Result<")) {
+            const ok = try self.parseType();
+            self.skipWhitespace();
+            if (!self.matchChar(',')) return ParseError.InvalidTypeSyntax;
+            self.skipWhitespace();
+            const err = try self.parseType();
+            if (!self.matchChar('>')) return ParseError.InvalidTypeSyntax;
+            const t = self.arena.arena.allocator().create(Type) catch return ParseError.OutOfMemory;
+            t.* = .{ .error_union = .{ .ok_type = ok, .err_type = err } };
+            return t;
+        }
+
+        // Parse base type, then check for optional suffix ?
+        const base = try self.parseNamedType();
+        self.skipWhitespace();
+        if (self.pos < self.input.len and self.input[self.pos] == '?') {
+            self.pos += 1;
+            return self.arena.optional(base) catch return ParseError.OutOfMemory;
+        }
+        return base;
     }
 
     fn parseNamedType(self: *TypeParser) ParseError!*Type {

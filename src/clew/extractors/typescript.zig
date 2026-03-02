@@ -245,3 +245,59 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32, 
 
     return null;
 }
+
+test "typescript: parse function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "function greet(name: string): void {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("greet", s.functions.items[0].name);
+}
+
+test "typescript: parse function return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "function getData(): Promise<string> {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("Promise<string>", s.functions.items[0].return_type.?);
+}
+
+test "typescript: parse interface" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "interface UserProps {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("UserProps", s.types.items[0].name);
+}
+
+test "typescript: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "export class UserService {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("UserService", s.types.items[0].name);
+}
+
+test "typescript: parse import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import { useState } from 'react';");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("react", s.imports.items[0].module);
+}
+
+test "typescript: parse async function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "async function fetchUser(): Promise<User> {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_async);
+}
+
+test "typescript: parse type alias" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "type Result = Success | Failure;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Result", s.types.items[0].name);
+}

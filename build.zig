@@ -1327,6 +1327,28 @@ pub fn build(b: *std.Build) void {
     });
     const run_scope_context_tests = b.addRunArtifact(scope_context_tests);
 
+    // Extractor inline tests (Rust, Java, Python, Kotlin language extractors)
+    // The test harness lives in src/clew/extractors/ so that relative @import
+    // paths work for test discovery (Zig only discovers inline tests via
+    // file-relative imports, not named module re-exports).
+    // Uses a minimal "ananke" stub (in src/ tree) to avoid module conflicts
+    // with the full ananke module tree (base.zig only needs types.constraint).
+    const ananke_test_stub = b.createModule(.{
+        .root_source_file = b.path("src/ananke_test_stub.zig"),
+        .target = target,
+    });
+    const extractor_inline_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/clew/extractors/inline_tests.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "ananke", .module = ananke_test_stub },
+            },
+        }),
+    });
+    const run_extractor_inline_tests = b.addRunArtifact(extractor_inline_tests);
+
     // A top level step for running all tests. dependOn can be called multiple
     // times and since the two run steps do not depend on one another, this will
     // make the two of them run in parallel.
@@ -1373,6 +1395,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_fim_tests.step);
     test_step.dependOn(&run_call_graph_context_tests.step);
     test_step.dependOn(&run_phase6_new_languages_tests.step);
+    test_step.dependOn(&run_extractor_inline_tests.step);
 
     // Property-based fuzz test step (run with: zig build test-fuzz -- -ffuzz for continuous fuzzing)
     const fuzz_test_step = b.step("test-fuzz", "Run property-based fuzz tests");

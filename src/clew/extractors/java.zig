@@ -234,3 +234,59 @@ fn parseMethod(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
         .has_error_handling = has_error_handling,
     };
 }
+
+test "java: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public class MyService {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("MyService", s.types.items[0].name);
+}
+
+test "java: parse method with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public String getName() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("getName", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("String", s.functions.items[0].return_type.?);
+}
+
+test "java: parse import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import java.util.List;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("java.util.List", s.imports.items[0].module);
+}
+
+test "java: parse interface" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public interface Comparable {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Comparable", s.types.items[0].name);
+}
+
+test "java: parse enum" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public enum Color {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Color", s.types.items[0].name);
+}
+
+test "java: detect throws" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public void process() throws IOException {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].has_error_handling);
+}
+
+test "java: skip comment line" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// public void fakeMethod() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}
