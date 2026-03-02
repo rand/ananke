@@ -37,6 +37,10 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
                 try structure.types.append(allocator, type_decl);
             }
         }
+        // Skip standalone annotation lines (next line may be a method)
+        else if (std.mem.startsWith(u8, trimmed, "@")) {
+            continue;
+        }
         // Parse methods (must have parentheses and not be control flow)
         else if (try parseMethod(allocator, trimmed, line_num)) |func_decl| {
             try structure.functions.append(allocator, func_decl);
@@ -150,8 +154,7 @@ fn parseMethod(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
         std.mem.indexOf(u8, line, "return ") != null or
         std.mem.indexOf(u8, line, "catch ") != null or
         std.mem.indexOf(u8, line, "catch(") != null or
-        std.mem.indexOf(u8, line, "new ") != null or
-        std.mem.indexOf(u8, line, "@") != null) // Skip annotations
+        std.mem.indexOf(u8, line, "new ") != null)
     {
         return null;
     }
@@ -233,4 +236,84 @@ fn parseMethod(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
         .return_type = return_type,
         .has_error_handling = has_error_handling,
     };
+}
+
+test "java: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public class MyService {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("MyService", s.types.items[0].name);
+}
+
+test "java: parse method with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public String getName() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("getName", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("String", s.functions.items[0].return_type.?);
+}
+
+test "java: parse import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import java.util.List;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("java.util.List", s.imports.items[0].module);
+}
+
+test "java: parse interface" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public interface Comparable {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Comparable", s.types.items[0].name);
+}
+
+test "java: parse enum" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public enum Color {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Color", s.types.items[0].name);
+}
+
+test "java: detect throws" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public void process() throws IOException {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].has_error_handling);
+}
+
+test "java: skip comment line" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// public void fakeMethod() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}
+
+test "java: parse method with annotation" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\@Override
+        \\public void doSomething() {
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("doSomething", s.functions.items[0].name);
+}
+
+test "java: parse method with multiple annotations" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\@Override
+        \\@Deprecated
+        \\public String getValue() {
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("getValue", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("String", s.functions.items[0].return_type.?);
 }

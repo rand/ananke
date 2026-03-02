@@ -214,3 +214,51 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32, 
 
     return null;
 }
+
+test "javascript: parse function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "function greet(name) {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("greet", s.functions.items[0].name);
+}
+
+test "javascript: parse arrow function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "const add = (a, b) => a + b;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("add", s.functions.items[0].name);
+}
+
+test "javascript: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "class Animal {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Animal", s.types.items[0].name);
+}
+
+test "javascript: parse es6 import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import { map } from 'lodash';");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("lodash", s.imports.items[0].module);
+}
+
+test "javascript: parse require import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "const fs = require('fs');");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("fs", s.imports.items[0].module);
+}
+
+test "javascript: parse async function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "async function fetchData() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_async);
+}

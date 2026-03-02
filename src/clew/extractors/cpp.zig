@@ -267,3 +267,58 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         .has_error_handling = has_error_handling,
     };
 }
+
+test "cpp: parse function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "int main() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("main", s.functions.items[0].name);
+}
+
+test "cpp: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "class Vector {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Vector", s.types.items[0].name);
+}
+
+test "cpp: parse include" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "#include <vector>");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("vector", s.imports.items[0].module);
+}
+
+test "cpp: parse using namespace" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "using namespace std;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("std", s.imports.items[0].module);
+}
+
+test "cpp: parse enum class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "enum class Color {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Color", s.types.items[0].name);
+}
+
+test "cpp: parse virtual method" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "virtual void draw() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("draw", s.functions.items[0].name);
+}
+
+test "cpp: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// void fake() {}");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}

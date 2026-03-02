@@ -327,6 +327,7 @@ pub const Clew = struct {
             self.allocator,
             source,
             lang_patterns.?,
+            language,
         );
         defer self.allocator.free(matches);
 

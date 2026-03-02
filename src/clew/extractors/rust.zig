@@ -8,10 +8,19 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
 
     var line_num: u32 = 1;
     var lines = std.mem.splitScalar(u8, source, '\n');
+    var in_where_clause = false;
 
     while (lines.next()) |line| : (line_num += 1) {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0 or std.mem.startsWith(u8, trimmed, "//")) continue;
+
+        // Skip lines inside multi-line where clauses
+        if (in_where_clause) {
+            if (std.mem.indexOf(u8, trimmed, "{") != null) {
+                in_where_clause = false;
+            }
+            continue;
+        }
 
         // Parse use statements
         if (std.mem.startsWith(u8, trimmed, "use ")) {
@@ -48,6 +57,13 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
             if (try parseFunction(allocator, trimmed, line_num)) |func_decl| {
                 try structure.functions.append(allocator, func_decl);
             }
+        }
+
+        // Check for multi-line where clause start
+        if (std.mem.endsWith(u8, trimmed, "where") and
+            std.mem.indexOf(u8, trimmed, "{") == null)
+        {
+            in_where_clause = true;
         }
     }
 
@@ -211,4 +227,92 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         .return_type = return_type,
         .has_error_handling = has_error_handling,
     };
+}
+
+test "rust: parse basic function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "fn main() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("main", s.functions.items[0].name);
+}
+
+test "rust: parse function with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub fn get_name() -> String {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("get_name", s.functions.items[0].name);
+    try std.testing.expect(s.functions.items[0].is_public);
+    try std.testing.expectEqualStrings("String", s.functions.items[0].return_type.?);
+}
+
+test "rust: parse struct" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub struct MyStruct {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("MyStruct", s.types.items[0].name);
+}
+
+test "rust: parse use statement" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "use std::collections::HashMap;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("std::collections::HashMap", s.imports.items[0].module);
+}
+
+test "rust: parse async function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub async fn fetch_data() -> Result<String, Error> {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_async);
+    try std.testing.expect(s.functions.items[0].has_error_handling);
+}
+
+test "rust: parse trait" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub trait Display {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Display", s.types.items[0].name);
+}
+
+test "rust: skip commented function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// fn commented_out() {}");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}
+
+test "rust: multi-line where clause" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\pub fn process<T>(item: T) -> String
+        \\where
+        \\    T: Display + Clone,
+        \\{
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("process", s.functions.items[0].name);
+}
+
+test "rust: where clause lines not misinterpreted" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\pub fn merge<T>(a: T, b: T) -> T
+        \\where
+        \\    T: Clone + Default,
+        \\    T: std::fmt::Display,
+        \\{
+        \\pub fn simple() {
+    );
+    defer s.deinit();
+    // Should find both functions: merge and simple
+    try std.testing.expectEqual(@as(usize, 2), s.functions.items.len);
+    try std.testing.expectEqualStrings("merge", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("simple", s.functions.items[1].name);
 }

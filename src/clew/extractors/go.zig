@@ -8,14 +8,31 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
 
     var line_num: u32 = 1;
     var lines = std.mem.splitScalar(u8, source, '\n');
+    var in_import_block = false;
 
     while (lines.next()) |line| : (line_num += 1) {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0 or std.mem.startsWith(u8, trimmed, "//")) continue;
 
+        // Handle grouped import block lines
+        if (in_import_block) {
+            if (std.mem.startsWith(u8, trimmed, ")")) {
+                in_import_block = false;
+                continue;
+            }
+            // Each line in import block is a quoted package path
+            if (try parseImportLine(allocator, trimmed, line_num)) |import_decl| {
+                try structure.imports.append(allocator, import_decl);
+            }
+            continue;
+        }
+
         // Parse imports
         if (std.mem.startsWith(u8, trimmed, "import ")) {
-            if (try parseImport(allocator, trimmed, line_num)) |import_decl| {
+            if (std.mem.indexOf(u8, trimmed, "(") != null) {
+                // Grouped import: import (
+                in_import_block = true;
+            } else if (try parseImport(allocator, trimmed, line_num)) |import_decl| {
                 try structure.imports.append(allocator, import_decl);
             }
         }
@@ -34,6 +51,22 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
     }
 
     return structure;
+}
+
+/// Parse a single line within a grouped import block.
+/// Each line is a quoted path, optionally preceded by an alias.
+fn parseImportLine(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.ImportDecl {
+    // Find the quoted string
+    const quote_start = std.mem.indexOf(u8, line, "\"") orelse return null;
+    const name_start = quote_start + 1;
+    const quote_end = std.mem.indexOfScalarPos(u8, line, name_start, '"') orelse return null;
+    if (quote_end <= name_start) return null;
+
+    return base.ImportDecl{
+        .module = try allocator.dupe(u8, line[name_start..quote_end]),
+        .line = line_num,
+        .items = &.{},
+    };
 }
 
 fn parseImport(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.ImportDecl {
@@ -163,4 +196,79 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         .return_type = return_type,
         .has_error_handling = has_error_handling,
     };
+}
+
+test "go: parse function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "func main() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("main", s.functions.items[0].name);
+}
+
+test "go: parse function with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "func GetName() string {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("GetName", s.functions.items[0].name);
+}
+
+test "go: parse struct" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "type Config struct {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Config", s.types.items[0].name);
+}
+
+test "go: parse interface" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "type Reader interface {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Reader", s.types.items[0].name);
+}
+
+test "go: parse single import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import \"fmt\"");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("fmt", s.imports.items[0].module);
+}
+
+test "go: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// func commented() {}");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}
+
+test "go: parse grouped imports" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\import (
+        \\    "fmt"
+        \\    "os"
+        \\    "strings"
+        \\)
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 3), s.imports.items.len);
+    try std.testing.expectEqualStrings("fmt", s.imports.items[0].module);
+    try std.testing.expectEqualStrings("os", s.imports.items[1].module);
+    try std.testing.expectEqualStrings("strings", s.imports.items[2].module);
+}
+
+test "go: parse aliased grouped import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\import (
+        \\    myfmt "fmt"
+        \\)
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("fmt", s.imports.items[0].module);
 }

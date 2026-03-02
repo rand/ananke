@@ -385,6 +385,7 @@ pub const HybridExtractor = struct {
             self.allocator,
             source,
             lang_patterns,
+            language_name,
         );
         defer self.allocator.free(matches);
 

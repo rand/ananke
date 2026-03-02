@@ -8,10 +8,31 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
 
     var line_num: u32 = 1;
     var lines = std.mem.splitScalar(u8, source, '\n');
+    var in_multiline_sig = false;
+    var multiline_sig_buf: [1024]u8 = undefined;
+    var multiline_sig_len: usize = 0;
+    var multiline_sig_line: u32 = 0;
 
     while (lines.next()) |line| : (line_num += 1) {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0 or trimmed[0] == '#') continue;
+
+        // Accumulate multi-line function signatures
+        if (in_multiline_sig) {
+            const to_add = @min(trimmed.len, multiline_sig_buf.len - multiline_sig_len);
+            if (to_add > 0) {
+                @memcpy(multiline_sig_buf[multiline_sig_len..][0..to_add], trimmed[0..to_add]);
+                multiline_sig_len += to_add;
+            }
+            if (std.mem.indexOf(u8, trimmed, ")") != null) {
+                in_multiline_sig = false;
+                const full_sig = multiline_sig_buf[0..multiline_sig_len];
+                if (try parseFunction(allocator, full_sig, multiline_sig_line)) |func_decl| {
+                    try structure.functions.append(allocator, func_decl);
+                }
+            }
+            continue;
+        }
 
         // Parse imports
         if (std.mem.startsWith(u8, trimmed, "import ") or std.mem.startsWith(u8, trimmed, "from ")) {
@@ -30,8 +51,18 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
             std.mem.indexOf(u8, trimmed, "async def") != null or
             std.mem.indexOf(u8, trimmed, "lambda") != null)
         {
-            if (try parseFunction(allocator, trimmed, line_num)) |func_decl| {
-                try structure.functions.append(allocator, func_decl);
+            // Check for multi-line signature (has open paren but no close paren)
+            if (std.mem.indexOf(u8, trimmed, "(") != null and
+                std.mem.indexOf(u8, trimmed, ")") == null)
+            {
+                in_multiline_sig = true;
+                multiline_sig_line = line_num;
+                multiline_sig_len = @min(trimmed.len, multiline_sig_buf.len);
+                @memcpy(multiline_sig_buf[0..multiline_sig_len], trimmed[0..multiline_sig_len]);
+            } else {
+                if (try parseFunction(allocator, trimmed, line_num)) |func_decl| {
+                    try structure.functions.append(allocator, func_decl);
+                }
             }
         }
     }
@@ -183,4 +214,88 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
     }
 
     return null;
+}
+
+test "python: parse basic function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "def greet(name):");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("greet", s.functions.items[0].name);
+}
+
+test "python: parse function with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "def get_count() -> int:");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("int", s.functions.items[0].return_type.?);
+}
+
+test "python: parse class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "class MyClass:");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("MyClass", s.types.items[0].name);
+}
+
+test "python: parse import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "import os");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("os", s.imports.items[0].module);
+}
+
+test "python: parse from import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "from typing import Optional");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("typing", s.imports.items[0].module);
+}
+
+test "python: parse async function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "async def fetch_data() -> str:");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_async);
+}
+
+test "python: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "# def commented_func():");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}
+
+test "python: parse multi-line function signature" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\def process(
+        \\    x: int,
+        \\    y: str
+        \\) -> bool:
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("process", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("bool", s.functions.items[0].return_type.?);
+}
+
+test "python: parse multi-line async function signature" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\async def fetch(
+        \\    url: str,
+        \\    timeout: int = 30
+        \\) -> str:
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("fetch", s.functions.items[0].name);
+    try std.testing.expect(s.functions.items[0].is_async);
+    try std.testing.expectEqualStrings("str", s.functions.items[0].return_type.?);
 }

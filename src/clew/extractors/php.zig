@@ -219,7 +219,7 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         if (type_start < line.len and line[type_start] == '?') type_start += 1;
         const ts = type_start;
         var type_end = ts;
-        while (type_end < line.len and (std.ascii.isAlphanumeric(line[type_end]) or line[type_end] == '_' or line[type_end] == '\\')) {
+        while (type_end < line.len and (std.ascii.isAlphanumeric(line[type_end]) or line[type_end] == '_' or line[type_end] == '\\' or line[type_end] == '|')) {
             type_end += 1;
         }
         if (type_end > ts) {
@@ -231,7 +231,7 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         if (type_start < line.len and line[type_start] == '?') type_start += 1;
         const ts = type_start;
         var type_end = ts;
-        while (type_end < line.len and (std.ascii.isAlphanumeric(line[type_end]) or line[type_end] == '_' or line[type_end] == '\\')) {
+        while (type_end < line.len and (std.ascii.isAlphanumeric(line[type_end]) or line[type_end] == '_' or line[type_end] == '\\' or line[type_end] == '|')) {
             type_end += 1;
         }
         if (type_end > ts) {
@@ -308,4 +308,46 @@ test "php: skip php tag" {
     defer s.deinit();
     try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
     try std.testing.expectEqualStrings("Foo", s.types.items[0].name);
+}
+
+test "php: parse abstract class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "abstract class BaseController {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("BaseController", s.types.items[0].name);
+    try std.testing.expectEqual(base.TypeDecl.TypeKind.class_type, s.types.items[0].kind);
+}
+
+test "php: parse enum" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "enum Suit: string {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Suit", s.types.items[0].name);
+    try std.testing.expectEqual(base.TypeDecl.TypeKind.enum_type, s.types.items[0].kind);
+}
+
+test "php: parse function with union return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "    public function getValue(): int|string {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("getValue", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("int|string", s.functions.items[0].return_type.?);
+}
+
+test "php: parse require_once" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "require_once 'config.php';");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("config.php", s.imports.items[0].module);
+}
+
+test "php: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// function notReal() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
 }

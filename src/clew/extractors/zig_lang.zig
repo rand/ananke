@@ -155,3 +155,58 @@ fn parseFunction(allocator: std.mem.Allocator, line: []const u8, line_num: u32) 
         .has_error_handling = has_error_handling,
     };
 }
+
+test "zig: parse function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "fn main() void {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("main", s.functions.items[0].name);
+}
+
+test "zig: parse pub function" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub fn init(allocator: std.mem.Allocator) !Self {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].is_public);
+}
+
+test "zig: parse struct" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "const Config = struct {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Config", s.types.items[0].name);
+}
+
+test "zig: parse import" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "const std = @import(\"std\");");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("std", s.imports.items[0].module);
+}
+
+test "zig: parse enum" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub const Direction = enum {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Direction", s.types.items[0].name);
+}
+
+test "zig: detect error handling" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "pub fn open(path: []const u8) !File {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expect(s.functions.items[0].has_error_handling);
+}
+
+test "zig: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// fn commented() void {}");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}

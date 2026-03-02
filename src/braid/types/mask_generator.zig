@@ -313,8 +313,10 @@ pub const MaskGenerator = struct {
         if (token.len == 0) return false;
         const c = token[0];
         return switch (lang) {
-            .typescript, .javascript, .rust, .go, .java, .cpp, .csharp, .kotlin, .zig_lang => c == '"' or c == '\'' or c == '`',
+            .typescript, .javascript, .rust, .go, .java, .cpp, .csharp, .kotlin, .zig_lang, .c, .swift => c == '"' or c == '\'' or c == '`',
             .python => c == '"' or c == '\'' or (token.len >= 2 and token[0] == 'f' and token[1] == '"'),
+            .ruby => c == '"' or c == '\'' or c == ':',
+            .php => c == '"' or c == '\'',
         };
     }
 

@@ -8,10 +8,21 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
 
     var line_num: u32 = 1;
     var lines = std.mem.splitScalar(u8, source, '\n');
+    var visibility_private = false;
 
     while (lines.next()) |line| : (line_num += 1) {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0 or std.mem.startsWith(u8, trimmed, "#")) continue;
+
+        // Track visibility modifiers
+        if (std.mem.eql(u8, trimmed, "private") or std.mem.eql(u8, trimmed, "protected")) {
+            visibility_private = true;
+            continue;
+        }
+        if (std.mem.eql(u8, trimmed, "public")) {
+            visibility_private = false;
+            continue;
+        }
 
         // Parse require/require_relative
         if (std.mem.startsWith(u8, trimmed, "require ") or std.mem.startsWith(u8, trimmed, "require_relative ")) {
@@ -27,19 +38,34 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
         }
         // Parse class definitions
         else if (std.mem.startsWith(u8, trimmed, "class ")) {
+            // Reset visibility on class boundary
+            visibility_private = false;
             if (try parseClass(allocator, trimmed, line_num)) |type_decl| {
                 try structure.types.append(allocator, type_decl);
             }
         }
         // Parse module definitions
         else if (std.mem.startsWith(u8, trimmed, "module ")) {
+            // Reset visibility on module boundary
+            visibility_private = false;
             if (try parseModule(allocator, trimmed, line_num)) |type_decl| {
                 try structure.types.append(allocator, type_decl);
             }
         }
+        // Parse attr_accessor/reader/writer
+        else if (std.mem.startsWith(u8, trimmed, "attr_accessor ") or
+            std.mem.startsWith(u8, trimmed, "attr_reader ") or
+            std.mem.startsWith(u8, trimmed, "attr_writer "))
+        {
+            if (try parseAttr(allocator, trimmed, line_num)) |func_decl| {
+                try structure.functions.append(allocator, func_decl);
+            }
+        }
         // Parse method definitions
         else if (std.mem.startsWith(u8, trimmed, "def ")) {
-            if (try parseMethod(allocator, trimmed, line_num)) |func_decl| {
+            if (try parseMethod(allocator, trimmed, line_num)) |func_decl_val| {
+                var func_decl = func_decl_val;
+                if (visibility_private) func_decl.is_public = false;
                 try structure.functions.append(allocator, func_decl);
             }
         }
@@ -167,6 +193,36 @@ fn parseMethod(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
     };
 }
 
+fn parseAttr(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.FunctionDecl {
+    var start: usize = 0;
+    if (std.mem.startsWith(u8, line, "attr_accessor ")) {
+        start = 14;
+    } else if (std.mem.startsWith(u8, line, "attr_reader ")) {
+        start = 12;
+    } else if (std.mem.startsWith(u8, line, "attr_writer ")) {
+        start = 12;
+    } else {
+        return null;
+    }
+    // Skip the colon prefix
+    if (start < line.len and line[start] == ':') start += 1;
+
+    var name_end = start;
+    while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
+        name_end += 1;
+    }
+    if (name_end <= start) return null;
+
+    return base.FunctionDecl{
+        .name = try allocator.dupe(u8, line[start..name_end]),
+        .line = line_num,
+        .is_public = true,
+        .is_async = false,
+        .return_type = null,
+        .has_error_handling = false,
+    };
+}
+
 test "ruby: parse class" {
     const allocator = std.testing.allocator;
     var s = try parse(allocator, "class UserService");
@@ -220,4 +276,55 @@ test "ruby: parse class with inheritance" {
     try std.testing.expectEqualStrings("Admin", s.types.items[0].name);
     try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
     try std.testing.expectEqualStrings("permissions", s.functions.items[0].name);
+}
+
+test "ruby: parse require_relative" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "require_relative 'helpers/auth'");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("helpers/auth", s.imports.items[0].module);
+}
+
+test "ruby: parse include" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "include Comparable");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("Comparable", s.imports.items[0].module);
+}
+
+test "ruby: parse attr_accessor" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "attr_accessor :name");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("name", s.functions.items[0].name);
+}
+
+test "ruby: parse private method" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\private
+        \\def secret
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("secret", s.functions.items[0].name);
+    try std.testing.expect(!s.functions.items[0].is_public);
+}
+
+test "ruby: parse method with special chars" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "def valid?");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("valid?", s.functions.items[0].name);
+}
+
+test "ruby: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "# def not_real");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
 }

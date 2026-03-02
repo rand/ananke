@@ -571,7 +571,7 @@ test "Layer 3: Pattern matching finds constructs in all 5 languages" {
             return error.TestUnexpectedResult;
         };
 
-        const matches = try patterns.findPatternMatches(allocator, lang.code, lang_patterns);
+        const matches = try patterns.findPatternMatches(allocator, lang.code, lang_patterns, lang.name);
         defer allocator.free(matches);
 
         std.debug.print("  {s}: {} pattern matches\n", .{ lang.name, matches.len });
