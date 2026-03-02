@@ -32,7 +32,7 @@ The system spans 14 languages, composes constraints across 5 domains with formal
                               │
                               v
 Source code ──> Clew (tree-sitter) + Repository Context
-                 │                        │
+                 │                         │
                  ├ SyntaxStructure         ├ ScopeContext (cross-file bindings)
                  │ (local AST data)        ├ Salience (per-entity importance)
                  │                         ├ Stability (temporal confidence)
