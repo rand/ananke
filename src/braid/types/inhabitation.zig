@@ -1650,15 +1650,15 @@ test "property: BFS reachability is reflexive" {
     const random = prng.random();
 
     const languages = [_]Language{
-        .typescript, .python, .rust, .go, .java,
+        .typescript, .python, .rust,   .go,       .java,
         .cpp,        .csharp, .kotlin, .zig_lang, .c,
         .ruby,       .php,    .swift,
     };
 
     const primitive_kinds = [_]PrimitiveKind{
-        .void_type, .boolean, .i8,  .i16,     .i32,
-        .i64,       .u8,      .u16, .u32,     .u64,
-        .f32,       .f64,     .number, .string, .char,
+        .void_type, .boolean, .i8,      .i16,    .i32,
+        .i64,       .u8,      .u16,     .u32,    .u64,
+        .f32,       .f64,     .number,  .string, .char,
         .null_type, .any,     .unknown, .never,
     };
 
@@ -1759,9 +1759,9 @@ test "property: all builtin edges produce valid types" {
     // For each language, calling addBuiltinEdges should not fail and all
     // edge endpoints should be resolvable within the graph.
     const languages = [_]Language{
-        .typescript, .javascript, .python, .rust, .go, .java,
-        .cpp,        .csharp,     .kotlin, .zig_lang, .c,
-        .ruby,       .php,        .swift,
+        .typescript, .javascript, .python, .rust,     .go, .java,
+        .cpp,        .csharp,     .kotlin, .zig_lang, .c,  .ruby,
+        .php,        .swift,
     };
 
     for (languages) |lang| {
@@ -1780,8 +1780,16 @@ test "property: all builtin edges produce valid types" {
             for (edge_list.items) |edge| {
                 // Each target_type must be a valid Type variant
                 switch (edge.target_type.*) {
-                    .primitive, .array, .tuple, .optional, .named,
-                    .union_type, .function, .generic, .reference, .error_union,
+                    .primitive,
+                    .array,
+                    .tuple,
+                    .optional,
+                    .named,
+                    .union_type,
+                    .function,
+                    .generic,
+                    .reference,
+                    .error_union,
                     => {},
                 }
                 // Each target must be self-reachable (reflexivity)

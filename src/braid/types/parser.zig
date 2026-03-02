@@ -1000,7 +1000,7 @@ test "property: parser never crashes on arbitrary input" {
     const random = prng.random();
 
     const languages = [_]Language{
-        .typescript, .python, .rust, .go, .java,
+        .typescript, .python, .rust,   .go,       .java,
         .cpp,        .csharp, .kotlin, .zig_lang, .c,
         .ruby,       .php,    .swift,
     };
@@ -1028,8 +1028,16 @@ test "property: parser never crashes on arbitrary input" {
         if (result) |t| {
             // Valid type returned; verify it is a real variant
             switch (t.*) {
-                .primitive, .array, .tuple, .optional, .named,
-                .union_type, .function, .generic, .reference, .error_union,
+                .primitive,
+                .array,
+                .tuple,
+                .optional,
+                .named,
+                .union_type,
+                .function,
+                .generic,
+                .reference,
+                .error_union,
                 => {},
             }
         } else |err| {

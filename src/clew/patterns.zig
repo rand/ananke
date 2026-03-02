@@ -3047,7 +3047,7 @@ test "property: pattern matching is deterministic" {
     const random = prng.random();
 
     const lang_names = [_][]const u8{
-        "typescript", "python", "rust", "go", "java",
+        "typescript", "python", "rust",   "go",  "java",
         "cpp",        "csharp", "kotlin", "zig", "c",
         "ruby",       "php",    "swift",
     };
