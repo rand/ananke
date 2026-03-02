@@ -2,8 +2,8 @@
 
 > Get started with constraint-driven code generation in 10-15 minutes.
 
-**Last Updated**: November 27, 2025 (Sprint 1 Complete)
-**Status**: Updated to reflect v0.1.0 actual implementation with all fixes
+**Last Updated**: March 2026
+**Status**: Current with CLaSH 5-domain algebra, 14 languages, FIM, domain fusion, 617 tests
 
 ---
 
@@ -320,10 +320,17 @@ You've just learned the foundation of Ananke! Here's what to explore next:
 
 ### For Building
 
-4. **Deploy the Inference Service** (Week 7+)
-   - When Maze is ready, you'll be able to generate code
-   - See `/modal_inference/` for setup instructions
-   - Requires GPU infrastructure (Modal or similar)
+4. **Deploy the Inference Service**
+   - `modal deploy maze/modal_inference/inference.py`
+   - OpenAI-compatible endpoint with `constraint_spec` extension
+   - Requires Modal account (GPU infrastructure)
+
+5. **Try Fill-in-the-Middle (FIM)**
+   ```bash
+   ananke generate --fim --prefix "fn add(" --suffix ") -> i32 {" --language zig
+   ```
+   - IDE-quality constrained infill
+   - See [docs/FIM_GUIDE.md](docs/FIM_GUIDE.md)
 
 5. **Integrate with Your Project**
    ```bash
@@ -366,7 +373,7 @@ Claude is optional for semantic understanding of business rules.
 **Yes!** The complete system is production-ready:
 - Extract constraints (Clew) ✓ PRODUCTION READY
 - Compile constraints (Braid) ✓ PRODUCTION READY
-- Define constraints (Ariadne) ✓ 70% COMPLETE (parsing works, type checking deferred to v0.2)
+- Define constraints (Ariadne) ✓ Parsing complete (type checking deferred to v0.2)
 - Generate code (Maze) ✓ PRODUCTION READY with Modal inference service
 
 The full pipeline is deployed and tested. See examples/04-full-pipeline for end-to-end usage. Code generation requires Modal service configuration (see `/modal_inference/`).
@@ -382,18 +389,16 @@ Fast enough for interactive use and CI/CD.
 
 ### Q: What languages are supported?
 
-**Fully Supported (9 languages):**
-- TypeScript (`typescript`, `ts`)
-- JavaScript (`javascript`, `js`)
-- Python (`python`, `py`)
-- Rust (`rust`, `rs`)
-- Go (`go`)
-- Zig (`zig`)
-- C (`c`)
-- C++ (`cpp`, `c++`)
-- Java (`java`)
+**Tier 1 — Full tree-sitter AST (9 languages, 0.95 confidence):**
+- TypeScript (`typescript`, `ts`), JavaScript (`javascript`, `js`)
+- Python (`python`, `py`), Rust (`rust`, `rs`), Go (`go`), Zig (`zig`)
+- C (`c`), C++ (`cpp`, `c++`), Java (`java`)
 
-All languages have full tree-sitter AST parsing with pattern-based fallback.
+**Tier 2 — tree-sitter + patterns (5 languages, 0.85 confidence):**
+- Kotlin (`kotlin`, `kt`), C# (`csharp`, `cs`)
+- Ruby (`ruby`, `rb`), PHP (`php`), Swift (`swift`)
+
+All 14 languages support constraint extraction, CLaSH domain compilation, and type analysis.
 
 ### Q: How accurate is constraint extraction?
 
@@ -482,10 +487,11 @@ After this quickstart, you should understand:
 3. **Two analysis modes**:
    - Static analysis (fast, free, structural)
    - Semantic analysis (slower, costs, understands intent)
-4. **Current status (v0.1.0)**:
-   - Constraint extraction: Production-ready ✓ (279 tests, 0 memory leaks)
-   - Constraint compilation: Production-ready ✓ (LRU cache, 11-13x speedup)
-   - Code generation: Production-ready ✓ (via Modal service)
+4. **Current status**:
+   - Constraint extraction: Production-ready ✓ (14 languages, tree-sitter AST)
+   - Constraint compilation: Production-ready ✓ (CLaSH 5-domain algebra, domain fusion)
+   - Code generation: Production-ready ✓ (sglang/Modal, FIM support)
+   - 617 tests (473 Zig + 144 Rust), zero memory leaks
 
 ---
 
@@ -590,10 +596,10 @@ done
 **Problem**: `error: UnsupportedLanguage`
 
 **Solution**: Check supported languages:
-- **Fully supported**: TypeScript, Python, Rust, Go, Zig
-- **Fallback (pattern-based)**: Kotlin, Java, C++
+- **Tier 1** (tree-sitter AST): TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
+- **Tier 2** (tree-sitter + patterns): Kotlin, C#, Ruby, PHP, Swift
 
-For unsupported languages, Ananke uses pattern matching which may have reduced accuracy.
+All 14 languages are fully supported with constraint extraction and CLaSH domain compilation.
 
 **Problem**: `error: FileNotFound` or `error: AccessDenied`
 

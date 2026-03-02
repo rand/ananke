@@ -1,550 +1,363 @@
 # Ananke System Architecture
 
-## Overview
-
-Ananke is a constraint-driven code generation system that transforms AI code generation from probabilistic text completion into controlled search through valid program spaces. The system enforces constraints at the token level during generation, ensuring outputs always satisfy specified requirements.
-
-## Core Philosophy
+Constraint-driven code generation treats AI output as search through valid program spaces. Instead of hoping a language model produces correct code and checking afterward, Ananke narrows the search space at every token so the model *cannot* produce invalid output. The constraint overhead per token is well under GPU forward-pass time. You pay nothing in throughput and get guarantees for free.
 
 > "If you can't make it explicit, you can't control it. If you can't control it, you can't trust it. If you can't trust it, you can't ship it."
 
+## Table of Contents
+
+- [CLaSH Domain Architecture](#clash-domain-architecture)
+- [System Components](#system-components)
+  - [Clew: Constraint Extraction](#clew-constraint-extraction)
+  - [Braid: Constraint Compilation](#braid-constraint-compilation)
+  - [Ariadne: Constraint DSL](#ariadne-constraint-dsl)
+  - [Maze: Inference Orchestration](#maze-inference-orchestration)
+- [Data Flow](#data-flow)
+- [Deployment](#deployment)
+- [Performance](#performance)
+- [Implementation Status](#implementation-status)
+- [Cross-References](#cross-references)
+
+---
+
+## CLaSH Domain Architecture
+
+CLaSH (Constraint Lattice for Syntax and Hints) organizes constraints into five domains across two tiers. The key insight: constraints compose algebraically via a formal lattice. Hard constraints guarantee; soft constraints guide. This is not a metaphor -- the composition rules have lattice properties, and the system enforces them structurally.
+
+### Hard Tier (binary, compose by intersection)
+
+Hard constraints are pass/fail. A token either satisfies them or it does not. When multiple hard constraints apply, the valid set is their intersection. An empty intersection means the constraint set is infeasible, which Braid detects before generation begins.
+
+| Domain | What it constrains | Enforcement mechanism |
+|--------|-------------------|----------------------|
+| **Syntax** | Grammar conformance at the cursor position | Earley parser / PDA tracking the parse state |
+| **Types** | Well-typedness of the expression being generated | Prefix automata over type-valid continuations |
+| **Imports** | Symbol availability from the scope graph | Vocabulary subset restricting to in-scope names |
+
+### Soft Tier (graded 0.0--1.0, compose additively)
+
+Soft constraints bias the distribution without blocking any token. They compose by weighted addition -- more evidence of a preference makes it stronger, but never absolute.
+
+| Domain | What it captures | Examples |
+|--------|-----------------|----------|
+| **ControlFlow** | Error handling patterns, async/await conventions, loop idioms | "This codebase uses `Result<T, E>` not exceptions" |
+| **Semantics** | Preconditions, postconditions, invariants | "The returned list is always sorted" |
+
+### Composition Invariants
+
+Three rules that the system enforces structurally, not by convention:
+
+1. **Soft never blocks.** A soft constraint with score 0.0 still permits the token. Soft constraints adjust logits; they do not mask them.
+2. **Cross-domain morphisms are monotonic.** A constraint flowing from one domain to another can only tighten the valid set, never widen it. This prevents circular relaxation.
+3. **Soft-to-Hard promotion is forbidden.** There is no path by which a soft preference becomes a hard gate. If you want a hard constraint, declare it as one. The type system enforces this at compile time.
+
+The full algebra -- including proofs of lattice closure, monotonicity, and distributivity -- is in [SPEC-01: CLaSH Algebra](spec/SPEC-01-clash-algebra.md).
+
+---
+
 ## System Components
 
-### 1. Clew (Constraint Extraction Engine)
-**Language**: Zig
-**Purpose**: Mines constraints from multiple sources
-**Location**: Runs locally or at edge (no GPU required)
+### Clew: Constraint Extraction
 
-#### Capabilities:
-- **Static Analysis**: Tree-sitter AST parsing via C FFI for robust syntactic extraction
-  - 9 languages supported: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
-  - Hybrid extraction: Tree-sitter AST (primary) + pattern matching (fallback)
-- **Semantic Understanding**: Optional Claude/OpenAI integration for deeper analysis
-- **Pattern Mining**: Extracts constraints from:
-  - Source code (syntactic, type, architectural patterns)
-  - Test files (implicit requirements, invariants)
-  - Production telemetry (performance constraints, usage patterns)
-  - Documentation (business rules, compliance requirements)
+**Language**: Zig | **Location**: `src/clew/` | **Runs**: locally, no GPU
 
-#### Constraint Categories:
-1. **Syntactic**: Code structure, formatting, naming conventions
-2. **Type**: Type safety, null checks, return types
-3. **Semantic**: Data flow, control flow, side effects
-4. **Architectural**: Module boundaries, dependency directions, layering
-5. **Operational**: Performance bounds, resource limits, scaling requirements
-6. **Security**: Input validation, authentication, authorization patterns
+Clew mines constraints from source code. It supports 14 languages via tree-sitter AST parsing with a pattern-matching fallback:
 
-### 2. Braid (Constraint Compilation Engine)
-**Language**: Zig
-**Purpose**: Compiles and optimizes constraints into efficient evaluation programs
-**Location**: Runs locally or at edge (no GPU required)
+**Tier 1** (9 languages, tree-sitter primary, 0.95 confidence):
+TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
 
-#### Capabilities:
-- **Graph Construction**: Builds constraint dependency DAG
-- **Conflict Resolution**: Detects and resolves conflicting constraints
-  - Optional Claude integration for complex conflict resolution
-- **Optimization**: Parallel validation with efficient constraint ordering
-- **Compilation**: Outputs ConstraintIR compatible with llguidance
-- **Caching**: LRU constraint cache with clone-on-get strategy
-  - In-process, in-memory cache (distributed caching planned for future)
-  - ~1μs cache hit latency
-  - Typical 20x speedup on repeated compilations
+These languages have mature tree-sitter grammars and comprehensive query coverage. The AST path handles all standard constructs; the pattern fallback activates only for edge cases (e.g., complex macro expansions in C/C++, decorator chains in Python).
 
-#### ConstraintIR Format:
-```zig
-const ConstraintIR = struct {
-    json_schema: ?JsonSchema,           // For structured data constraints
-    grammar: ?ContextFreeGrammar,       // For syntax constraints
-    regex_patterns: []Regex,            // For pattern matching
-    token_masks: ?TokenMaskRules,       // For direct token control
-    priority_rules: []PriorityRule,     // For conflict resolution
-};
-```
+**Tier 2** (5 languages, tree-sitter + pattern hybrid, 0.85 confidence):
+Kotlin, C#, Ruby, PHP, Swift
 
-### 3. Ariadne (Constraint DSL - Optional)
-**Language**: Zig
-**Purpose**: High-level DSL for expressing complex constraint relationships
-**Location**: Compiles to ConstraintIR locally
+Tier 2 languages have tree-sitter grammars that cover the core syntax but need pattern assistance for language-specific idioms -- Ruby's metaprogramming, PHP's mixed HTML/code boundaries, Kotlin's coroutine patterns. The 0.85 confidence floor means extraction results are still reliable enough for all five CLaSH domains; the slightly lower confidence adjusts how aggressively Braid trusts the extracted constraints during compilation.
 
-#### Features:
-- **Declarative Syntax**: Express constraints naturally
-- **Inheritance**: Build on existing constraint sets
-- **Composition**: Combine constraints with operators
-- **Macros**: Reusable constraint templates
-- **Type Safety**: Compile-time constraint validation
+All 14 parsers are compiled as static libraries and linked at build time via the Zig build system's C interop. No runtime parser loading, no dynamic dispatch on the hot path. Adding a new language means adding its tree-sitter grammar as a build dependency and implementing the extraction queries -- the pattern library and CLaSH domain tagging follow a template established by the existing languages.
 
-#### Example:
+#### Extraction Pipeline
+
+The hybrid extraction architecture lives in two layers:
+
+- **`src/clew/tree_sitter/`** -- AST-based extraction. Walks the concrete syntax tree to extract type bindings, function signatures, class definitions, imports, control flow patterns, and semantic constraints. This is the primary path for Tier 1 languages.
+- **`src/clew/patterns.zig`** -- Pattern-matching fallback. 383 patterns across 14 languages (up from 101 across 5 in v0.1). Activates when tree-sitter produces low-confidence results or for language constructs that resist AST-level extraction.
+
+#### Context Sources
+
+Beyond direct extraction, Clew integrates several context sources:
+
+- **Scope context** (`src/clew/scope_context.zig`): Cross-file name resolution via Homer's scope graph. Exports `ScopeBinding`, `BindingKind`, and `CanonicalImport` -- enough for the Imports domain to know what symbols are actually available, not just what's declared locally.
+- **Call graph context** (`src/clew/call_graph_context.zig`): InlineCoder-style upstream callers and downstream callees. Gives the model awareness of how the code being generated will be called and what it will call.
+- **Convention mining** (`src/clew/conventions.zig`): Extracts naming conventions, import ordering preferences, error handling patterns, documentation style, and code organization norms. These feed the soft CLaSH domains -- ControlFlow and Semantics -- so the model matches the codebase's existing style without being forced to.
+
+#### Output
+
+Clew produces a rich context bundle: `type_bindings`, `function_signatures`, `class_definitions`, `imports`, `control_flow`, and `semantic_constraints`. Each is tagged with its CLaSH domain and confidence level.
+
+---
+
+### Braid: Constraint Compilation
+
+**Language**: Zig | **Location**: `src/braid/` | **Runs**: locally, no GPU
+
+Braid compiles extracted constraints into the `ConstraintIR` format that Maze and llguidance consume. This is where the CLaSH algebra becomes concrete.
+
+#### Core Compiler
+
+**`src/braid/braid.zig`** orchestrates the full compilation pipeline: take a set of `Constraint` values, run them through feasibility analysis, salience scoring, temporal adjustment, domain fusion, and type inhabitation, then emit `ConstraintIR`. The compiler supports incremental recompilation (only recompute what changed) and an LRU constraint cache with clone-on-get semantics.
+
+Conflict resolution has two modes: a deterministic default strategy (priority-based with domain ordering), and an optional Claude API call for genuinely ambiguous conflicts where human-like judgment helps.
+
+#### Analysis Stages
+
+Each stage enriches or filters the constraint set before final compilation:
+
+**Feasibility analysis** (`src/braid/feasibility.zig`, 7 tests): Detects conflicts between constraints before they reach the model. Computes tightness scores (how close the constraint set is to infeasible) and identifies community-aware tension -- clusters of constraints that are individually satisfiable but collectively problematic.
+
+**Salience scoring** (`src/braid/salience.zig`, 10 tests): Maps Homer's four-quadrant salience model (high/low importance x high/low urgency) into a normalized intensity + confidence pair. High-salience constraints get priority in soft-domain composition; low-salience constraints still apply but with reduced influence.
+
+**Temporal analysis** (`src/braid/temporal.zig`, 7 tests): Classifies constraints by stability (stable, trending, volatile) using change history. Recent changes reduce confidence; long-stable constraints get a confidence boost. Co-change patterns from Homer inform which constraints are likely to shift together.
+
+**Domain fusion** (`src/braid/domain_fusion.zig`, 13 tests): The main event. Two fusion strategies compose hard and soft constraints into a single token-level guidance signal:
+
+- *ASAp* (Algebraic Soft-as-Prior): Distribution-preserving fusion. Hard constraints mask; soft constraints adjust the remaining probability mass proportionally. The model's original distribution is disturbed as little as possible while satisfying all constraints.
+- *CRANE* (Constraint-Ranked Adaptive Normalization Engine): Adaptive switching. Under low constraint density, CRANE behaves like ASAp. Under high density, it becomes more aggressive, giving hard constraints earlier influence to avoid dead ends in the generation.
+
+The system selects between them based on constraint density and tightness -- details in [DOMAIN_FUSION.md](DOMAIN_FUSION.md).
+
+**Type inhabitation** (`src/braid/types/`, 24 tests across 4 modules): For the Types domain specifically, Braid builds an inhabitation graph from the type environment at the cursor. The four modules:
+
+- `type_system.zig` -- `TypeArena` for efficient type allocation and structural equality
+- `parser.zig` -- `TypeParser` for parsing type annotations from source
+- `inhabitation.zig` -- `InhabitationGraph` for computing which types can be constructed from available values
+- `mask_generator.zig` -- `MaskGenerator` for converting inhabitation results into token masks
+
+The result: at each token position, only type-valid continuations are permitted.
+
+**FIM analysis** (`src/braid/fim.zig`, 12 tests): For fill-in-the-middle completions (cursor in the middle of existing code), Braid analyzes both the prefix and suffix to constrain the hole. `PrefixAnalysis` determines the syntactic and type context leading in; `SuffixAnalysis` determines what the generated code must connect to. `HoleScale` classifies the expected completion size (expression, statement, block, function body) to calibrate constraint aggressiveness.
+
+---
+
+### Ariadne: Constraint DSL
+
+**Language**: Zig | **Location**: `src/ariadne/` | **Status**: parsing complete, type checking deferred
+
+Ariadne provides a declarative DSL for specifying constraint sets. It compiles to the same `ConstraintIR` that Braid produces, so downstream components (Maze, llguidance) are agnostic to the constraint source.
+
 ```ariadne
 constraint secure_api inherits base_security {
     requires: authentication;
     validates: input_schema;
-    max_complexity: 10;
     forbid: ["eval", "exec", "system"];
-
-    temporal: {
-        timeout: 30s;
-        retry_policy: exponential_backoff;
-    }
 }
 ```
 
-### 4. Maze (AI Orchestration Layer)
-**Language**: Rust + Python
-**Purpose**: Coordinates constrained code generation
-**Location**: Communicates with GPU inference servers
+The parser is complete; type checking is deferred. For production use today, Braid's programmatic API or JSON configuration are the recommended paths.
 
-#### Architecture:
-- **Rust Core**: Async orchestration with Tokio
-- **Python Bridge**: PyO3 integration for model communication
-- **Constraint Application**: Real-time token masking via llguidance
-- **Streaming**: Progressive generation with constraint validation
+---
 
-#### Key Requirement:
-Maze MUST have control over the inference process. It cannot use managed APIs (Claude/OpenAI) for generation because constrained generation requires:
-- Access to raw logits
-- Token-by-token intervention
-- Real-time constraint application
+### Maze: Inference Orchestration
 
-### 5. Inference Service
-**Technology**: vLLM/SGLang + llguidance
-**Purpose**: Performs actual constrained generation
-**Location**: GPU infrastructure (Modal/RunPod/Local)
+**Language**: Rust | **Location**: `maze/` | **Tests**: 144
 
-#### Components:
-- **vLLM/SGLang**: High-performance inference server
-- **llguidance**: Token-level constraint enforcement (~50μs/token)
-- **Model**: Llama, Mistral, DeepSeek, or similar open models
-- **GPU Requirements**: 16GB+ VRAM for 7B models, 40GB+ for 13B, 80GB+ for 30B+
+Maze bridges the constraint world (Zig) to the inference world (Python/GPU). It has one job that matters: get `ConstraintIR` to the inference server and get constrained tokens back.
+
+#### Architecture
+
+- **Rust core** (`maze/src/`): Async orchestration with Tokio. Handles request routing, retry logic, backend auto-detection, and the FFI bridge to Zig.
+- **Modal deployment** (`maze/modal_inference/inference.py`): Qwen2.5-Coder-32B-Instruct on A100-80GB with scale-to-zero. Two endpoints:
+  - `/v1/chat/completions` -- OpenAI-compatible, with a `constraint_spec` extension field that carries the compiled CLaSH domains
+  - `/generate` -- custom format for direct constraint control
+- **Backend auto-detect**: sglang if configured, Modal as fallback. The system discovers available backends at startup and routes accordingly.
+
+#### Constraint Delivery
+
+The `constraint_spec` extension field in the OpenAI-compatible endpoint carries per-domain structured context as JSON. This is metadata for the inference server -- it tells llguidance what constraints to enforce. The `json_schema` field in `ConstraintIR` is structural metadata about the constraint shape, not an output-format constraint. Only EBNF grammars go to llguidance for token-level enforcement.
+
+Maze uses sglang and vLLM as inference backends because constrained generation requires logit access. Managed APIs (Claude, OpenAI) do not expose raw logits, so they cannot participate in token-level constraint enforcement. They can, however, be used upstream for semantic analysis during extraction.
+
+#### Rust Modules
+
+The Maze codebase (`maze/src/`) is organized around specific concerns:
+
+- `modal_client.rs` -- HTTP client for the Modal inference endpoint, with retry logic and error mapping
+- `ffi.rs` -- FFI bridge to Zig core; marshals `ConstraintIR` across the language boundary
+- `model_router.rs` and `model_selector.rs` -- backend discovery and request routing
+- `adaptive_selector.rs` -- runtime strategy selection based on constraint density and latency history
+- `telemetry.rs` -- structured logging for constraint application, latency tracking, and cache metrics
+- `progressive_refinement.rs` -- foundation for bidirectional streaming (not yet fully wired)
+
+---
 
 ## Data Flow
 
-### System-Level Data Flow
-
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Input Sources                               │
-├─────────────────┬──────────────┬─────────────┬──────────────────────┤
-│  Source Code    │  Test Files  │ Telemetry   │  Documentation       │
-│  (TS/Py/Rust)   │  (assertions)│ (prod data) │  (business rules)    │
-└────────┬────────┴──────┬───────┴──────┬──────┴────────┬─────────────┘
-         │               │              │               │
-         └───────────────┼──────────────┼───────────────┘
-                         │              │
-         ┌───────────────▼──────────────▼──────────┐
-         │  Clew: Constraint Extraction Engine    │
-         │  - Pattern Matching (O(n) in code len) │
-         │  - Optional Claude Integration          │
-         │  - 101 Built-in Patterns               │
-         └───────────────┬──────────────────────────┘
-                         │
-         ┌───────────────▼──────────────────────────┐
-         │  Extracted Constraints Set               │
-         │  - Type Safety                           │
-         │  - Security                              │
-         │  - Performance                           │
-         │  - Semantic                              │
-         │  - Architectural                         │
-         └───────────────┬──────────────────────────┘
-                         │
-    ┌────────┬───────────┼───────────┬──────────────┐
-    │        │           │           │              │
-    │  ┌─────▼─┐    ┌────▼──┐   ┌───▼──┐      ┌──┐│
-    │  │Ariadne│    │ JSON  │   │YAML  │      │? ││
-    │  │  DSL  │    │Config │   │Config│      │  ││
-    │  └───────┘    └───────┘   └──────┘      └──┘│
-    │                                             │
-    └─────────────────────┬──────────────────────┘
-                          │
-         ┌────────────────▼──────────────────────┐
-         │  Braid: Constraint Compilation       │
-         │  - Dependency Graph Analysis         │
-         │  - Conflict Detection (O(n log n))   │
-         │  - Optimization (topological sort)   │
-         │  - IR Generation                     │
-         │  - LRU Caching (~20x speedup)        │
-         └────────────────┬──────────────────────┘
-                          │
-         ┌────────────────▼──────────────────────┐
-         │  ConstraintIR (Optimized Format)     │
-         │  ├─ JSON Schema                      │
-         │  ├─ Context-Free Grammar             │
-         │  ├─ Regex Patterns                   │
-         │  ├─ Token Mask Rules                 │
-         │  └─ Priority Rules                   │
-         └────────────────┬──────────────────────┘
-                          │
-    ┌─────────────────────▼──────────────────────┐
-    │  Maze: AI Orchestration Layer              │
-    │  - FFI to Zig/Rust boundary                │
-    │  - Token-by-token validation               │
-    │  - Real-time constraint application        │
-    │  - HTTP Client (Modal/vLLM)                │
-    └─────────────────────┬──────────────────────┘
-                          │
-    ┌─────────────────────▼──────────────────────┐
-    │  Inference Service (GPU)                   │
-    │  - vLLM/SGLang Server                      │
-    │  - llguidance Token Masking                │
-    │  - Constrained Generation (~50μs/token)    │
-    └─────────────────────┬──────────────────────┘
-                          │
-    ┌─────────────────────▼──────────────────────┐
-    │  Output: Guaranteed Valid Code             │
-    │  - Satisfies all constraints               │
-    │  - Type-safe                               │
-    │  - Production-ready                        │
-    └────────────────────────────────────────────┘
+Source Code (14 languages)
+    |
+    v
+Clew (tree-sitter AST + pattern fallback)
+    |-- Constraints (tagged per CLaSH domain)
+    |-- Rich Context (types, imports, control flow, semantics)
+    |-- Homer Context (scope graph, salience, temporal, conventions, call graph)
+    |
+    v
+Braid
+    |-- Feasibility analysis (conflict detection, tightness scoring)
+    |-- Salience scoring (Homer quadrant -> intensity + confidence)
+    |-- Temporal analysis (stability class -> confidence adjustment)
+    |-- CLaSH domain compilation
+    |   |-- Hard: Syntax mask, Types mask, Imports mask
+    |   +-- Soft: ControlFlow scores, Semantics scores
+    |-- Domain Fusion (ASAp + CRANE adaptive selection)
+    |-- Type Inhabitation (if Types domain active)
+    |-- FIM Analysis (if fill-in-the-middle mode)
+    |
+    v
+ConstraintIR + ConstraintSpec (JSON)
+    |
+    v
+Maze / sglang
+    |-- OpenAI-compatible endpoint with constraint_spec extension
+    |-- llguidance token-level enforcement
+    |-- Hard masks applied per-token; soft scores adjust logits
+    |
+    v
+Generated Code (constraint-validated)
 ```
 
-### Detailed Component Data Flow
+The entire pipeline from source to `ConstraintIR` runs locally with no GPU. Network calls happen only at inference time (Maze to sglang/Modal) and optionally during extraction (Claude API for semantic analysis, Homer for scope/salience/temporal data).
 
-```mermaid
-graph LR
-    A[Source Code] --> B[Clew]
-    T[Tests] --> B
-    D[Telemetry] --> B
-    B --> |Constraints| C[Braid]
-    AR[Ariadne DSL] --> C
-    C --> |ConstraintIR| M[Maze]
-    I[User Intent] --> M
-    M --> |Request| IS[Inference Service]
-    IS --> |Constrained Code| O[Output]
+A few things worth noting about the flow:
 
-    CL[Claude API] -.-> |Analysis| B
-    CL -.-> |Optimization| C
-```
+**Incremental by default.** When a file changes, Clew re-extracts only that file's constraints. Braid's cache means unchanged constraint sets skip recompilation entirely. In a typical editing session, the end-to-end latency from keystroke to updated `ConstraintIR` is dominated by tree-sitter parsing (~10 ms), not by compilation.
 
-### Constraint Flow Through System
+**Fail-open on context.** Homer context (scope graph, salience, temporal, call graph) enriches the constraint set but is not required. If Homer is unavailable, Clew falls back to file-local extraction. The constraint set is narrower but still valid -- you lose cross-file awareness, not correctness.
+
+**FIM is a mode, not a different pipeline.** Fill-in-the-middle requests follow the same data flow. The difference is that Braid's FIM analysis adds suffix-derived constraints alongside the prefix-derived ones, and `HoleScale` adjusts how tightly those constraints bind. A small hole (expression-level) gets tight constraints; a large hole (function body) gets looser ones to avoid over-constraining the model.
+
+---
+
+## Deployment
+
+### Local Development
 
 ```
-Input Source → Pattern Matching → Extracted Constraint
-    │              │                    │
-    └─ Language    └─ 101 Built-in     └─ (name, kind, source, priority)
-       Detection      Pattern Library
-
-Extracted Constraint → Dependency Graph → Conflict Detection
-    │                     │                  │
-    └─ Set of            └─ DAG with         └─ Conflicting pairs
-       constraints          edges between       identified
-                           constraints
-
-Conflict → Resolution Strategy → Optimized Graph
-    │          │                   │
-    └─ Manual  └─ Heuristic        └─ Topological sort
-       override    └─ LLM-assisted     └─ Optimal evaluation order
-
-Optimized Graph → IR Generation → ConstraintIR
-    │                 │              │
-    └─ Ordered       └─ JSON Schema  └─ Multi-format IR:
-       constraints       Grammar        ├─ JSON Schema
-                        Regex          ├─ Grammar
-                        Token Masks    ├─ Regex
-                                       └─ Token Masks
+Developer Machine
++-- Ananke CLI (Zig binary, ~4MB)
+|   +-- Clew (extraction)
+|   +-- Braid (compilation)
+|   +-- Ariadne (DSL, optional)
++-- Maze (Rust binary)
++-- API keys (Modal, optionally Claude/Homer)
 ```
 
-## Deployment Architecture
+Eight CLI commands: `extract`, `compile`, `generate`, `validate`, `export-spec`, `init`, `version`, `help`.
 
-### Development Mode
-```
-Developer Machine:
-├── Ananke CLI (Zig binary)
-│   ├── Clew (extraction)
-│   ├── Braid (compilation)
-│   └── Ariadne (DSL)
-├── Local GGUF Model (optional)
-└── API Keys (Claude, Modal)
-```
+FIM mode is available via `--fim --prefix <prefix> --suffix <suffix>` on the `generate` command.
 
-### Production Mode
-```
-Edge/Local:
-├── Ananke Core (Zig)
-│   └── Constraint Processing
-│
-Network:
-├── Claude API (optional analysis)
-│
-GPU Cloud (Modal/RunPod):
-└── Inference Service
-    ├── vLLM Server
-    └── llguidance
-```
+### Production
 
-## Integration Patterns
+The inference service runs on Modal with scale-to-zero:
 
-### 1. Without Ariadne (JSON/YAML)
-```yaml
-constraints:
-  type_safety:
-    forbid: ["any", "unknown"]
-    require: ["explicit_returns"]
-  security:
-    validate: ["input_sanitization"]
-```
+| Parameter | Value |
+|-----------|-------|
+| Model | Qwen2.5-Coder-32B-Instruct |
+| GPU | A100-80GB |
+| Scale | 0 to N (auto) |
+| Endpoints | `https://rand--v1-chat-completions.modal.run` (OpenAI-compat) |
+| | `https://rand--ananke-inference-generate-api.modal.run` (custom) |
 
-### 2. With Ariadne (DSL)
-```ariadne
-constraint type_safe {
-    forbid any_type;
-    require explicit_returns;
-}
-```
+Backend selection is automatic: the system checks for a local sglang instance first, then falls back to Modal. Configuration lives in `maze/modal_inference/config.yaml`.
 
-### 3. Direct API
-```zig
-const constraints = try Clew.extract(source);
-const compiled = try Braid.compile(constraints);
-const result = try Maze.generate(intent, compiled);
-```
+### Why Modal
 
-### 4. CLI
-```bash
-ananke extract ./src --use-claude
-ananke compile constraints.json
-ananke generate "implement feature"
-```
+Scale-to-zero matters. A100-80GB GPUs cost real money when idle. Modal spins up an instance on the first request and tears it down after a configurable idle timeout (currently 2 minutes for development, longer for production). Cold start is noticeable (~30 seconds for model loading), but warm inference is fast. For a development tool that sees bursty usage -- intense for an hour, idle for three -- this beats a persistent GPU allocation on cost by an order of magnitude.
 
-## Implementation Status (v0.1.0)
+### Evaluation Infrastructure
 
-### Clew (Constraint Extraction)
-**Status**: PRODUCTION READY
-- **Parser**: Tree-sitter AST via C FFI
-  - Direct binding to tree-sitter C library
-  - Hybrid extraction: AST-based (0.95 confidence) + pattern matching fallback
-  - ~100ms extraction time for typical files
-- **Supported Languages**: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
-  - All 9 parsers compiled as static libraries and linked at build time
-- **Pattern Library**: 101 constraint patterns implemented
-- **Claude Integration**: Optional semantic analysis working correctly
-- **Tests**: 40+ unit tests, 100% pass rate
+The eval framework (`eval/core/evaluator.zig`) supports multi-sample pass@k estimation: generate N completions, check how many pass a test suite, compute the unbiased pass@k estimator. `BatchEvaluationResult` aggregates across task categories with statistical significance tests (paired t-test, bootstrap confidence intervals). This is how we verify that constraint changes actually improve generation quality rather than just changing it.
 
-### Braid (Constraint Compilation)
-**Status**: PRODUCTION READY
-- **All 4 Components Implemented**:
-  1. Regex Matcher: Extract and validate regex patterns
-  2. JSON Schema Generator: Build structured output schemas
-  3. Grammar Builder: Compile context-free grammars
-  4. Token Mask Compiler: Generate direct token constraints
-- **Caching**: LRU in-process cache with clone-on-get (20x typical speedup)
-- **Conflict Resolution**: Topological sorting with cycle detection
-- **Tests**: 31+ unit tests, 100% pass rate
+---
 
-### Ariadne (Constraint DSL)
-**Status**: 70% COMPLETE (EXPERIMENTAL)
-- **Parsing**: Complete, all DSL syntax works
-- **Type Checking**: Deferred to v0.2
-- **Error Recovery**: Basic (enhanced in v0.2)
-- **Production Recommendation**: Use JSON config for mission-critical deployments
+## Performance
 
-### Maze (Orchestration)
-**Status**: PRODUCTION READY
-- **Rust Core**: Async/await orchestration with Tokio
-- **FFI Integration**: Complete Zig-Rust FFI boundary
-- **HTTP Client**: Robust retry logic and error handling
-- **Modal Service**: Actively deployed and tested
-- **Tests**: 43+ Rust tests, 100% pass rate
+| Operation | Measured Latency |
+|-----------|-----------------|
+| Constraint extraction (per file) | ~10 ms |
+| Constraint compilation | ~1 ms |
+| Token-level enforcement (llguidance) | ~50 us/token |
+| Hard domain fusion | ~10 us/token |
+| Cache hit (LRU, clone-on-get) | ~5--15 us |
+| Homer queries (amortized) | <5% of inference time |
 
-### Inference Service
-**Status**: PRODUCTION DEPLOYED
-- **Endpoint**: https://<YOUR_MODAL_WORKSPACE>--ananke-inference-generate-api.modal.run
-- **Model**: Qwen2.5-Coder-32B-Instruct
-- **Performance**: 22.3 tokens/sec with JSON schema constraints
-- **Infrastructure**: Modal Labs with A100-80GB GPU
-- **Cost**: ~$0.004/request (development mode, 2-minute scale-down)
+For context, GPU forward-pass time for a 32B parameter model is roughly 10 ms/token. The total constraint overhead per token -- fusion, masking, type checking -- is under 100 us. That is 1% of inference time. Throughput impact: zero.
 
-### Test Coverage
-- **Total Tests**: 197 passing (100% pass rate)
-- **Zig Tests**: 154 (core extraction, compilation, integration)
-- **Rust Tests**: 43 (orchestration, FFI, infrastructure)
-- **Performance**: All test suites complete in <5 seconds
+The LRU cache deserves a note. Braid caches compiled `ConstraintIR` keyed on the input constraint set's content hash. On a cache hit, it clones the result (no shared mutable state) in 5--15 us. Typical hit rates exceed 80% during interactive editing sessions where the file's constraint environment changes incrementally.
 
-### Known Gaps
-- **Distributed Cache**: Single-machine in-memory only
-- **Type Checking in Ariadne**: Deferred to v0.2
-- **Type Extraction Robustness**: Some fallback paths use string matching instead of AST
+---
 
-## Performance Characteristics
+## Implementation Status
 
-### Latency Targets
-- **Constraint Extraction**: <2s (with Claude), <100ms (without)
-- **Constraint Compilation**: <50ms for 1000 constraints
-- **Token Validation**: <50μs per token
-- **End-to-End Generation**: <5s typical
+### By the Numbers
 
-### Scalability
-- **Concurrent Validations**: 10,000+
-- **Max Constraints**: 10,000 per request
-- **Graph Nodes**: 100,000 max
-- **Memory Usage**: <512MB per request
+| Metric | Count |
+|--------|-------|
+| Tests (Zig + Rust) | 617 (473 + 144) |
+| Test failures | 0 |
+| Memory leaks | 0 |
+| Supported languages | 14 |
+| Constraint patterns | 383 |
+| CLaSH domains | 5 (3 hard, 2 soft) |
+| CLI commands | 8 |
 
-## Security Model
+### Complete
 
-### API Key Management
-- OS keychain integration for secure storage
-- Environment variable support
-- Encrypted configuration files
-- Separate keys for analysis vs generation
+- **CLaSH algebra**: Five-domain, two-tier constraint lattice with formal composition rules
+- **Domain fusion**: ASAp distribution-preserving + CRANE adaptive switching
+- **Type inhabitation**: TypeArena, TypeParser, InhabitationGraph, MaskGenerator
+- **FIM support**: Prefix/suffix analysis, hole-scale classification
+- **Homer integration**: Scope graph, salience scoring, temporal analysis, convention mining, call graph context
+- **sglang backend**: OpenAI-compatible endpoint with `constraint_spec` extension
+- **Modal deployment**: Qwen2.5-Coder-32B-Instruct on A100-80GB, scale-to-zero
+- **Evaluation framework**: Multi-sample pass@k, statistical significance tests, batch evaluation, extended task categories
+- **14-language extraction**: Tier 1 (9 languages, AST-primary) + Tier 2 (5 languages, hybrid)
 
-### Constraint Validation
-- All constraints validated at compile time
-- Type-safe constraint composition
-- Sandboxed execution for untrusted constraints
-- Audit logging for constraint application
+### Planned
 
-## Extensibility
+- **Ariadne type checking**: Parser works; type system deferred
+- **Bidirectional streaming**: Progressive constraint refinement during generation
+- **Multi-model orchestration**: Route different constraint profiles to different models
+- **Distributed constraint cache**: Currently single-machine, in-memory only
 
-Ananke provides well-defined extension points for developers to add custom functionality.
+---
 
-### Extension Architecture
+## Design Decisions
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Extension Points (See docs/EXTENDING.md for detailed guide)    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Clew (Extraction Layer)                                        │
-│  ├─ Custom Language Parsers                                     │
-│  │  └─ Implement: TokenKind, tokenize(), AST extraction        │
-│  │                                                              │
-│  ├─ Custom Pattern Extractors                                  │
-│  │  └─ Implement: PatternLibrary.extract()                     │
-│  │                                                              │
-│  └─ Custom Source Extractors (APIs, Telemetry, Docs)          │
-│     └─ Implement: SourceExtractor interface                    │
-│                                                                 │
-│  Braid (Compilation Layer)                                     │
-│  ├─ Custom Constraint Types                                    │
-│  │  └─ Add to ConstraintKind enum + IR union                  │
-│  │     └─ Implement: validation + IR generation               │
-│  │                                                              │
-│  ├─ Custom Validators                                          │
-│  │  └─ Add constraint-specific validation logic               │
-│  │                                                              │
-│  └─ Custom Optimizers                                          │
-│     └─ Improve compilation for specific patterns              │
-│                                                                 │
-│  Ariadne (DSL Layer)                                            │
-│  ├─ Extend Grammar with New Syntax                             │
-│  │  └─ Add rules to ariadne.zig grammar                       │
-│  │                                                              │
-│  └─ Add DSL Features                                            │
-│     └─ Implement semantic actions for new syntax              │
-│                                                                 │
-│  Maze (Orchestration Layer)                                    │
-│  ├─ Custom Constraint Application Strategies                   │
-│  │  └─ Implement: TokenMask generation for custom IR          │
-│  │                                                              │
-│  └─ New Inference Service Integrations                         │
-│     └─ Implement: HTTP client for new backends                │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+A few choices that are non-obvious and worth explaining.
 
-### Adding New Constraint Types
+**Zig for extraction and compilation, Rust for orchestration.** Clew and Braid are pure computation -- parse trees, constraint graphs, mask generation. Zig's comptime, explicit allocators, and C interop (critical for tree-sitter) make it the right tool. Maze is I/O-bound -- HTTP clients, async request routing, FFI marshaling. Rust's async ecosystem (Tokio) and the PyO3 bridge to Python make it the right tool there. The boundary is clean: Zig produces `ConstraintIR` as a serializable struct; Rust consumes it.
 
-**Location**: `/Users/rand/src/ananke/src/types/constraint.zig`
+**Two-tier constraint classification is structural, not cosmetic.** We tried a single-tier system with priority levels. It didn't work. The fundamental issue: if a "soft" constraint can accidentally block a token (because someone set its priority high enough), you get silent infeasibility that manifests as empty completions or degenerate output. The hard/soft split makes this impossible by construction. Hard constraints mask tokens out of the vocabulary; soft constraints adjust logit values. Different mechanisms, not different priority levels.
 
-**Steps**:
-1. Add variant to `ConstraintKind` enum
-2. Define constraint structure
-3. Add IR representation to `ConstraintIR` union
-4. Implement compilation logic in Braid
-5. Add validation and tests
-6. Document in PATTERN_REFERENCE.md
+**ASAp as default, CRANE as escalation.** ASAp preserves the model's original probability distribution as much as possible -- it only removes probability mass (hard masks) and rescales what remains (soft adjustments). This is conservative and safe. CRANE activates under high constraint density where ASAp's conservative approach leads to generation dead ends (the model commits to a token sequence that becomes infeasible three tokens later). CRANE looks ahead and applies hard constraints more aggressively to avoid these traps. The selection is automatic based on constraint tightness.
 
-**Complexity**: Moderate (2-4 hours)
+**Convention mining feeds soft constraints, never hard.** When Clew discovers that a codebase uses `camelCase` for functions, this becomes a Semantics-domain soft constraint, not a Syntax-domain hard constraint. The model is nudged toward `camelCase` but can use `snake_case` if the type system or API requires it. Getting this wrong -- making style conventions into hard constraints -- was an early mistake that produced syntactically valid but contextually absurd code.
 
-**Example**: See `EXTENDING.md > Adding New Constraint Types`
+---
 
-### Adding New Language Support
+## Cross-References
 
-**Location**: `/Users/rand/src/ananke/src/clew/parsers/`
-
-**Steps**:
-1. Implement language parser (tokenizer + AST)
-2. Register in language detection
-3. Implement pattern extractors
-4. Add language-specific tests
-5. Document in USER_GUIDE.md
-
-**Complexity**: High (4-8 hours depending on language)
-
-**Supported**: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
-
-**Example**: See `EXTENDING.md > Adding Language Support`
-
-### Creating Custom Extractors
-
-**Location**: `/Users/rand/src/ananke/src/clew/extractors/`
-
-**Purpose**: Extract constraints from non-code sources (APIs, telemetry, docs)
-
-**Steps**:
-1. Implement extractor interface
-2. Parse source format (JSON, YAML, etc.)
-3. Generate constraints from parsed data
-4. Integrate into Clew.extract()
-5. Add tests
-
-**Complexity**: Low-Moderate (2-4 hours)
-
-**Examples**:
-- OpenAPI extractor (API contracts)
-- Prometheus extractor (monitoring rules)
-- Policy extractor (compliance rules)
-
-See `EXTENDING.md > Creating Custom Extractors`
-
-### Adding New Models
-
-**Location**: Inference service configuration (Modal/vLLM)
-
-**Requirements**:
-1. Model must support logit access (needed for token masking)
-2. Requires vLLM or SGLang support
-3. Must support llguidance compatibility
-
-**Steps**:
-1. Verify model supports logit streaming
-2. Add to vLLM configuration
-3. Test llguidance compatibility
-4. Benchmark performance and VRAM requirements
-5. Document in DEPLOYMENT.md
-
-**Verified Models**:
-- Qwen 2.5 Coder (32B, 7B)
-- Llama 3.1 (8B, 70B)
-- DeepSeek Coder (6.7B, 33B)
-- Mistral (7B)
-
-**Complexity**: Low (1-2 hours + benchmarking)
-
-## Monitoring & Observability
-
-### Metrics
-- Constraint extraction time
-- Compilation success rate
-- Generation latency
-- Constraint violation rate
-- Cache hit rate
-
-### Logging
-- Structured JSON logs
-- Trace correlation IDs
-- Constraint application history
-- Performance profiling
-
-## Future Enhancements
-
-### Planned Features
-- Incremental constraint learning
-- Multi-model ensemble generation
-- Constraint suggestion from code review
-- IDE real-time constraint validation
-- Constraint marketplace
-
-### Research Areas
-- Formal verification of constraints
-- Constraint synthesis from examples
-- Cross-language constraint transfer
-- Probabilistic constraint relaxation
+| Document | Contents |
+|----------|----------|
+| [SPEC-01: CLaSH Algebra](spec/SPEC-01-clash-algebra.md) | Formal lattice properties, composition proofs, domain morphisms |
+| [SPEC-02: sglang Integration](spec/SPEC-02-sglang-integration.md) | Backend protocol, `constraint_spec` format, endpoint design |
+| [SPEC-03: Rich Context](spec/SPEC-03-rich-context.md) | Context bundle format, extraction pipeline, confidence scoring |
+| [SPEC-04: Homer Integration](spec/SPEC-04-homer-integration.md) | Scope graph, salience, temporal analysis, convention mining |
+| [SPEC-05: Domain Fusion](spec/SPEC-05-domain-fusion.md) | ASAp and CRANE algorithms, adaptive selection, benchmarks |
+| [CLASH_ALGEBRA.md](CLASH_ALGEBRA.md) | 5-domain, 2-tier constraint algebra |
+| [DOMAIN_FUSION.md](DOMAIN_FUSION.md) | Domain fusion implementation guide |
+| [TYPE_INHABITATION.md](TYPE_INHABITATION.md) | Type-directed token mask generation |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Modal setup, GPU configuration, endpoint management |
+| [CLI_GUIDE.md](CLI_GUIDE.md) | All 8 commands with examples |
+| [FFI_GUIDE.md](FFI_GUIDE.md) | Zig-Rust FFI boundary, data marshaling |
+| [EXTENDING.md](EXTENDING.md) | Adding languages, constraint types, extractors |

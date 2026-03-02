@@ -1,30 +1,155 @@
 # Ananke CLI Guide
 
-Complete guide to using the Ananke command-line interface for constraint-driven code generation via Modal inference.
+Complete guide to the Ananke command-line interfaces.
+
+Ananke has two CLIs: the **Zig CLI** (primary, for constraint extraction, compilation, and generation) and the **Python CLI** (Maze, for direct Modal interaction). This guide covers both.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Installation](#installation)
-- [Configuration](#configuration)
-  - [Environment Variables](#environment-variables)
-- [Commands](#commands)
-  - [config](#config) - Show configuration
-  - [generate](#generate) - Generate code with optional constraints
-  - [compile](#compile) - Compile constraints to llguidance format
-  - [health](#health) - Check inference service health
-  - [cache](#cache) - View or clear constraint compilation cache
+- [Zig CLI (Primary)](#zig-cli-primary)
+- [Python CLI (Maze)](#python-cli-maze)
 - [Common Workflows](#common-workflows)
-  - [Basic Code Generation](#basic-code-generation)
-  - [Generation with Constraints](#generation-with-constraints)
-  - [Cache Management](#cache-management)
-  - [Batch Processing](#batch-processing)
-  - [CI/CD Integration](#cicd-integration)
 - [Constraint Format](#constraint-format)
 - [Tips and Best Practices](#tips-and-best-practices)
 - [Troubleshooting](#troubleshooting)
 
-## Overview
+---
+
+## Zig CLI (Primary)
+
+The Zig CLI is the main interface for constraint extraction, compilation, and generation. It supports 14 languages, CLaSH domain compilation, FIM mode, and both sglang and Modal backends.
+
+### Installation
+
+```bash
+# Build from source
+git clone --recurse-submodules https://github.com/rand/ananke.git
+cd ananke && zig build
+
+# Binary at ./zig-out/bin/ananke
+./zig-out/bin/ananke --version
+```
+
+### Commands (8 total)
+
+#### extract
+
+Extract constraints from source code via tree-sitter AST analysis.
+
+```bash
+ananke extract <FILE> [OPTIONS]
+# Options: --output/-o, --language, --verbose/-v
+```
+
+#### compile
+
+Compile constraints into ConstraintIR (JSON Schema, grammar, regex, token masks).
+
+```bash
+ananke compile <FILE> [OPTIONS]
+# Options: --output/-o, --verbose/-v
+```
+
+#### generate
+
+Generate code with constraints. Supports sglang and Modal backends, FIM mode.
+
+```bash
+ananke generate <PROMPT> [OPTIONS]
+# Options:
+#   --backend sglang|modal    Backend selection (auto-detect from config)
+#   --constraints/-c FILE     Constraint file
+#   --context FILE            Source file for auto-extraction + rich context
+#   --language LANG           Target language
+#   --output/-o FILE          Output file
+#   --max-tokens N            Max tokens (default: 4096)
+#   --temperature F           Sampling temperature (default: 0.7)
+#   --model NAME              Model override
+#   --endpoint URL            Endpoint override
+#   --verbose/-v              Verbose output
+#
+# FIM mode:
+#   --fim                     Enable fill-in-the-middle mode
+#   --prefix TEXT             Code before the cursor
+#   --suffix TEXT             Code after the cursor
+#   --hole-scale SCALE        expression|statement|block|function|module
+#   --cursor-line N           Cursor line number
+#   --cursor-column N         Cursor column number
+```
+
+**FIM example:**
+```bash
+ananke generate --fim \
+    --prefix "def process(data: List[str]) -> " \
+    --suffix ":\n    for item in data:" \
+    --language python \
+    --hole-scale expression \
+    --backend sglang
+```
+
+#### validate
+
+Validate code against constraints.
+
+```bash
+ananke validate <FILE> [OPTIONS]
+```
+
+#### export-spec
+
+One-shot pipeline: extract + compile + rich context → ConstraintSpec JSON.
+
+```bash
+ananke export-spec <FILE> [OPTIONS]
+# Outputs the full ConstraintSpec JSON for sglang consumption
+```
+
+#### init
+
+Initialize `.ananke.toml` configuration file.
+
+```bash
+ananke init
+```
+
+#### version / help
+
+```bash
+ananke version
+ananke help [COMMAND]
+```
+
+### Configuration
+
+The Zig CLI reads from `.ananke.toml` and environment variables:
+
+```toml
+# .ananke.toml
+[sglang]
+endpoint = "https://rand--v1-chat-completions.modal.run"
+
+[modal]
+endpoint = "https://rand--ananke-inference-generate-api.modal.run"
+
+[model]
+name = "Qwen/Qwen2.5-Coder-32B-Instruct"
+```
+
+Backend auto-detection: sglang if `sglang.endpoint` is configured, otherwise Modal.
+
+---
+
+## Python CLI (Maze)
+
+The Python CLI wraps the Maze Rust library for direct Modal inference interaction.
+
+### Installation
+
+```bash
+cd maze && maturin develop
+```
+
+### Overview
 
 The Ananke CLI provides command-line access to constraint-driven code generation powered by vLLM and llguidance. It allows you to:
 
@@ -84,8 +209,8 @@ export ANANKE_MODAL_ENDPOINT="https://your-app.modal.run"
 # Modal API key (optional, some endpoints may not require it)
 export ANANKE_MODAL_API_KEY="your-api-key"
 
-# Model name (optional, defaults to meta-llama/Llama-3.1-8B-Instruct)
-export ANANKE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
+# Model name (optional, defaults to Qwen/Qwen2.5-Coder-32B-Instruct)
+export ANANKE_MODEL="Qwen/Qwen2.5-Coder-32B-Instruct"
 ```
 
 #### ANANKE_MODAL_ENDPOINT
@@ -106,10 +231,10 @@ export ANANKE_MODAL_API_KEY="modal_token_abc123"
 
 #### ANANKE_MODEL
 
-The LLM model to use for generation. Defaults to `meta-llama/Llama-3.1-8B-Instruct`.
+The LLM model to use for generation. Defaults to `Qwen/Qwen2.5-Coder-32B-Instruct`.
 
 ```bash
-export ANANKE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
+export ANANKE_MODEL="Qwen/Qwen2.5-Coder-32B-Instruct"
 ```
 
 ### Quick Setup Script
@@ -121,7 +246,7 @@ Create a `.env.local` file in your project:
 # .env.local - Source this to set up CLI environment
 export ANANKE_MODAL_ENDPOINT="https://your-org-ananke.modal.run"
 export ANANKE_MODAL_API_KEY="your-api-key"
-export ANANKE_MODEL="meta-llama/Llama-3.1-8B-Instruct"
+export ANANKE_MODEL="Qwen/Qwen2.5-Coder-32B-Instruct"
 ```
 
 Then source it before running commands:
@@ -166,7 +291,7 @@ ananke config --endpoint https://different-endpoint.modal.run
 ```
 Ananke Configuration:
   Endpoint: https://your-app.modal.run
-  Model:    meta-llama/Llama-3.1-8B-Instruct
+  Model:    Qwen/Qwen2.5-Coder-32B-Instruct
   API Key:  (configured)
 ```
 
@@ -247,7 +372,7 @@ If output file ends with `.json`, the full response is saved as JSON:
   "finish_reason": "length|stop_sequence",
   "tokens_generated": 256,
   "constraint_satisfied": true,
-  "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "model": "Qwen/Qwen2.5-Coder-32B-Instruct",
   "timestamp": "2024-11-26T10:30:45Z"
 }
 ```
@@ -363,7 +488,7 @@ Output on success:
 ```
 Status: HEALTHY
 Endpoint: https://your-app.modal.run
-Model: meta-llama/Llama-3.1-8B-Instruct
+Model: Qwen/Qwen2.5-Coder-32B-Instruct
 ```
 
 Output on failure:

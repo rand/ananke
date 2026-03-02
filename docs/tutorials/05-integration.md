@@ -131,13 +131,15 @@ jobs:
         with:
           fetch-depth: 0  # Full history for better analysis
       
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
         with:
-          python-version: '3.11'
-      
-      - name: Install Ananke
-        run: pip install ananke-ai
+          version: '0.15.2'
+
+      - name: Build Ananke
+        run: |
+          git submodule update --init --recursive
+          zig build -Doptimize=ReleaseSafe
       
       - name: Extract constraints
         run: |
@@ -319,12 +321,18 @@ curl $MODAL_ENDPOINT/health
 Create `Dockerfile`:
 
 ```dockerfile
-FROM python:3.11-slim
+FROM ubuntu:22.04
 
 WORKDIR /app
 
-# Install Ananke
-RUN pip install ananke-ai
+# Install Zig and build Ananke
+RUN apt-get update && apt-get install -y curl xz-utils git \
+    && curl -L https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz | tar xJ \
+    && ln -s /app/zig-linux-x86_64-0.15.2/zig /usr/local/bin/zig
+
+COPY . .
+RUN git submodule update --init --recursive \
+    && zig build -Doptimize=ReleaseSafe
 
 # Copy constraints
 COPY .ananke/ .ananke/

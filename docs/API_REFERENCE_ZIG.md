@@ -2,9 +2,9 @@
 
 Complete API reference for Ananke's Zig components (Clew and Braid).
 
-**Version**: 0.1.0  
-**Generated**: November 24, 2025  
-**Zig Version**: 0.15.1
+**Version**: 0.2.0
+**Updated**: March 2026
+**Zig Version**: 0.15.2
 
 ---
 
@@ -105,12 +105,21 @@ Extracts constraints from source code using pattern matching and optional LLM an
 - `source`: Source code to analyze (UTF-8 encoded)
 - `language`: Programming language identifier
 
-**Supported Languages**:
-- `"typescript"` - TypeScript/JavaScript
+**Supported Languages** (14 languages):
+- `"typescript"` - TypeScript
+- `"javascript"` - JavaScript
 - `"python"` - Python
 - `"rust"` - Rust
 - `"zig"` - Zig
 - `"go"` - Go
+- `"c"` - C
+- `"cpp"` - C++
+- `"java"` - Java
+- `"kotlin"` - Kotlin
+- `"csharp"` - C#
+- `"ruby"` - Ruby
+- `"php"` - PHP
+- `"swift"` - Swift
 
 **Returns**: ConstraintSet with extracted constraints
 
@@ -1603,6 +1612,28 @@ Braid optimizes evaluation order using topological sort for minimal redundant ch
 
 ---
 
+## Additional Modules
+
+The following modules have been added since the initial API surface documented above. They are covered in detail in the conceptual documentation:
+
+- **`braid.domain_fusion`** - ASAp-style hard mask intersection + soft score composition (see `DOMAIN_FUSION.md`)
+- **`braid.fim`** - FIM (Fill-in-the-Middle) prefix/suffix analysis for IDE completions
+- **`braid.types/`** - Type inhabitation system (see `TYPE_INHABITATION.md`):
+  - `type_system` - TypeArena and type representation
+  - `parser` - TypeParser for type expressions
+  - `inhabitation` - InhabitationGraph for constructive type proofs
+  - `mask_generator` - MaskGenerator for type-directed token masks
+- **`braid.salience`** - Salience scoring for constraint prioritization
+- **`braid.temporal`** - Temporal constraint handling
+- **`braid.feasibility`** - Constraint feasibility analysis
+- **`clew.scope_context`** - Cross-file bindings from scope graph analysis
+- **`clew.call_graph_context`** - InlineCoder-style upstream/downstream context
+- **`clew.conventions`** - Repository coding convention extraction
+
+See also: `CLASH_ALGEBRA.md`, `DOMAIN_FUSION.md`, `TYPE_INHABITATION.md` for conceptual documentation.
+
+---
+
 ## See Also
 
 - [Rust API Reference](/Users/rand/src/ananke/docs/API_REFERENCE_RUST.md) - Maze orchestration layer
@@ -1613,6 +1644,6 @@ Braid optimizes evaluation order using topological sort for minimal redundant ch
 
 ---
 
-**API Version**: 0.1.0  
-**Last Updated**: November 24, 2025  
-**Zig Compiler**: 0.15.1
+**API Version**: 0.2.0
+**Last Updated**: March 2026
+**Zig Compiler**: 0.15.2

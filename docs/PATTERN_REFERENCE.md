@@ -1,12 +1,14 @@
 # Ananke Pattern Reference
 
-**Version**: 1.0  
-**Last Updated**: 2025-11-24  
-**Total Patterns**: 101 across 5 languages
+**Version**: 2.0
+**Last Updated**: March 2026
+**Total Patterns**: 383 across 14 languages
 
 ## Overview
 
-Ananke uses pattern-based constraint extraction to mine programming patterns from source code. This document catalogs all 101 extraction patterns, organized by language and category.
+Ananke uses pattern-based constraint extraction as a fallback and supplement to tree-sitter AST extraction. Tree-sitter is the primary extraction path (0.95 confidence); patterns provide quick filtering and coverage for edge cases (0.85 confidence). This document catalogs extraction patterns organized by language and category.
+
+**Since v0.1.0**: Expanded from 101 patterns across 5 languages to 383 patterns across 14 languages. Added Kotlin (25), C# (26), Ruby (16), PHP (22), Swift (24), and expanded patterns for existing languages. See [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) for the full language matrix.
 
 ### Pattern Categories
 
@@ -383,7 +385,7 @@ pub fn findPatternMatches(
 - **Optimization**: Early exit on non-matching first character
 
 **Benchmarks**:
-- 75 lines of TypeScript: 4-5ms (101 patterns checked)
+- 75 lines of TypeScript: 4-5ms (383 patterns checked)
 - 200 lines of Rust: 10-12ms
 - 500 lines of Python: 25-30ms
 

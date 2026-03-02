@@ -156,6 +156,37 @@ ananke generate "feature" \
   --max-tokens 100
 ```
 
+## Alternative: sglang Backend
+
+In addition to Modal, Ananke supports sglang as an inference backend. This is useful
+for local development or when you have direct access to GPU infrastructure:
+
+```bash
+# Generate using an sglang endpoint
+ananke generate "Create a function that validates email addresses" \
+  --constraints compiled.cir \
+  --backend sglang \
+  --endpoint http://localhost:30000 \
+  --max-tokens 256
+```
+
+## FIM Mode (Fill-in-the-Middle)
+
+For IDE-style completions where you have code before and after the cursor, use FIM mode:
+
+```bash
+# Generate a completion for the cursor position
+ananke generate --fim \
+  --prefix "def validate_email(email: str) -> bool:\n    " \
+  --suffix "\n    return is_valid" \
+  --constraints compiled.cir \
+  --max-tokens 128
+```
+
+FIM mode is covered in depth in [Tutorial 7: FIM for IDE Completions](07-fim-ide.md).
+
+---
+
 ## Step 8: Integrate into Your Workflow
 
 Use generated code in your project:
@@ -262,7 +293,7 @@ ananke validate generated.py \
 modal app list
 
 # Redeploy if needed
-modal deploy modal_inference/inference.py
+modal deploy maze/modal_inference/inference.py
 
 # Check logs
 modal logs ananke-inference

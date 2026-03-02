@@ -2,9 +2,9 @@
 
 > Transform AI code generation from probabilistic guessing into controlled search through valid program spaces.
 
-**Status**: Production-ready  
-**Version**: 0.1.0  
-**Last Updated**: November 2025
+**Status**: Production-ready
+**Version**: 0.2.0
+**Last Updated**: March 2026
 
 ---
 
@@ -31,11 +31,14 @@ Ananke is a constraint-driven code generation system that ensures AI-generated c
 
 ### Quick Start (60 seconds)
 
-**Prerequisites**: Python 3.8+, a Modal account (free tier), and 5 minutes
+**Prerequisites**: Zig 0.15.2+, Rust (stable), a Modal account (free tier), and 10 minutes
 
 ```bash
-# 1. Install Ananke
-pip install ananke-ai
+# 1. Build Ananke from source
+git clone https://github.com/ananke-ai/ananke.git
+cd ananke
+zig build -Doptimize=ReleaseSafe
+cd maze && cargo build --release && cd ..
 
 # 2. Authenticate with Modal (one-time setup)
 modal token new
@@ -243,40 +246,30 @@ Ananke is a four-layer system:
 
 ### System Requirements
 
-- **Minimum**: Python 3.8+, 2GB disk space
-- **For Analysis Only** (Clew/Braid): MacOS/Linux/Windows
-- **For Generation** (Maze): Linux or MacOS with Docker
+- **Minimum**: Zig 0.15.2+, Rust (stable), 2GB disk space
+- **For Analysis Only** (Clew/Braid): MacOS/Linux
+- **For Generation** (Maze): Linux or MacOS
 - **For Inference**: GPU infrastructure (Modal account recommended)
 
-### Option 1: Quick Install (Recommended)
-
-```bash
-# Install from PyPI
-pip install ananke-ai
-
-# Verify installation
-ananke --version
-# Output: ananke 0.1.0
-```
-
-### Option 2: From Source
+### Option 1: From Source (Recommended)
 
 ```bash
 # Clone repository
 git clone https://github.com/ananke-ai/ananke.git
 cd ananke
 
-# Install development version
-pip install -e .
+# Build Zig components (requires Zig 0.15.2+)
+zig build -Doptimize=ReleaseSafe
 
-# Build Zig components (requires Zig 0.15.1+)
-zig build -Doptimize=ReleaseFast
+# Build Rust components
+cd maze && cargo build --release && cd ..
 
-# Run tests
-zig build test
+# Run tests (617 tests: 473 Zig + 144 Rust)
+zig build test --summary all
+cd maze && cargo test && cd ..
 ```
 
-### Option 3: Docker
+### Option 2: Docker
 
 ```bash
 # Build image
@@ -323,16 +316,14 @@ modal app list
 
 If building from source:
 
-- **Zig**: 0.15.1 or later (install from https://ziglang.org)
+- **Zig**: 0.15.2 or later (install from https://ziglang.org)
 - **Rust**: Latest stable (install from https://rustup.rs)
-- **Python**: 3.8+ with pip
 - **Git**: For cloning the repository
 
 ```bash
 # Verify prerequisites
-zig version      # Should print 0.15.1+
-rustc --version  # Should print 1.70+
-python --version # Should print 3.8+
+zig version      # Should print 0.15.2+
+rustc --version  # Should print 1.80+
 ```
 
 ---
@@ -447,7 +438,6 @@ jobs:
       
       - name: Check constraints
         run: |
-          pip install ananke-ai
           ananke validate ./src --constraints .ananke/constraints.json
           
           if [ $? -ne 0 ]; then
@@ -820,17 +810,15 @@ ANANKE_LOG_LEVEL=debug ananke generate "feature" --constraints constraints.json
 
 ### Installation Issues
 
-**Problem**: `ModuleNotFoundError: No module named 'ananke'`
+**Problem**: Build fails or binary not found
 
 **Solution**:
 ```bash
-# Reinstall
-pip install --upgrade ananke-ai
-
-# Or from source
+# Build from source
 git clone https://github.com/ananke-ai/ananke.git
 cd ananke
-pip install -e .
+zig build -Doptimize=ReleaseSafe
+cd maze && cargo build --release && cd ..
 ```
 
 **Problem**: `Zig not found` when building from source
@@ -982,7 +970,7 @@ curl https://yourapp.modal.run/health
 echo $MODAL_ENDPOINT
 
 # Redeploy if needed
-modal deploy modal_inference/inference.py
+modal deploy maze/modal_inference/inference.py
 ```
 
 **Problem**: `401 Unauthorized` API errors

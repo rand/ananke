@@ -34,14 +34,13 @@ Suitable for production deployment.
 
 ### What languages does Ananke support?
 
-Currently supported:
-- Python
-- TypeScript/JavaScript
-- Rust
-- Go
-- Java (partial)
+**14 languages**, in two tiers:
 
-More languages being added based on community demand.
+**Tier 1** (tree-sitter AST, 0.95 confidence): TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
+
+**Tier 2** (tree-sitter + patterns, 0.85 confidence): Kotlin, C#, Ruby, PHP, Swift
+
+All 14 support constraint extraction, CLaSH domain compilation, and type analysis. See [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md) for details.
 
 ### Can I run Ananke without Modal?
 
@@ -72,8 +71,8 @@ Ananke uses both: prompts describe intent, constraints ensure quality.
 Yes. If you have contradictory constraints or constraints too specific to past code, generation might fail.
 
 **Solutions**:
-1. Use `ananke constraints analyze` to find conflicts
-2. Use Claude to suggest relaxations: `ananke constraints validate --use-claude`
+1. Use feasibility analysis (`src/braid/feasibility.zig`) to detect conflicts and tightness
+2. The CLaSH relaxation cascade handles over-constraint automatically: drop Imports → Types → Syntax-only
 3. Start with fewer constraints and add incrementally
 
 ### How do I know what constraints to extract?
@@ -81,7 +80,7 @@ Yes. If you have contradictory constraints or constraints too specific to past c
 Start with automatic extraction:
 
 ```bash
-ananke extract ./src --output auto.json
+./zig-out/bin/ananke extract path/to/code.ts
 ```
 
 Then review and adjust based on:
@@ -143,20 +142,15 @@ See Tutorial 5 for complete setup. Quick version:
 # .github/workflows/ananke-check.yml
 - name: Validate constraints
   run: |
-    pip install ananke-ai
-    ananke validate ./src --constraints .ananke/constraints.cir
+    zig build -Doptimize=ReleaseSafe
+    ./zig-out/bin/ananke validate ./src
 ```
 
 ### Can I use Ananke with my existing tools?
 
-**Pre-commit hooks**: Yes
-```bash
-ananke hook install
-```
-
-**VS Code**: Via CLI commands
+**VS Code**: Via [ananke-vscode](https://github.com/rand/ananke-vscode) extension
 **GitHub Actions**: Via workflow steps
-**Build systems**: Via library API
+**Build systems**: Via Zig library API or Rust FFI
 
 ### How do I share constraints with my team?
 
@@ -184,11 +178,9 @@ ananke generate "feature" --constraints .ananke/constraints.cir
 
 To speed up:
 ```bash
-# Extract only certain types
-ananke extract ./src --types security,type_safety
-
-# Disable Claude
-ananke extract ./src --no-claude
+# Static analysis only (no Claude API)
+unset ANTHROPIC_API_KEY
+./zig-out/bin/ananke extract path/to/code.ts
 ```
 
 ### How fast is constraint compilation?
@@ -197,14 +189,7 @@ ananke extract ./src --no-claude
 - **Medium** (5-25 constraints): 10-50ms
 - **Large** (25+ constraints): 50-200ms
 
-To speed up:
-```bash
-# Remove redundant constraints
-ananke constraints prune constraints.json
-
-# Compile with optimization
-ananke compile constraints.json --optimize
-```
+Braid uses LRU caching — repeated compilations of the same constraint set are near-instant (~5-15μs cache hit). First compilation is ~1ms for typical constraint sets.
 
 ### How fast is code generation?
 
@@ -217,16 +202,13 @@ See "How fast is generation?" above.
 ### What's under the hood?
 
 **Architecture**:
-- **Clew**: Tree-sitter static analysis
-- **Braid**: Constraint DAG + llguidance compilation
-- **Ariadne**: Constraint DSL parser
-- **Maze**: Rust orchestration layer
-- **Modal**: vLLM + llguidance GPU service
+- **Clew** (Zig): Tree-sitter AST extraction across 14 languages, scope context, call graph, conventions
+- **Braid** (Zig): CLaSH 5-domain constraint algebra, domain fusion (ASAp + CRANE), type inhabitation, FIM
+- **Ariadne** (Zig): Constraint DSL parser
+- **Maze** (Rust): Orchestration layer, FFI bridge, Modal/sglang client
+- **Inference**: sglang/vLLM + llguidance, Qwen2.5-Coder-32B-Instruct on A100-80GB
 
-**Languages**:
-- **Zig**: Constraint engines (fast, memory-efficient)
-- **Rust**: Orchestration (async, safe)
-- **Python**: Bindings and CLI
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and [CLASH_ALGEBRA.md](CLASH_ALGEBRA.md) for the constraint algebra.
 
 ### How are constraints validated?
 
@@ -274,10 +256,24 @@ Yes! Check `CONTRIBUTING.md` for:
 
 ---
 
+### What is CLaSH?
+
+CLaSH (Constraint Lattice for Shaped Holefilling) is the algebraic foundation. Five constraint domains in two tiers: hard (Syntax, Types, Imports — binary pass/fail) and soft (ControlFlow, Semantics — graded preferences). Hard constraints compose by intersection; soft constraints never block generation. See [CLASH_ALGEBRA.md](CLASH_ALGEBRA.md).
+
+### What is FIM?
+
+Fill-in-the-middle: generate code between existing prefix and suffix (cursor in the middle of a file). Ananke quotients the grammar by surrounding context so the infill is guaranteed to connect prefix to suffix through valid program states. See [FIM_GUIDE.md](FIM_GUIDE.md).
+
+### What is domain fusion?
+
+How 5 CLaSH domains fuse into 1 per-token decision. Hard domains intersect (exact), soft domains reweight (additive), ASAp preserves the distribution, CRANE adapts intensity by generation phase. See [DOMAIN_FUSION.md](DOMAIN_FUSION.md).
+
+---
+
 ## More Information
 
-- **User Guide**: See `USER_GUIDE.md`
-- **Tutorials**: See `docs/tutorials/`
-- **API Reference**: See `docs/API.md`
-- **Troubleshooting**: See `docs/TROUBLESHOOTING.md`
+- **User Guide**: See [USER_GUIDE.md](USER_GUIDE.md)
+- **Tutorials**: See [tutorials/](tutorials/)
+- **Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 

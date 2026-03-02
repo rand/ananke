@@ -353,8 +353,8 @@ Create `~/.config/ananke/config.toml`:
 # Use Claude for semantic analysis
 use_claude = false
 
-# Supported languages
-languages = ["typescript", "python", "rust", "zig", "go"]
+# Supported languages (14 total)
+languages = ["typescript", "javascript", "python", "rust", "zig", "go", "c", "cpp", "java", "kotlin", "csharp", "ruby", "php", "swift"]
 
 [compilation]
 # Optimize with LLM
@@ -619,36 +619,15 @@ spec:
 
 For production constraint-driven generation, deploy the Modal inference service:
 
-```python
-# modal_deploy.py
-import modal
+The inference service uses Modal's `@app` decorator style (note: older examples using
+`modal.Stub` are outdated). The default model is `Qwen/Qwen2.5-Coder-32B-Instruct` on A100-80GB.
 
-stub = modal.Stub("ananke-inference")
-
-@stub.function(
-    image=modal.Image.debian_slim().pip_install(
-        "vllm==0.11.0",
-        "llguidance==0.7.11",
-    ),
-    gpu="A100",
-    timeout=3600,
-)
-def generate(prompt: str, constraints: dict) -> str:
-    # Implement constrained generation with vLLM + llguidance
-    pass
-
-@stub.webhook(method="POST")
-def generate_api(request: dict) -> dict:
-    result = generate.call(
-        request["prompt"],
-        request["constraints"]
-    )
-    return {"code": result}
-```
+See `maze/modal_inference/inference.py` for the full implementation, which provides
+an OpenAI-compatible `/v1/chat/completions` endpoint with vLLM + llguidance.
 
 Deploy:
 ```bash
-modal deploy modal_deploy.py
+modal deploy maze/modal_inference/inference.py
 ```
 
 ---

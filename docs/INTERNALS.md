@@ -1,1104 +1,622 @@
-# Ananke Internals: Developer Guide
+# Ananke Internals
 
-This guide provides deep technical documentation of Ananke's internal architecture for developers who want to understand, maintain, or extend the codebase.
+Ananke turns AI code generation from probabilistic text completion into
+search through valid program spaces. It extracts constraints from source
+code, compiles them into token-level masks and grammars, and ships those
+artifacts to an inference backend that enforces them during decoding.
 
-**Audience**: Systems engineers, compiler developers, maintainers
-
-**Time to Read**: 60-90 minutes for full overview
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Core Type System](#core-type-system)
-- [Clew: Constraint Extraction Engine](#clew-constraint-extraction-engine)
-- [Braid: Constraint Compilation Engine](#braid-constraint-compilation-engine)
-- [Ariadne: Constraint DSL](#ariadne-constraint-dsl)
-- [Maze: Orchestration Layer](#maze-orchestration-layer)
-- [Memory Management](#memory-management)
-- [Concurrency Model](#concurrency-model)
-- [Testing Strategy](#testing-strategy)
-- [Performance Profiling](#performance-profiling)
+This document describes the machinery that makes that happen. Every
+number below was verified against the source tree at commit `ae119b3`.
 
 ---
 
-## Overview
-
-Ananke transforms AI code generation through **constraint-driven synthesis**: converting probabilistic text completion into controlled search through valid program spaces.
-
-### System Layers
+## System Layers
 
 ```
-Layer 4: Inference Service (GPU)
-├─ vLLM/SGLang Server
-├─ llguidance Token Masking
-└─ Constrained Generation
-
-Layer 3: Maze (Orchestration)
-├─ Async Rust + Tokio
-├─ FFI Boundary (Zig/Rust)
-└─ HTTP Client
-
-Layer 2: Braid (Compilation)
-├─ Constraint Graph Analysis
-├─ Conflict Resolution
-├─ IR Generation
-└─ LRU Caching
-
-Layer 1: Clew (Extraction)
-├─ Pattern Matching
-├─ Language Parsing
-└─ Optional LLM Analysis
-
-Foundation: Type System
-├─ Constraint Definition
-├─ Constraint Kinds
-└─ Intermediate Representation
+┌─────────────────────────────────────────────┐
+│              CLI (src/cli/)                   │
+│  extract │ compile │ generate │ validate      │
+│  export-spec │ init │ version │ help          │
+├─────────────────────────────────────────────┤
+│              Ariadne (src/ariadne/)           │
+│  Constraint DSL parsing                       │
+├─────────────────────────────────────────────┤
+│              Braid (src/braid/)               │
+│  CLaSH algebra │ Domain fusion │ Feasibility  │
+│  Type inhabitation │ FIM │ Salience │ Temporal│
+├─────────────────────────────────────────────┤
+│              Clew (src/clew/)                 │
+│  14 languages │ tree-sitter │ patterns        │
+│  Scope context │ Call graph │ Conventions      │
+├─────────────────────────────────────────────┤
+│              Maze (maze/)                     │
+│  Rust FFI │ Modal client │ sglang integration │
+├─────────────────────────────────────────────┤
+│              Eval (eval/)                     │
+│  pass@k │ quality scoring │ statistical tests │
+└─────────────────────────────────────────────┘
 ```
 
-### Key Files
-
-**Type System** (`/Users/rand/src/ananke/src/types/`)
-- `constraint.zig` - Core type definitions (Constraint, ConstraintIR, ConstraintKind)
-- `intent.zig` - Intent representation for generation requests
-
-**Clew** (`/Users/rand/src/ananke/src/clew/`)
-- `clew.zig` - Main extraction engine
-- `parsers/` - Language-specific parsers
-- `patterns/` - Constraint pattern library
-- `extractors/` - Source-specific extractors
-
-**Braid** (`/Users/rand/src/ananke/src/braid/`)
-- `braid.zig` - Main compilation engine
-- `json_schema_builder.zig` - JSON schema generation
-
-**Ariadne** (`/Users/rand/src/ananke/src/ariadne/`)
-- `ariadne.zig` - DSL parser and compiler
-
-**CLI** (`/Users/rand/src/ananke/src/cli/`)
-- `main.zig` - Entry point
-- `commands/` - Command implementations
-- `config.zig` - Configuration management
+Data flows bottom-up at extraction time and top-down at generation time.
+Clew mines constraints from source; Braid compiles them to an IR that
+Maze forwards to sglang or Modal for constrained decoding. The eval
+harness measures whether any of this actually helps.
 
 ---
 
-## Core Type System
+## File Map
 
-### Constraint Definition
+### Clew — Constraint Extraction (`src/clew/`)
 
-**File**: `/Users/rand/src/ananke/src/types/constraint.zig`
+| File | Purpose |
+|------|---------|
+| `clew.zig` | Main extraction engine. The `Ananke` struct lives here. |
+| `extractors.zig` | Extractor registry and dispatch |
+| `extractors/` | 15 files: `base.zig` + one per language (`c.zig`, `cpp.zig`, `csharp.zig`, `go.zig`, `java.zig`, `javascript.zig`, `kotlin.zig`, `php.zig`, `python.zig`, `ruby.zig`, `rust.zig`, `swift.zig`, `typescript.zig`, `zig_lang.zig`) |
+| `patterns.zig` | 383 pattern rules across 14 languages, 8 categories per language |
+| `hybrid_extractor.zig` | tree-sitter primary + pattern fallback |
+| `tree_sitter.zig` | tree-sitter FFI orchestration |
+| `tree_sitter/` | C FFI bindings for tree-sitter |
+| `scope_context.zig` | Homer scope graph integration: `ScopeBinding`, `CanonicalImport`, `ScopeContext` (11 tests) |
+| `call_graph_context.zig` | InlineCoder-style caller/callee context (7 tests) |
+| `conventions.zig` | Convention mining, produces soft CLaSH constraints (5 tests) |
+| `hole_detector.zig` | Typed hole detection (`TODO`, `pass`, `unimplemented!`, etc.) |
+| `semantic_hole_detector.zig` | Semantic hole detection via AST analysis |
+| `parsers/` | Language-specific parser helpers |
+
+### Braid — Constraint Compilation (`src/braid/`)
+
+| File | Purpose |
+|------|---------|
+| `braid.zig` | Main compiler: Constraint[] to ConstraintIR. Cache, incremental, conflict resolution. |
+| `domain_fusion.zig` | CLaSH 5-domain fusion: hard mask intersection + soft additive reweighting + CRANE phase switching (13 tests) |
+| `feasibility.zig` | Conflict detection, tightness scoring, community-aware tension (7 tests) |
+| `salience.zig` | Homer quadrant to intensity + confidence mapping (10 tests) |
+| `temporal.zig` | Stability classes, co-change patterns, confidence adjustment (7 tests) |
+| `fim.zig` | FIM context analysis: `PrefixAnalysis`, `SuffixAnalysis`, `HoleScale` (12 tests) |
+| `types/type_system.zig` | `TypeArena`, `Type` union (12 variants), `PrimitiveKind` (20 variants), `Language` (10 variants) (5 tests) |
+| `types/parser.zig` | `TypeParser`: string signatures to unified types, 10 languages (7 tests) |
+| `types/inhabitation.zig` | `InhabitationGraph`: BFS reachability, 9 `EdgeKind`s, per-language builtins (4 tests) |
+| `types/mask_generator.zig` | `MaskGenerator`, `TypeInhabitationState`, `TypeInhabitationBuilder` (8 tests) |
+| `types/types.zig` | Type module root |
+| `json_schema_builder.zig` | JSON Schema Draft 7 generation |
+| `regex_analyzer.zig` | Regex pattern extraction + pathology filtering (catastrophic backtracking detection) |
+| `string_interner.zig` | `GrammarInterner` + `RegexPatternPool` for string deduplication |
+| `hole_compiler.zig` | Typed holes to IR compilation |
+| `sanitizer.zig` | Constraint injection prevention (name length limits, input validation) |
+
+### Ariadne — Constraint DSL (`src/ariadne/`)
+
+| File | Purpose |
+|------|---------|
+| `ariadne.zig` | DSL parser (parsing complete, type checking deferred) |
+| `test_parser.zig` | Parser tests |
+
+### CLI (`src/cli/commands/`)
+
+| File | Purpose |
+|------|---------|
+| `extract.zig` | Constraint extraction from source files |
+| `compile.zig` | Constraint compilation to IR |
+| `generate.zig` | Code generation via sglang/Modal, FIM support (11 tests) |
+| `validate.zig` | Code validation against constraints |
+| `export_spec.zig` | One-shot extract+compile+context to ConstraintSpec JSON |
+| `init.zig` | `.ananke.toml` initialization |
+| `version.zig` | Version information |
+| `help.zig` | Help display |
+
+### Maze — Rust FFI + Inference (`maze/`)
+
+| File | Purpose |
+|------|---------|
+| `src/lib.rs` | Crate root. `MazeOrchestrator`, `GenerationRequest`, `GenerationResponse`. |
+| `src/ffi.rs` | FFI bridge to Zig core (constraint extraction and compilation) |
+| `src/modal_client.rs` | Modal HTTP client |
+| `src/model_router.rs` | Model routing and selection logic |
+| `src/model_selector.rs` | Strategy-based model selection |
+| `src/adaptive_selector.rs` | Adaptive model selection based on task characteristics |
+| `src/progressive_refinement.rs` | Iterative generation refinement |
+| `src/diffusion.rs` | Diffusion-based generation strategy |
+| `src/strategy_stats.rs` | Generation strategy statistics |
+| `src/telemetry.rs` | Inference telemetry collection |
+| `src/python.rs` | Python bindings |
+| `tests/` | `ffi_tests.rs`, `orchestrator_tests.rs`, `zig_integration_test.rs`, `modal_client_tests.rs`, `end_to_end_tests.rs` |
+| `modal_inference/inference.py` | Modal deployment: Qwen2.5-Coder-32B-Instruct on A100-80GB |
+
+### Eval — Evaluation Framework (`eval/core/`)
+
+| File | Purpose |
+|------|---------|
+| `evaluator.zig` | `Evaluator`, `MultiSampleEvaluator`, `BatchEvaluationResult` |
+| `task_spec.zig` | `TaskSpec`, 24 `TaskCategory` variants, 4 `DifficultyLevel`s |
+| `quality_scorer.zig` | 5-axis quality scoring |
+| `metrics/pass_at_k.zig` | pass@k statistics |
+| `metrics/statistical_tests.zig` | Paired t-test |
+| `metrics/constraint_metrics.zig` | CodeIF constraint satisfaction metrics |
+| `modal_client.zig` | Eval-specific Modal client |
+| `eval_constraint_compiler.zig` | Constraint compilation for eval tasks |
+| `test_runner.zig` | Test execution harness |
+| `prompt_normalizer.zig` | Prompt normalization |
+| `failure_analyzer.zig` | Failure classification and analysis |
+
+---
+
+## Core Types
+
+### ConstraintKind
+
+Six variants, mapping to analysis domains:
 
 ```zig
-pub const Constraint = struct {
-    /// Unique constraint identifier
-    id: []const u8,
-    
-    /// Human-readable name
-    name: []const u8,
-    
-    /// Constraint category
-    kind: ConstraintKind,
-    
-    /// What constraint enforces
-    description: []const u8,
-    
-    /// Where constraint came from
-    source: ConstraintSource,
-    
-    /// Evaluation priority (higher = earlier)
-    priority: ConstraintPriority = .medium,
-    
-    /// Whether constraint is active
-    enabled: bool = true,
-    
-    /// Dependent constraint IDs
-    dependencies: []const []const u8 = &[_][]const u8{},
-    
-    /// Conflicting constraint IDs (if known)
-    conflicts: []const []const u8 = &[_][]const u8{},
-};
-
 pub const ConstraintKind = enum {
-    type_safety,
-    security,
-    performance,
-    semantic,
-    architectural,
-    custom,
-};
-
-pub const ConstraintSource = enum {
-    source_code,
-    test_file,
-    telemetry,
-    documentation,
-    ariadne_dsl,
-    api_spec,
-    policy,
-    user_defined,
+    syntactic,      // Code structure, formatting, naming
+    type_safety,    // Type annotations, null safety, generics
+    semantic,       // Data flow, control flow, side effects
+    architectural,  // Module boundaries, dependencies, layering
+    operational,    // Performance, memory, concurrency
+    security,       // Input validation, auth, dangerous ops
 };
 ```
 
-### Constraint Set
+### ConstraintIR
 
-Wrapper around collection of constraints with metadata:
+The compiled form of constraints. This is the artifact that crosses the
+FFI boundary and travels to the inference backend.
 
 ```zig
-pub const ConstraintSet = struct {
-    constraints: std.ArrayList(Constraint),
-    extracted_at: i64,  // Unix timestamp
-    version: []const u8,
-    
-    /// Add constraint to set
-    pub fn add(self: *ConstraintSet, constraint: Constraint) !void
-    
-    /// Check if constraint exists by ID
-    pub fn contains(self: ConstraintSet, id: []const u8) bool
-    
-    /// Remove constraint by ID
-    pub fn remove(self: *ConstraintSet, id: []const u8) bool
-    
-    /// Get constraint by ID
-    pub fn get(self: ConstraintSet, id: []const u8) ?Constraint
+pub const ConstraintIR = struct {
+    json_schema: ?JsonSchema = null,
+    grammar: ?Grammar = null,
+    regex_patterns: []const Regex = &.{},
+    token_masks: ?TokenMaskRules = null,
+    type_inhabitation: ?TypeInhabitationData = null,
+    priority: u32 = 0,
+    hole_specs: []const HoleSpec = &.{},
+    rich_context: ?RichContext = null,
+    feasibility_score: f32 = 0.0,
+    is_feasible: bool = true,
+    // ...
 };
 ```
 
-### ConstraintIR: Intermediate Representation
+The `json_schema` field carries structural metadata for the sglang
+backend. Only the `grammar` field (EBNF) goes to llguidance for
+actual token masking.
 
-The compiled form of constraints, optimized for token-level validation:
+The `rich_context` field carries the full CLaSH decomposition as
+serialized JSON -- function signatures, type bindings, class
+definitions, imports, control flow patterns, semantic constraints,
+scope bindings, and call graph context. Eight JSON blobs, each
+independently nullable. This structure lets backends consume whichever
+context they support without requiring all-or-nothing.
 
-```zig
-pub const ConstraintIR = union(ConstraintKind) {
-    type_safety: JsonSchema,
-    security: Grammar,
-    performance: TokenMaskRules,
-    semantic: RegexConstraints,
-    architectural: DependencyRules,
-    custom: CustomConstraintIR,
-};
-```
+`ConstraintIR` also carries `owns_grammar_strings` -- a flag
+distinguishing borrowed (interned) grammar strings from owned (cloned)
+ones. Cache hits return cloned IRs that own their strings; the cache
+itself holds interned originals. Getting this wrong means either a
+double-free or a use-after-free, which is why the flag exists.
 
-**Each variant stores precompiled form ready for inference:**
+### Sanitizer
 
-```zig
-pub const JsonSchema = struct {
-    type: []const u8,  // "object", "array", "string", etc.
-    properties: ?std.StringHashMap(JsonSchema),
-    required: [][]const u8,
-    pattern: ?[]const u8,
-    minLength: ?usize,
-    maxLength: ?usize,
-    enum: ?[][]const u8,
-};
-
-pub const Grammar = struct {
-    rules: []GrammarRule,
-    start_symbol: []const u8,
-};
-
-pub const GrammarRule = struct {
-    name: []const u8,
-    productions: [][]const u8,  // Alternatives
-};
-
-pub const TokenMaskRules = struct {
-    rules: []TokenMaskRule,
-};
-
-pub const TokenMaskRule = struct {
-    context: []const u8,  // Previous tokens pattern
-    allowed_tokens: []i32,  // Token IDs that satisfy constraint
-    forbidden_tokens: []i32,
-};
-```
+`braid/sanitizer.zig` prevents constraint injection attacks. Constraint
+names are capped at 64 bytes. Descriptions are scrubbed for control
+characters. The concern is that untrusted constraint sources (user
+config, telemetry, LLM-generated) could inject malformed data that
+corrupts the IR or escapes into grammar rules. The sanitizer runs
+before any constraint enters the compilation pipeline.
 
 ---
 
-## Clew: Constraint Extraction Engine
+## Clew: Extraction
 
-**Location**: `/Users/rand/src/ananke/src/clew/clew.zig`
+Clew answers one question: given source code, what constraints does it
+imply?
 
-**Purpose**: Mine constraints from multiple sources through pattern matching and optional LLM analysis.
+### Hybrid Extraction
 
-### Architecture
+Extraction runs in two tiers:
 
-```
-Source Code (TS/Py/Rust/Zig)
-    ↓
-Language Detection
-    ↓
-Tokenization
-    ↓
-Pattern Matching (101 built-in patterns)
-    ↓
-Constraint Extraction
-    ↓
-Optional Claude Analysis (semantic enrichment)
-    ↓
-ConstraintSet
-```
+1. **tree-sitter AST walk** (primary). Per-language extractors in
+   `extractors/` walk the concrete syntax tree and emit structured
+   constraints: function signatures, type annotations, class
+   hierarchies, import maps, error handling patterns.
 
-### Main Functions
+2. **Pattern matching** (fallback). When tree-sitter parsing fails or
+   a language grammar isn't loaded, `patterns.zig` applies 383
+   string-match rules organized into 8 categories per language:
+   `function_decl`, `type_annotation`, `async_pattern`,
+   `error_handling`, `imports`, `class_struct`, `metadata`,
+   `memory_management`.
 
-#### `extractFromCode()`
+The `hybrid_extractor.zig` orchestrates this: try tree-sitter first,
+fall back to patterns, merge results. The pattern matcher
+(`scanPatterns` in `patterns.zig`) is a linear scan: for each byte
+position in the source, it checks all pattern sets in a nested loop.
+This is O(n * p) where n is source length and p is total pattern count
+-- acceptable because p is bounded (383) and patterns are short string
+matches, not regex.
 
-```zig
-pub fn extractFromCode(
-    self: *Clew,
-    source: []const u8,
-    language: []const u8,
-) !ConstraintSet
-```
+### Homer Context (Optional)
 
-**Complexity**: O(n) where n = source code length
+When Homer is available, Clew enriches extraction with cross-file
+intelligence:
 
-**Time**: 4-7ms for ~75 lines (pattern-based)
+- **Scope context** (`scope_context.zig`): queries Homer's scope graph
+  for bindings visible at the cursor position. Produces
+  `ScopeBinding` records (name, kind, qualified type, definition file)
+  and `CanonicalImport` records. This feeds the Imports domain in
+  CLaSH -- the vocabulary subset constraint ensures the model only
+  references symbols that are actually in scope.
 
-**Algorithm**:
-1. Language detection (switch on language string)
-2. Get language parser from factory
-3. Tokenize source code
-4. Apply pattern library to tokens
-5. Deduplicate constraints
-6. Optional: Call Claude for semantic analysis
-7. Return ConstraintSet
+- **Call graph context** (`call_graph_context.zig`): InlineCoder-style
+  analysis. For a function being generated, retrieves upstream callers
+  (what calls this function, with what arguments, how is the result
+  used) and downstream callees (what this function calls, with what
+  signatures). This gives the model concrete usage patterns rather
+  than abstract type signatures.
 
-**Pattern Library** (101 patterns):
+- **Conventions** (`conventions.zig`): mines repository-wide coding
+  conventions (naming patterns, error handling idioms, import styles)
+  and produces soft CLaSH constraints. If 95% of the codebase uses
+  `camelCase`, the model gets a soft nudge toward `camelCase`.
 
-Patterns are regex/syntactic rules that match constraint indicators:
+### 14 Languages
 
-```zig
-pub const PATTERNS = [_]Pattern{
-    .{
-        .name = "null_check_required",
-        .regex = "if \\(.*\\s*==\\s*null\\)",
-        .kind = .type_safety,
-    },
-    .{
-        .name = "encryption_required",
-        .regex = "password|secret|credential",
-        .kind = .security,
-    },
-    // ... 99 more patterns
-};
-```
+C, C++, C#, Go, Java, JavaScript, Kotlin, PHP, Python, Ruby, Rust,
+Swift, TypeScript, Zig. Each gets a dedicated extractor in
+`extractors/` and a pattern set in `patterns.zig`.
 
-#### `extractFromTests()`
+### Rich Context Export
 
-Analyzes test files for implicit constraints:
+Extraction produces more than flat constraint lists. The `RichContext`
+struct carries eight JSON blobs covering the CLaSH domain decomposition:
 
-```zig
-pub fn extractFromTests(self: *Clew, test_source: []const u8) !ConstraintSet
-```
+- `function_signatures_json` — name, parameters (with types), return type, async flag
+- `type_bindings_json` — name, kind, fields
+- `class_definitions_json` — name, methods, fields
+- `imports_json` — module, items, wildcard flag
+- `control_flow_json` — async patterns, generators, error handling style, recursion
+- `semantic_constraints_json` — kind, expression, source
+- `scope_bindings_json` — Homer scope graph bindings (cross-file)
+- `call_graph_json` — Homer call graph (callers, callees, argument usage)
 
-**Extracts**:
-- Invariants from assertions
-- Input validation patterns
-- Expected error conditions
-- Boundary values
-
-**Example**:
-```javascript
-test("rejects negative numbers", () => {
-  expect(() => process(-1)).toThrow();
-});
-```
-
-Extracted constraint: "input must be non-negative"
-
-#### `extractFromTelemetry()`
-
-Generates operational constraints from production data:
-
-```zig
-pub fn extractFromTelemetry(
-    self: *Clew,
-    telemetry: Telemetry,
-) !ConstraintSet
-```
-
-**Example**: If P99 latency > 100ms, generates performance constraint
-
-### Language Parsers
-
-**File**: `/Users/rand/src/ananke/src/clew/parsers/`
-
-Each language gets a dedicated parser:
-
-```zig
-pub const TypeScriptParser = struct {
-    pub fn tokenize(source: []const u8) ![]Token
-    pub fn extractFunctions(source: []const u8) ![]FunctionPattern
-    pub fn extractClasses(source: []const u8) ![]ClassPattern
-    pub fn extractTypeAnnotations(source: []const u8) ![]TypeConstraint
-};
-```
-
-**Tokenization strategy**: Lexical analysis without full AST
-
-**Trade-off**: Speed (ms) over complete semantic understanding
-
-### Claude Integration
-
-Optional semantic analysis step:
-
-```zig
-pub fn setClaudeClient(self: *Clew, client: *claude_api.ClaudeClient) void {
-    self.claude_client = client;
-}
-```
-
-When set, after pattern extraction:
-1. Serialize constraints to JSON
-2. Send to Claude API with context
-3. Receive enhanced/additional constraints
-4. Merge results
-
-**Performance impact**: +200-500ms per extraction (HTTP latency)
+The last two require a running Homer instance. Without it, those
+fields are null and everything else works fine.
 
 ---
 
-## Braid: Constraint Compilation Engine
+## Braid: Compilation
 
-**Location**: `/Users/rand/src/ananke/src/braid/braid.zig`
-
-**Purpose**: Transform constraints into optimized evaluation programs (ConstraintIR).
+Braid transforms a bag of constraints into a `ConstraintIR` suitable
+for token-level enforcement. The pipeline has eleven stages.
 
 ### Compilation Pipeline
 
-```
-Constraint[]
-    ↓
-Build Dependency Graph (DAG)
-    ↓
-Detect Conflicts
-    ↓
-Resolve Conflicts (heuristic or LLM)
-    ↓
-Optimize Order (topological sort)
-    ↓
-Generate IR (JSON Schema, Grammar, Regex, TokenMasks)
-    ↓
-Cache Results (LRU, 20x typical speedup)
-    ↓
-ConstraintIR
-```
+From `braid.zig`, method `compile()`:
 
-### Step 1: Dependency Graph Construction
+1. **Cache key** — `computeCacheKey` hashes canonically-sorted constraints with Wyhash.
+2. **Cache lookup** — LRU cache with copy-on-write `SharedConstraintIR` (reference-counted). Cache hit returns a clone in O(1).
+3. **Dependency graph** — `buildDependencyGraph` creates edges: syntactic before type_safety before semantic. Topological structure.
+4. **Conflict detection** — `detectConflicts` groups constraints by `ConstraintKind`, checks pairs within each group. O(n^2/k) where k is the number of kinds.
+5. **Conflict resolution** — Claude API if an LLM client is configured; otherwise default heuristic (higher severity wins).
+6. **Graph optimization** — `optimizeGraph` does topological sort and boosts priority based on severity.
+7. **IR generation** (`compileToIR`):
+   - Feasibility analysis via `FeasibilityAnalyzer` (tightness scoring, feasibility flag)
+   - JSON Schema generation from type constraints
+   - Type inhabitation data (parses "must return type: T" from descriptions, builds reachability graph)
+   - Grammar construction from syntactic constraints (EBNF rules, string-interned)
+   - Regex pattern extraction with pathology filtering via `RegexAnalyzer`
+   - Token mask generation from security constraints
 
-```zig
-fn buildDependencyGraph(self: *Braid, constraints: []const Constraint) !ConstraintGraph {
-    // Initialize graph with constraint count vertices
-    var graph = try ConstraintGraph.init(allocator, constraints.len);
-    
-    // Build edges from dependency declarations
-    for (constraints) |constraint, i| {
-        for (constraint.dependencies) |dep_id| {
-            // Find constraint with dep_id
-            if (findConstraint(constraints, dep_id)) |dep_idx| {
-                try graph.addEdge(i, dep_idx);
-            }
-        }
-    }
-    
-    return graph;
-}
+After `compileToIR` returns, the caller layers on additional analyses:
 
-pub const ConstraintGraph = struct {
-    vertices: usize,
-    edges: [][]usize,  // Adjacency list
-    constraints: []const Constraint,
-    
-    pub fn hasCycle(self: ConstraintGraph) bool {
-        // DFS-based cycle detection
-    }
-};
-```
+8. **Salience scoring** — Homer quadrant mapped to intensity level and confidence.
+9. **Temporal analysis** — stability classification, co-change decay, confidence adjustment.
+10. **Domain fusion** — ASAp-style hard mask intersection + soft additive reweighting, with CRANE phase switching between reasoning and structured output.
+11. **FIM analysis** — if `--fim` mode is active, `PrefixAnalysis` and `SuffixAnalysis` determine hole scale and context boundaries.
 
-**Complexity**: O(c²) worst case where c = constraint count
+### Incremental Compilation
 
-**Typical case**: O(c) for sparse graphs
+Braid supports incremental recompilation via fingerprint-based change
+detection (`IncrementalState`). On recompile:
 
-### Step 2: Conflict Detection
+- Unchanged constraints skip reprocessing entirely.
+- Changed constraints propagate through `getAffectedSubgraph`.
+- If more than 80% of the graph is affected, Braid falls back to a
+  full rebuild (it's faster than selective patching at that point).
 
-Identifies constraints that cannot be simultaneously satisfied:
+### CLaSH Algebra
 
-```zig
-fn detectConflicts(self: *Braid, graph: *ConstraintGraph) ![]Conflict {
-    var conflicts = std.ArrayList(Conflict).init(self.allocator);
-    
-    // Check explicit conflict declarations
-    for (graph.constraints) |constraint| {
-        for (constraint.conflicts) |conflict_id| {
-            try conflicts.append(Conflict{
-                .constraint_a = constraint.id,
-                .constraint_b = conflict_id,
-                .reason = .explicit_declaration,
-            });
-        }
-    }
-    
-    // Semantic conflict detection (if enabled)
-    try self.detectSemanticConflicts(graph, &conflicts);
-    
-    return conflicts.toOwnedSlice();
-}
+CLaSH organizes constraints into 5 domains across 2 tiers:
 
-pub const Conflict = struct {
-    constraint_a: []const u8,
-    constraint_b: []const u8,
-    reason: ConflictReason,
-    severity: Severity = .warning,
-};
-```
+| Domain | Tier | Enforcement |
+|--------|------|-------------|
+| Syntax | Hard | Earley parser / PDA |
+| Types | Hard | Prefix automata |
+| Imports | Hard | Vocabulary subset |
+| ControlFlow | Soft | Graded 0.0--1.0 |
+| Semantics | Soft | Graded 0.0--1.0 |
 
-**Conflict types**:
-- **Explicit**: Declared in constraint metadata
-- **Semantic**: Incompatible requirements (e.g., "forbid eval" + "allow eval")
-- **Resource**: Competing for same resource
+Hard constraints define the feasible token set (binary pass/fail). Soft
+constraints rank candidates within that set. Domain fusion intersects
+hard masks, then applies additive reweighting from soft scores.
 
-### Step 3: Conflict Resolution
+CRANE-style phase switching relaxes constraints during reasoning tokens
+and tightens them during structured output, preventing constraint
+enforcement from interfering with chain-of-thought. During `reasoning`
+phase with adaptive switching enabled, only the Syntax domain stays
+active. During `structured_output`, all domains at the current
+intensity level participate.
 
-Three strategies:
+### Salience and Intensity
 
-```zig
-fn resolveConflicts(self: *Braid, graph: *ConstraintGraph, conflicts: []const Conflict) !void {
-    for (conflicts) |conflict| {
-        if (conflict.severity == .error) {
-            // Option 1: Manual override (user specified resolution)
-            if (self.resolution_overrides.get(conflict.constraint_a)) |action| {
-                switch (action) {
-                    .disable => disableConstraint(graph, conflict.constraint_b),
-                    .relax => relaxConstraint(graph, conflict.constraint_b),
-                    .reorder => reorderConstraints(graph, conflict.constraint_a, conflict.constraint_b),
-                }
-            } else if (self.llm_client) |client| {
-                // Option 2: LLM-assisted resolution
-                const suggestion = try client.suggestResolution(conflict);
-                try applyResolution(graph, suggestion);
-            } else {
-                // Option 3: Default heuristic
-                try defaultResolution(graph, conflict);
-            }
-        }
-    }
-}
-```
+Salience scoring (`salience.zig`) maps Homer's repository analysis into
+constraint intensity levels. Homer produces a composite score (weighted
+blend of PageRank 30%, betweenness 15%, HITS 15%, churn 15%, bus
+factor 10%, code size 5%, test presence 10%) and a four-quadrant
+classification:
 
-### Step 4: Graph Optimization
+| Quadrant | Centrality | Churn | Intensity | Confidence |
+|----------|-----------|-------|-----------|------------|
+| FoundationalStable | High | Low | `full_hard` | High |
+| ActiveHotspot | High | High | `full` | Medium |
+| PeripheralActive | Low | High | `standard` | -- |
+| QuietLeaf | Low | Low | `syntax_only` | -- |
 
-Topological sort to determine evaluation order:
+Intensity levels form a lattice from `none` (no constraints) through
+`syntax_only`, `standard` (Syntax + Types), `full_hard` (all 3 hard
+domains), `full` (all 5 domains), to `exhaustive` (all domains plus
+verification hooks). Each level carries a per-token latency budget:
+50us for syntax-only up to 5000us for exhaustive.
 
-```zig
-fn optimizeGraph(self: *Braid, graph: *ConstraintGraph) !void {
-    const order = try topologicalSort(graph);
-    
-    // Reorder constraints to minimize redundant checks
-    var optimized = std.ArrayList(Constraint).init(self.allocator);
-    for (order) |idx| {
-        try optimized.append(graph.constraints[idx]);
-    }
-    
-    graph.constraints = optimized.items;
-}
-```
+The practical effect: foundational code gets all five domains enforced;
+a rarely-touched leaf file might only get grammar checking. This avoids
+the "constrain everything equally" failure mode where enforcement cost
+swamps generation speed on code that doesn't need it.
 
-**Result**: Constraints evaluated in dependency order, maximizing early termination.
+### Temporal Analysis
 
-### Step 5: IR Generation
+Temporal analysis (`temporal.zig`) adjusts constraint confidence based
+on code stability over time. It classifies files by modification
+frequency, applies co-change decay (recently-changed files get reduced
+confidence), and modulates the salience-derived intensity accordingly.
+A file that was stable for months but just got a major refactor should
+temporarily have its constraint confidence reduced until the new
+patterns settle.
 
-Convert constraints to format llguidance can use:
+### FIM (Fill-in-the-Middle)
 
-```zig
-fn compileToIR(self: *Braid, graph: *ConstraintGraph) !ConstraintIR {
-    // Group constraints by kind
-    var ir: ConstraintIR = undefined;
-    
-    for (graph.constraints) |constraint| {
-        switch (constraint.kind) {
-            .type_safety => {
-                ir.type_safety = try self.buildJsonSchema(constraint);
-            },
-            .security => {
-                ir.security = try self.buildGrammar(constraint);
-            },
-            .performance => {
-                ir.performance = try self.buildTokenMasks(constraint);
-            },
-            // ... other kinds
-        }
-    }
-    
-    return ir;
-}
-```
+When `--fim` mode is active, `fim.zig` analyzes the code surrounding a
+cursor position. `PrefixAnalysis` examines what comes before the hole:
+function context, type expectations, variable bindings in scope.
+`SuffixAnalysis` examines what comes after: expected return types,
+closing delimiters, downstream usage. Together they determine the
+`HoleScale` -- whether the model needs to fill a single expression, a
+statement, a block, or an entire function body. This scale determines
+which constraint domains are relevant (a single expression needs type
+constraints; a full function body needs all five domains).
 
-### Step 6: IR Caching
+### Type Inhabitation
 
-LRU cache with clone-on-get strategy:
+The type system in `braid/types/` implements cross-language type
+reasoning:
 
-```zig
-pub const IRCache = struct {
-    cache: std.AutoHashMap([32]u8, ConstraintIR),  // Hash -> IR
-    lru_order: RingQueue(usize),  // Track access order
-    max_size: usize = 128,  // Max 128 compiled IRs in memory
-    
-    pub fn get(self: *IRCache, key: [32]u8) !?ConstraintIR {
-        if (self.cache.get(key)) |ir| {
-            // Clone before returning (copy-on-get)
-            const cloned = try ir.clone(self.allocator);
-            self.lru_order.push(key);
-            return cloned;
-        }
-        return null;
-    }
-    
-    pub fn put(self: *IRCache, key: [32]u8, ir: ConstraintIR) !void {
-        if (self.cache.count() >= self.max_size) {
-            // Evict LRU entry
-            const oldest = self.lru_order.pop() orelse return;
-            _ = self.cache.remove(oldest);
-        }
-        try self.cache.put(key, ir);
-    }
-};
-```
-
-**Performance**: ~20x typical speedup on repeated compilations
+- **TypeArena** allocates all types in a single arena. One `deinit`
+  frees everything.
+- **Type** is a tagged union with 12 variants: `primitive`, `array`,
+  `tuple`, `object`, `function`, `union_type`, `intersection`,
+  `optional`, `named`, `generic`, `reference`, `error_union`.
+- **PrimitiveKind** has 20 variants spanning Zig's integer types,
+  floats, JS/TS specials (`number`, `any`, `unknown`, `never`), and
+  universals (`string`, `char`, `boolean`, `void_type`, `null_type`,
+  `undefined`).
+- **TypeParser** maps string type signatures from 10 languages into
+  the unified `Type` representation.
+- **InhabitationGraph** does BFS reachability over 9 edge kinds
+  (`coercion`, `binary_op`, `property`, `method`, `application`,
+  `indexing`, `construction`, `template`, `assertion`) to determine
+  which types are constructible from available bindings.
+- **MaskGenerator** converts inhabitation results into token masks.
 
 ---
 
-## Ariadne: Constraint DSL
+## Maze: FFI and Inference
 
-**Location**: `/Users/rand/src/ananke/src/ariadne/ariadne.zig`
-
-**Purpose**: High-level language for expressing complex constraint relationships.
-
-### DSL Syntax
-
-```ariadne
-constraint secure_api inherits base_security {
-    requires: authentication;
-    validates: input_schema;
-    forbid: ["eval", "exec", "system"];
-    
-    temporal: {
-        timeout: 30s;
-        retry_policy: exponential_backoff;
-    }
-    
-    complexity: {
-        max_cyclomatic: 10;
-        max_nesting: 5;
-    }
-}
-```
-
-### Parsing Strategy
-
-```
-DSL Source
-    ↓
-Lexical Analysis (tokenization)
-    ↓
-Syntax Analysis (grammar parsing)
-    ↓
-Semantic Analysis (type checking, v0.2)
-    ↓
-Code Generation (Constraint[])
-```
-
-### Lexer
-
-```zig
-pub fn tokenize(source: []const u8) ![]Token {
-    var tokens = std.ArrayList(Token).init(allocator);
-    
-    // Scan source character by character
-    while (i < source.len) {
-        // Skip whitespace
-        // Handle keywords (constraint, requires, forbid, etc.)
-        // Handle identifiers
-        // Handle strings/numbers
-        // Handle operators
-    }
-    
-    return tokens.toOwnedSlice();
-}
-```
-
-### Parser
-
-Recursive descent parser:
-
-```zig
-pub fn parse(self: *Parser) ![]Constraint {
-    var constraints = std.ArrayList(Constraint).init(self.allocator);
-    
-    while (!self.isAtEnd()) {
-        const constraint = try self.parseConstraint();
-        try constraints.append(constraint);
-    }
-    
-    return constraints.toOwnedSlice();
-}
-
-fn parseConstraint(self: *Parser) !Constraint {
-    try self.consume(.keyword_constraint, "Expected 'constraint'");
-    const name = try self.parseIdentifier();
-    
-    var inherited: ?[]const u8 = null;
-    if (self.match(.keyword_inherits)) {
-        inherited = try self.parseIdentifier();
-    }
-    
-    try self.consume(.left_brace, "Expected '{'");
-    const body = try self.parseConstraintBody();
-    try self.consume(.right_brace, "Expected '}'");
-    
-    return Constraint{
-        .name = name,
-        .inherits_from = inherited,
-        .body = body,
-    };
-}
-```
-
-### Compilation to Constraints
-
-```zig
-fn compileConstraint(self: *Compiler, ariadne_constraint: AriadneConstraint) ![]Constraint {
-    var constraints = std.ArrayList(Constraint).init(self.allocator);
-    
-    // Handle inheritance
-    if (ariadne_constraint.inherits_from) |parent_name| {
-        const parent = try self.lookupConstraint(parent_name);
-        // Merge parent constraints
-    }
-    
-    // Compile each declaration
-    for (ariadne_constraint.requires) |req| {
-        try constraints.append(try self.compileRequirement(req));
-    }
-    
-    for (ariadne_constraint.forbid) |forbid_item| {
-        try constraints.append(try self.compileForbid(forbid_item));
-    }
-    
-    return constraints.toOwnedSlice();
-}
-```
-
----
-
-## Maze: Orchestration Layer
-
-**Location**: `/Users/rand/src/ananke/src/maze/` (Rust)
-
-**Language**: Rust (PyO3 bindings to Python)
-
-**Purpose**: Coordinate constrained code generation with inference service.
+Maze is the Rust crate that bridges Zig's constraint engine to GPU
+inference.
 
 ### Architecture
 
 ```
-Python CLI / Library Call
-    ↓
-PyO3 Binding (Python ↔ Rust FFI)
-    ↓
-Rust Async Executor (Tokio)
-    ↓
-Constraint Application (token masking)
-    ↓
-HTTP Client (Modal/vLLM)
-    ↓
-Inference Service (GPU)
-    ↓
-Token Stream
-    ↓
-Output
+Zig (Ananke core)  →  C ABI  →  Rust FFI (maze/src/ffi.rs)
+                                      ↓
+                               MazeOrchestrator
+                                 ↓           ↓
+                          Modal client    sglang client
+                                 ↓           ↓
+                           A100-80GB     vLLM + llguidance
 ```
 
-### FFI Boundary
+The Zig core is compiled as a C-compatible library. Rust calls it via
+FFI for constraint extraction and compilation, receiving a
+`ConstraintIR` that it serializes and forwards to the inference
+backend.
 
-**Zig side** (exports):
-```zig
-pub extern "c" fn clew_extract(source: [*]const u8, len: usize, language: [*]const u8) callconv(.C) ConstraintSet
-pub extern "c" fn braid_compile(constraints: [*]const Constraint, count: usize) callconv(.C) ConstraintIR
-```
+### Inference Backends
 
-**Rust side** (imports):
-```rust
-extern "C" {
-    fn clew_extract(source: *const u8, len: usize, language: *const u8) -> ConstraintSet;
-    fn braid_compile(constraints: *const Constraint, count: usize) -> ConstraintIR;
-}
-```
+**sglang**: OpenAI-compatible HTTP with a `constraint_spec` extension
+field. The grammar goes to llguidance for token masking; JSON schema
+travels as structural metadata.
 
-### Token Masking Application
+**Modal**: Custom `/generate` endpoint. Currently runs
+Qwen2.5-Coder-32B-Instruct on an A100-80GB. Deployed via
+`modal deploy maze/modal_inference/inference.py`.
 
-```rust
-pub fn apply_constraints(
-    ir: &ConstraintIR,
-    logits: &mut [f32],
-    token_id: i32,
-) -> Result<()> {
-    // Apply JSON schema validation
-    if let Some(schema) = &ir.json_schema {
-        self.apply_json_schema(schema, logits)?;
-    }
-    
-    // Apply grammar rules
-    if let Some(grammar) = &ir.grammar {
-        self.apply_grammar(grammar, logits)?;
-    }
-    
-    // Apply token masks
-    if let Some(masks) = &ir.token_masks {
-        self.apply_token_masks(masks, logits)?;
-    }
-    
-    // Zero out disallowed tokens
-    for (mask, logit) in self.allowed_mask.iter().zip(logits.iter_mut()) {
-        if !*mask {
-            *logit = f32::NEG_INFINITY;
-        }
-    }
-    
-    Ok(())
-}
-```
+The orchestrator (`MazeOrchestrator` in `lib.rs`) handles the full
+generation lifecycle. It accepts a `GenerationRequest` (prompt,
+constraints IR, max tokens, temperature, optional context) and returns
+a `GenerationResponse` with the generated code, validation results,
+and provenance metadata (which model, which constraints were active).
 
-**Performance**: ~50μs/token for constraint application
+Supporting modules:
+
+- `model_router.rs` + `model_selector.rs` + `adaptive_selector.rs`:
+  pick the right backend and model for a given task. The adaptive
+  selector adjusts based on task characteristics (code complexity,
+  constraint density, language).
+- `progressive_refinement.rs`: iterative generation -- generate,
+  validate against constraints, refine, repeat until satisfied or
+  budget exhausted.
+- `diffusion.rs`: diffusion-based generation strategy (experimental).
+- `strategy_stats.rs`: tracks per-strategy success rates and latencies.
+- `telemetry.rs`: collects inference metrics for observability.
 
 ---
 
 ## Memory Management
 
-### Allocator Strategy
+### Allocation Strategy
 
-Ananke uses explicit allocator passing throughout:
-
-```zig
-// Good: Explicit allocator parameter
-pub fn extractConstraints(allocator: std.mem.Allocator, source: []const u8) !ConstraintSet
-
-// Bad: Hidden global allocator
-pub fn extractConstraints(source: []const u8) !ConstraintSet
-```
-
-### Arena Allocation Pattern
-
-For temporary allocations during processing:
+Zig's explicit allocator passing is used throughout. No hidden globals.
+The pattern is consistent:
 
 ```zig
-var arena = std.heap.ArenaAllocator.init(allocator);
-defer arena.deinit();
-
-const temp_allocator = arena.allocator();
-const parsed = try parseConstraints(temp_allocator, source);
-// All temp_allocator allocations freed at arena.deinit()
+var thing = try allocate(allocator);
+errdefer thing.deinit(allocator);
+// ... use thing ...
+return thing;  // caller owns it
 ```
 
-### Ownership Semantics
+### Key Allocators
 
-```zig
-// Return value is caller-owned (must deinit/free)
-pub fn extractConstraints(...) !ConstraintSet {
-    var constraints = try ConstraintSet.init(allocator);
-    // Caller must call constraints.deinit()
-    return constraints;
-}
+- **TypeArena** (`braid/types/type_system.zig`): Single
+  `ArenaAllocator` for all type allocations during inhabitation
+  analysis. One `deinit` frees every `Type` node, every field slice,
+  every string. No individual frees needed.
 
-// Slice parameters are borrowed (not owned)
-pub fn compile(constraints: []const Constraint) !ConstraintIR {
-    // Don't free constraints parameter
-}
-```
+- **GrammarInterner** (`braid/string_interner.zig`): Deduplicates
+  grammar rule strings and regex patterns. Grammar rules for common
+  constructs (e.g., identifier patterns) appear hundreds of times
+  across constraints; interning them saves meaningful memory.
 
-### Error Path Cleanup
+- **RingQueue**: Fixed-size circular buffer used for LRU cache
+  eviction ordering.
 
-```zig
-pub fn compileConstraints(allocator: std.mem.Allocator, constraints: []const Constraint) !ConstraintIR {
-    var graph = try allocator.alloc(Node, constraints.len);
-    errdefer allocator.free(graph);  // Freed if function returns error
-    
-    var ir = try buildIR(allocator, graph);
-    errdefer ir.deinit(allocator);
-    
-    return ir;
-}
-```
+- **SharedConstraintIR**: Reference-counted wrapper around
+  `ConstraintIR`. Cache stores the original; callers get either a
+  clone (via `compile()`) or an acquired reference (via
+  `compileShared()`). The shared path avoids cloning for read-only
+  access -- important when the same constraint set is compiled
+  repeatedly during iterative generation. `compileShared()` returns
+  an acquired reference that the caller must `release()` when done;
+  `compile()` returns an owned clone the caller must `deinit()`.
+  Two APIs because the performance characteristics differ enough
+  to matter: the shared path is O(1), the clone path is O(n) in
+  IR size.
+
+### Error Paths
+
+Every allocation that could be abandoned on error gets an `errdefer`.
+This is enforced by convention and caught by Zig's leak-detecting test
+allocator, which fails the test if any allocation is not freed.
 
 ---
 
-## Concurrency Model
+## Testing
 
-### Single-Threaded Processing
+### Counts
 
-Default mode: All operations are single-threaded.
+At last measurement: 370 Zig tests + 86 Rust tests = 456 total, zero
+failures, zero memory leaks (Zig's `std.testing.allocator` detects
+leaks as test failures).
 
-```zig
-// Typical usage
-var ananke = try Ananke.init(allocator);
-defer ananke.deinit();
+### Organization
 
-var constraints = try ananke.extract(source, "typescript");
-var ir = try ananke.compile(constraints.constraints.items);
-```
+**Zig**: Inline `test "name" { ... }` blocks colocated with the code
+they test. This is idiomatic Zig -- tests live next to the functions
+they exercise, share the same file scope, and run with
+`zig build test --summary all`.
 
-### Thread-Safe Wrapper (Planned v0.2)
+**Rust**: `maze/tests/` for integration tests (`ffi_tests.rs`,
+`orchestrator_tests.rs`, `zig_integration_test.rs`,
+`modal_client_tests.rs`). Unit tests via `#[cfg(test)]` modules
+inside `maze/src/` files.
 
-```zig
-pub const ConcurrentAnankee = struct {
-    mutex: std.Thread.Mutex,
-    ananke: Ananke,
-    
-    pub fn extractAsync(self: *ConcurrentAnanke, source: []const u8) !ConstraintSet {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        return try self.ananke.extract(source, "typescript");
-    }
-};
-```
+**Eval fixtures**: `eval/tasks/fixtures/` contains Zig programs used
+as evaluation targets.
 
-### Modal Concurrency
+### Test Coverage by Module
 
-Python/Rust layer handles parallel inference requests:
+Modules with the highest test density (test count in parentheses):
 
-```rust
-pub async fn generate_parallel(prompts: Vec<String>, constraints: &ConstraintIR) -> Result<Vec<String>> {
-    let futures = prompts.iter().map(|prompt| {
-        self.generate_one(prompt, constraints)
-    });
-    
-    let results = futures::future::join_all(futures).await;
-    Ok(results)
-}
-```
+- `domain_fusion.zig` (13) — CLaSH fusion correctness
+- `fim.zig` (12) — FIM prefix/suffix analysis
+- `scope_context.zig` (11) — scope graph integration
+- `generate.zig` (11) — CLI generation command
+- `salience.zig` (10) — salience scoring
+- `mask_generator.zig` (8) — type inhabitation masks
+- `feasibility.zig` (7) — conflict detection
+- `temporal.zig` (7) — temporal analysis
+- `parser.zig` (7) — type parser
+- `call_graph_context.zig` (7) — call graph context
 
----
+### Eval Framework
 
-## Testing Strategy
+The eval harness supports multi-sample pass@k evaluation with paired
+constrained-vs-unconstrained comparison. `MultiSampleEvaluator`
+generates n samples per task, `pass_at_k.zig` computes the unbiased
+estimator, and `statistical_tests.zig` runs a paired t-test (p < 0.05
+threshold) to determine whether constraints actually improve output
+quality.
 
-### Unit Testing
-
-Tests co-located with implementation:
-
-```zig
-// In clew.zig or clew_test.zig
-test "extract constraints from typescript" {
-    const allocator = std.testing.allocator;
-    const source = "function add(a: number, b: number): number { return a + b; }";
-    
-    var clew = try Clew.init(allocator);
-    defer clew.deinit();
-    
-    var constraints = try clew.extractFromCode(source, "typescript");
-    defer constraints.deinit();
-    
-    try std.testing.expect(constraints.constraints.items.len > 0);
-}
-```
-
-### Integration Testing
-
-Multi-component tests:
-
-```zig
-test "full pipeline: extract -> compile -> validate" {
-    const allocator = std.testing.allocator;
-    const source = @embedFile("test/fixtures/sample.ts");
-    
-    // Extract
-    var clew = try Clew.init(allocator);
-    defer clew.deinit();
-    var constraints = try clew.extractFromCode(source, "typescript");
-    defer constraints.deinit();
-    
-    // Compile
-    var braid = try Braid.init(allocator);
-    defer braid.deinit();
-    var ir = try braid.compile(constraints.constraints.items);
-    defer ir.deinit(allocator);
-    
-    // Validate IR
-    try validateIR(ir);
-}
-```
-
-### Test Coverage
-
-Current status (v0.1.0):
-- **Unit tests**: 154 tests
-- **Integration tests**: 43 tests
-- **Pass rate**: 100%
-- **Execution time**: <5 seconds
+Task specs cover 24 categories (algorithms, API, async, caching,
+concurrency, data processing, data structures, database, error handling,
+file I/O, mathematics, memory management, messaging, parsing, patterns,
+performance, resilience, security, string processing, system utilities,
+type system, utilities, validation, web components) across 4 difficulty
+levels (simple, medium, moderate, complex).
 
 ---
 
-## Performance Profiling
-
-### Benchmarking Extraction
-
-```zig
-test "benchmark constraint extraction" {
-    const source = @embedFile("bench/fixtures/large.ts");  // ~10K lines
-    const start = std.time.milliTimestamp();
-    
-    var clew = try Clew.init(allocator);
-    var constraints = try clew.extractFromCode(source, "typescript");
-    defer constraints.deinit();
-    
-    const elapsed = std.time.milliTimestamp() - start;
-    std.debug.print("Extraction: {}ms\n", .{elapsed});
-}
-```
-
-### Benchmarking Compilation
-
-```zig
-test "benchmark constraint compilation" {
-    const constraints = generateTestConstraints(allocator, 100);
-    defer allocator.free(constraints);
-    
-    const start = std.time.milliTimestamp();
-    
-    var braid = try Braid.init(allocator);
-    var ir = try braid.compile(constraints);
-    defer ir.deinit(allocator);
-    
-    const elapsed = std.time.milliTimestamp() - start;
-    std.debug.print("Compilation (100 constraints): {}ms\n", .{elapsed});
-}
-```
-
-### Cache Performance
-
-```zig
-test "benchmark cache hit rate" {
-    const constraints = generateTestConstraints(allocator, 50);
-    
-    var braid = try Braid.init(allocator);
-    defer braid.deinit();
-    
-    // First compilation (cache miss)
-    const start1 = std.time.nanoTimestamp();
-    var ir1 = try braid.compile(constraints);
-    defer ir1.deinit(allocator);
-    const elapsed1 = std.time.nanoTimestamp() - start1;
-    
-    // Second compilation (cache hit)
-    const start2 = std.time.nanoTimestamp();
-    var ir2 = try braid.compile(constraints);
-    defer ir2.deinit(allocator);
-    const elapsed2 = std.time.nanoTimestamp() - start2;
-    
-    std.debug.print("Cache speedup: {d:.1}x\n", .{@intToFloat(f64, elapsed1) / @intToFloat(f64, elapsed2)});
-}
-```
-
-### Memory Profiling
+## Build and Run
 
 ```bash
-# Valgrind memory check
-valgrind --leak-check=full zig build run
+# Build and test (Zig)
+zig build test --summary all
 
-# Instrument code with allocator tracking
-var gpa = std.heap.GeneralPurposeAllocator(.{ .verbose_log = true }){};
-var allocator = gpa.allocator();
+# Build release binary
+zig build -Doptimize=ReleaseSafe -p /tmp/ananke-build
 
-// ... run code ...
+# Rust tests (from maze/)
+cargo test
 
-_ = gpa.deinit();  // Reports any leaks
+# Deploy Modal inference
+modal deploy maze/modal_inference/inference.py
 ```
+
+CI runs 7 jobs: security, lint, coverage, ubuntu, macos, integration,
+and gate. `zig fmt --check .` enforces formatting at the repository
+root (including `build.zig`). `cargo fmt --check` enforces Rust
+formatting in `maze/`.
+
+One quirk: the `tree-sitter-zig` submodule always shows as dirty
+(`m vendor/tree-sitter-zig` in `git status`). This is harmless -- a
+generated file differs from what git expects. Do not commit it.
+`tree-sitter-swift` is pinned to the `0.7.1-with-generated-files` tag
+of the alex-pinkus fork (the upstream main branch lacks `parser.c`).
 
 ---
 
-## Debugging Techniques
+## Cross-References
 
-### Using Zig's Built-in Debugging
-
-```bash
-# Build with debug symbols
-zig build -Doptimize=Debug
-
-# Run with GDB
-gdb ./zig-cache/bin/ananke
-(gdb) b clew.zig:123
-(gdb) run
-(gdb) bt  # Backtrace
-```
-
-### Debug Output
-
-```zig
-// Add temporary debug prints
-std.debug.print("Extracted {} constraints\n", .{constraints.len});
-
-// Check a condition
-if (constraints.len == 0) {
-    std.debug.panic("No constraints extracted", .{});
-}
-
-// Trace execution
-for (constraints) |constraint| {
-    std.debug.print("Processing: {s}\n", .{constraint.name});
-    try processConstraint(constraint);
-    std.debug.print("  -> OK\n", .{});
-}
-```
-
-### Assertion-Based Testing
-
-```zig
-std.debug.assert(constraints.len > 0);
-std.debug.assert(ir.json_schema != null);
-```
-
----
-
-## Future Enhancements
-
-### Planned v0.2
-
-- **Tree-sitter integration**: Full AST-based extraction
-- **Extended language support**: Rust, Go, C++, Java
-- **Ariadne type checking**: Compile-time constraint validation
-- **Incremental compilation**: Compile only changed constraints
-- **Distributed caching**: Redis backend for constraint IR cache
-
-### Research Areas
-
-- **Formal verification**: Prove constraint sets are satisfiable
-- **Constraint synthesis**: Generate constraints from examples
-- **Cross-language transfer**: Reuse constraints across languages
-- **Probabilistic relaxation**: Gracefully degrade constraints
-
----
-
-## Contributing Guidelines
-
-**Before modifying internals:**
-
-1. Understand the layer (Clew/Braid/Ariadne/Maze)
-2. Review existing tests for the component
-3. Check CONSTRAINT.md for type changes
-4. Write tests before implementation
-5. Profile performance impact
-
-**Code review checklist:**
-
-- [ ] Tests added/updated
-- [ ] Memory management verified (no leaks)
-- [ ] Performance impact profiled
-- [ ] Documentation updated
-- [ ] All tests pass
-- [ ] No compiler warnings
-
----
-
-**Version**: 0.1.0  
-**Last Updated**: November 2025  
-**Maintainers**: Ananke Core Team
+| Document | What it covers |
+|----------|---------------|
+| `docs/CLASH_ALGEBRA.md` | Formal CLaSH domain definitions, tier semantics |
+| `docs/DOMAIN_FUSION.md` | ASAp + CRANE fusion algorithm details |
+| `docs/TYPE_INHABITATION.md` | Type system, inhabitation graph, mask generation |
+| `docs/FIM_GUIDE.md` | Fill-in-the-middle mode usage and internals |
+| `docs/HOMER_INTEGRATION.md` | Homer MCP integration, scope graph, call graph |
+| `docs/FFI_GUIDE.md` | Zig/Rust FFI boundary details |
+| `docs/EVAL_GUIDE.md` | Evaluation framework usage |
+| `docs/spec/SPEC-01` through `SPEC-05` | Feature specifications |
+| `docs/adr/ADR-001` through `ADR-007` | Architectural decision records |

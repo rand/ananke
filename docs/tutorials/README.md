@@ -78,6 +78,36 @@ Integrate Ananke into your development workflow.
 
 ---
 
+### 6. Understanding CLaSH Domains (20 min)
+**File**: `06-clash-domains.md`
+
+Explore the 5 CLaSH constraint domains and how they compose.
+
+- Extract constraints and see their domain assignments
+- Hard vs soft tiers in practice
+- Cross-domain morphisms (Types ↔ Imports)
+- Adaptive intensity levels
+- How hole scale maps to constraint strength
+
+**Skills**: CLaSH algebra, constraint composition, domain understanding
+
+---
+
+### 7. Fill-in-the-Middle for IDE Completions (15 min)
+**File**: `07-fim-ide.md`
+
+Use constrained FIM for IDE-quality code completions.
+
+- Standard vs FIM completion
+- Basic FIM via CLI
+- Constraint-aware FIM with type context
+- HoleScale variations
+- IDE integration path
+
+**Skills**: FIM constrained decoding, IDE integration, cursor-aware generation
+
+---
+
 ## How to Use These Tutorials
 
 ### Quick Path (1 hour)
@@ -85,8 +115,8 @@ Integrate Ananke into your development workflow.
 2. Complete Tutorial 2 (compile)
 3. Skim Tutorial 3 (generate)
 
-### Full Path (2 hours)
-Complete all 5 tutorials in order.
+### Full Path (3 hours)
+Complete all 7 tutorials in order.
 
 ### By Interest
 - **Code Analysis**: Tutorials 1, 2
@@ -95,12 +125,19 @@ Complete all 5 tutorials in order.
 
 ---
 
+### By Interest
+- **CLaSH Deep Dive**: Tutorials 1, 2, 6
+- **IDE Integration**: Tutorials 1, 7
+- **Full Understanding**: All 7 tutorials
+
+---
+
 ## Prerequisites
 
-- Python 3.8+ installed
-- Ananke installed: `pip install ananke-ai`
-- For generation: Modal account (free tier)
-- 1 hour per tutorial
+- Zig 0.15.2+ installed ([ziglang.org/download](https://ziglang.org/download/))
+- Ananke built from source: `git clone --recurse-submodules ... && zig build`
+- For generation: Modal account (free tier) or sglang endpoint
+- 15-20 minutes per tutorial
 
 ---
 

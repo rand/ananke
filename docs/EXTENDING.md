@@ -14,25 +14,33 @@ This guide covers how to extend Ananke with new constraint types, language suppo
 
 ---
 
+**Last Updated**: March 2026
+
 ## Overview
 
-Ananke's architecture supports several extension points:
+Ananke supports 14 languages with 383 patterns. The architecture provides several extension points:
 
 ```
 Clew (Extraction)
-├── Language Parsers: Add lexical/syntactic analyzers
-├── Pattern Library: Add constraint detection patterns
-└── Custom Extractors: Add domain-specific constraint mining
+├── Language Extractors: tree-sitter AST + pattern-based (src/clew/extractors/)
+├── Pattern Library: 383 patterns across 14 languages (src/clew/patterns.zig)
+├── Scope Context: Homer scope graph integration (src/clew/scope_context.zig)
+├── Call Graph: InlineCoder-style context (src/clew/call_graph_context.zig)
+└── Conventions: Convention mining → soft CLaSH constraints (src/clew/conventions.zig)
 
 Braid (Compilation)
-├── IR Components: Extend ConstraintIR with new constraint types
-├── Validators: Add constraint-specific validation logic
-└── Optimizers: Improve compilation for specific patterns
+├── CLaSH Domains: 5 domains, 2 tiers (src/braid/domain_fusion.zig)
+├── Type Inhabitation: Type → token mask (src/braid/types/)
+├── FIM Analysis: Fill-in-the-middle constraints (src/braid/fim.zig)
+├── Feasibility: Conflict detection + relaxation (src/braid/feasibility.zig)
+└── Salience/Temporal: Homer-informed priority (src/braid/salience.zig, temporal.zig)
 
 Ariadne (DSL)
-├── Grammar: Extend DSL syntax for new constraint types
-└── Semantic Actions: Add compilation rules for new syntax
+├── Grammar: Constraint DSL syntax (src/ariadne/)
+└── Compilation: DSL → ConstraintIR
 ```
+
+When extending, remember the CLaSH invariant: new hard constraints compose by intersection; new soft constraints must never block generation. See [CLASH_ALGEBRA.md](CLASH_ALGEBRA.md).
 
 ---
 
