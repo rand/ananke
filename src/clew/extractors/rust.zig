@@ -8,10 +8,19 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
 
     var line_num: u32 = 1;
     var lines = std.mem.splitScalar(u8, source, '\n');
+    var in_where_clause = false;
 
     while (lines.next()) |line| : (line_num += 1) {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0 or std.mem.startsWith(u8, trimmed, "//")) continue;
+
+        // Skip lines inside multi-line where clauses
+        if (in_where_clause) {
+            if (std.mem.indexOf(u8, trimmed, "{") != null) {
+                in_where_clause = false;
+            }
+            continue;
+        }
 
         // Parse use statements
         if (std.mem.startsWith(u8, trimmed, "use ")) {
@@ -48,6 +57,13 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
             if (try parseFunction(allocator, trimmed, line_num)) |func_decl| {
                 try structure.functions.append(allocator, func_decl);
             }
+        }
+
+        // Check for multi-line where clause start
+        if (std.mem.endsWith(u8, trimmed, "where") and
+            std.mem.indexOf(u8, trimmed, "{") == null)
+        {
+            in_where_clause = true;
         }
     }
 
@@ -269,4 +285,34 @@ test "rust: skip commented function" {
     var s = try parse(allocator, "// fn commented_out() {}");
     defer s.deinit();
     try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
+}
+
+test "rust: multi-line where clause" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\pub fn process<T>(item: T) -> String
+        \\where
+        \\    T: Display + Clone,
+        \\{
+    );
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("process", s.functions.items[0].name);
+}
+
+test "rust: where clause lines not misinterpreted" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator,
+        \\pub fn merge<T>(a: T, b: T) -> T
+        \\where
+        \\    T: Clone + Default,
+        \\    T: std::fmt::Display,
+        \\{
+        \\pub fn simple() {
+    );
+    defer s.deinit();
+    // Should find both functions: merge and simple
+    try std.testing.expectEqual(@as(usize, 2), s.functions.items.len);
+    try std.testing.expectEqualStrings("merge", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("simple", s.functions.items[1].name);
 }

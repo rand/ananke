@@ -52,6 +52,25 @@ pub const Binding = struct {
     binding_type: *const Type,
 };
 
+/// Scope binding info for dynamic edge creation.
+/// Decoupled from scope_context.ScopeBinding to avoid cross-module imports.
+/// Callers convert ScopeBinding -> ScopeBindingInfo at the boundary.
+pub const ScopeBindingInfo = struct {
+    name: []const u8,
+    qualified_type: ?[]const u8 = null,
+    kind: ScopeBindingKind,
+};
+
+/// Kinds of bindings from scope graph resolution.
+/// Mirrors scope_context.BindingKind without the import dependency.
+pub const ScopeBindingKind = enum {
+    type_definition,
+    function,
+    variable,
+    module,
+    type_alias,
+};
+
 /// Type inhabitation graph for reachability analysis
 pub const InhabitationGraph = struct {
     allocator: std.mem.Allocator,
@@ -1153,6 +1172,124 @@ pub const InhabitationGraph = struct {
         self.bindings.clearRetainingCapacity();
     }
 
+    /// Add dynamic inhabitation edges from scope bindings.
+    /// Function bindings with qualified_type create application edges.
+    /// Type/variable bindings create named bindings for canTokenLeadToGoal.
+    pub fn addScopeEdges(self: *InhabitationGraph, scope_bindings: []const ScopeBindingInfo) !void {
+        for (scope_bindings) |sb| {
+            switch (sb.kind) {
+                .function => {
+                    if (sb.qualified_type) |qt| {
+                        // Parse arrow-style signatures: "ParamType -> ReturnType"
+                        // If no arrow, the whole string is the return type.
+                        if (std.mem.indexOf(u8, qt, " -> ")) |arrow_pos| {
+                            const param_str = std.mem.trim(u8, qt[0..arrow_pos], " ");
+                            const ret_str = std.mem.trim(u8, qt[arrow_pos + 4 ..], " ");
+                            const param_type = try self.resolveTypeName(param_str);
+                            const return_type = try self.resolveTypeName(ret_str);
+
+                            // Add application edge: param_type -> return_type via function name
+                            try self.addEdge(param_type, .{
+                                .kind = .application,
+                                .target_type = return_type,
+                                .token_pattern = sb.name,
+                                .description = sb.name,
+                            });
+
+                            // Also add as binding with the return type
+                            try self.addBinding(.{
+                                .name = sb.name,
+                                .binding_type = return_type,
+                            });
+                        } else {
+                            // No arrow: treat qualified_type as return type
+                            const return_type = try self.resolveTypeName(qt);
+                            try self.addBinding(.{
+                                .name = sb.name,
+                                .binding_type = return_type,
+                            });
+                        }
+                    }
+                },
+                .type_definition, .type_alias => {
+                    // Create named type from qualified_type or name
+                    const type_name = sb.qualified_type orelse sb.name;
+                    const resolved = try self.resolveTypeName(type_name);
+                    try self.addBinding(.{
+                        .name = sb.name,
+                        .binding_type = resolved,
+                    });
+                },
+                .variable => {
+                    if (sb.qualified_type) |qt| {
+                        const resolved = try self.resolveTypeName(qt);
+                        try self.addBinding(.{
+                            .name = sb.name,
+                            .binding_type = resolved,
+                        });
+                    }
+                },
+                .module => {
+                    // Module bindings don't create type edges
+                },
+            }
+        }
+    }
+
+    /// Resolve a type name string to a Type pointer.
+    /// Checks common primitive names first (language-agnostic), then
+    /// falls back to creating a named type via the arena.
+    fn resolveTypeName(self: *InhabitationGraph, name: []const u8) !*const Type {
+        // Check common primitive names across languages
+        const primitives = .{
+            .{ "string", PrimitiveKind.string },
+            .{ "String", PrimitiveKind.string },
+            .{ "str", PrimitiveKind.string },
+            .{ "int", PrimitiveKind.i32 },
+            .{ "Int", PrimitiveKind.i32 },
+            .{ "i32", PrimitiveKind.i32 },
+            .{ "i64", PrimitiveKind.i64 },
+            .{ "integer", PrimitiveKind.i64 },
+            .{ "Integer", PrimitiveKind.i64 },
+            .{ "long", PrimitiveKind.i64 },
+            .{ "Long", PrimitiveKind.i64 },
+            .{ "float", PrimitiveKind.f32 },
+            .{ "Float", PrimitiveKind.f32 },
+            .{ "f32", PrimitiveKind.f32 },
+            .{ "double", PrimitiveKind.f64 },
+            .{ "Double", PrimitiveKind.f64 },
+            .{ "f64", PrimitiveKind.f64 },
+            .{ "number", PrimitiveKind.number },
+            .{ "bool", PrimitiveKind.boolean },
+            .{ "Bool", PrimitiveKind.boolean },
+            .{ "boolean", PrimitiveKind.boolean },
+            .{ "Boolean", PrimitiveKind.boolean },
+            .{ "void", PrimitiveKind.void_type },
+            .{ "Void", PrimitiveKind.void_type },
+            .{ "None", PrimitiveKind.void_type },
+            .{ "null", PrimitiveKind.null_type },
+            .{ "nil", PrimitiveKind.null_type },
+            .{ "any", PrimitiveKind.any },
+            .{ "Any", PrimitiveKind.any },
+            .{ "object", PrimitiveKind.any },
+            .{ "Object", PrimitiveKind.any },
+        };
+
+        inline for (primitives) |p| {
+            if (std.mem.eql(u8, name, p[0])) {
+                return try self.arena.primitive(p[1]);
+            }
+        }
+
+        // Strip generic parameters for named type lookup: "List<String>" -> "List"
+        const base_name = if (std.mem.indexOfScalar(u8, name, '<')) |angle|
+            name[0..angle]
+        else
+            name;
+
+        return try self.arena.named(base_name, self.language);
+    }
+
     /// Check if target type is reachable from source type
     pub fn isReachable(self: *InhabitationGraph, source: *const Type, target: *const Type) bool {
         // Same type is always reachable
@@ -1352,4 +1489,153 @@ test "InhabitationGraph - Python edges" {
 
     // str should be reachable from int (via str())
     try std.testing.expect(graph.isReachable(int_type, str_type));
+}
+
+test "scope edges: function binding creates binding" {
+    var arena = TypeArena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var graph = InhabitationGraph.init(std.testing.allocator, &arena, .typescript);
+    defer graph.deinit();
+
+    try graph.addBuiltinEdges();
+
+    const bindings = [_]ScopeBindingInfo{
+        .{ .name = "getUserName", .qualified_type = "String", .kind = .function },
+    };
+    try graph.addScopeEdges(&bindings);
+
+    // "getUserName" should be reachable to string since its return type is String
+    const str_type = try arena.primitive(.string);
+    try std.testing.expect(graph.canTokenLeadToGoal("getUserName", null, str_type));
+}
+
+test "scope edges: function with arrow creates application edge" {
+    var arena = TypeArena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var graph = InhabitationGraph.init(std.testing.allocator, &arena, .typescript);
+    defer graph.deinit();
+
+    const bindings = [_]ScopeBindingInfo{
+        .{ .name = "parseInt", .qualified_type = "string -> int", .kind = .function },
+    };
+    try graph.addScopeEdges(&bindings);
+
+    // parseInt should resolve to i32 (return type), reachable to number in TS
+    const num_type = try arena.primitive(.number);
+    try std.testing.expect(graph.canTokenLeadToGoal("parseInt", null, num_type));
+
+    // Also check that the application edge was created: string -> int via "parseInt"
+    const str_type = try arena.primitive(.string);
+    const i32_type = try arena.primitive(.i32);
+    try std.testing.expect(graph.isReachable(str_type, i32_type));
+}
+
+test "scope edges: type binding creates named binding" {
+    var arena = TypeArena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var graph = InhabitationGraph.init(std.testing.allocator, &arena, .python);
+    defer graph.deinit();
+
+    const bindings = [_]ScopeBindingInfo{
+        .{ .name = "User", .qualified_type = "models.User", .kind = .type_definition },
+        .{ .name = "UserId", .kind = .type_alias },
+    };
+    try graph.addScopeEdges(&bindings);
+
+    // "User" should lead to a named type "models.User"
+    // Verify that the binding was created by checking bindings count
+    try std.testing.expectEqual(@as(usize, 2), graph.bindings.items.len);
+    try std.testing.expectEqualStrings("User", graph.bindings.items[0].name);
+    try std.testing.expectEqualStrings("UserId", graph.bindings.items[1].name);
+
+    // The type_alias without qualified_type should use the name itself
+    try std.testing.expect(graph.bindings.items[1].binding_type.* == .named);
+    try std.testing.expectEqualStrings("UserId", graph.bindings.items[1].binding_type.named.name);
+}
+
+test "scope edges: variable binding with qualified type" {
+    var arena = TypeArena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var graph = InhabitationGraph.init(std.testing.allocator, &arena, .typescript);
+    defer graph.deinit();
+
+    try graph.addBuiltinEdges();
+
+    const bindings = [_]ScopeBindingInfo{
+        .{ .name = "count", .qualified_type = "number", .kind = .variable },
+        .{ .name = "label", .qualified_type = "string", .kind = .variable },
+        .{ .name = "untyped_var", .kind = .variable }, // no qualified_type, should be skipped
+    };
+    try graph.addScopeEdges(&bindings);
+
+    const str_type = try arena.primitive(.string);
+    const num_type = try arena.primitive(.number);
+
+    // "count" should be able to lead to string (number -> string via toString)
+    try std.testing.expect(graph.canTokenLeadToGoal("count", null, str_type));
+
+    // "label" should lead directly to string
+    try std.testing.expect(graph.canTokenLeadToGoal("label", null, str_type));
+
+    // "count" should lead to number directly
+    try std.testing.expect(graph.canTokenLeadToGoal("count", null, num_type));
+
+    // untyped_var should not have been added (only 2 bindings, not 3)
+    try std.testing.expectEqual(@as(usize, 2), graph.bindings.items.len);
+}
+
+test "scope edges: module bindings are ignored" {
+    var arena = TypeArena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var graph = InhabitationGraph.init(std.testing.allocator, &arena, .python);
+    defer graph.deinit();
+
+    const bindings = [_]ScopeBindingInfo{
+        .{ .name = "os", .kind = .module },
+        .{ .name = "sys", .qualified_type = "sys", .kind = .module },
+    };
+    try graph.addScopeEdges(&bindings);
+
+    // No bindings should have been created for modules
+    try std.testing.expectEqual(@as(usize, 0), graph.bindings.items.len);
+}
+
+test "scope edges: resolveTypeName primitives" {
+    var arena = TypeArena.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var graph = InhabitationGraph.init(std.testing.allocator, &arena, .typescript);
+    defer graph.deinit();
+
+    // Resolve primitive names and verify they produce correct types
+    const string_t = try graph.resolveTypeName("string");
+    try std.testing.expect(string_t.* == .primitive);
+    try std.testing.expectEqual(PrimitiveKind.string, string_t.primitive);
+
+    const int_t = try graph.resolveTypeName("int");
+    try std.testing.expect(int_t.* == .primitive);
+    try std.testing.expectEqual(PrimitiveKind.i32, int_t.primitive);
+
+    const bool_t = try graph.resolveTypeName("bool");
+    try std.testing.expect(bool_t.* == .primitive);
+    try std.testing.expectEqual(PrimitiveKind.boolean, bool_t.primitive);
+
+    const none_t = try graph.resolveTypeName("None");
+    try std.testing.expect(none_t.* == .primitive);
+    try std.testing.expectEqual(PrimitiveKind.void_type, none_t.primitive);
+
+    // Non-primitive resolves to named type
+    const user_t = try graph.resolveTypeName("User");
+    try std.testing.expect(user_t.* == .named);
+    try std.testing.expectEqualStrings("User", user_t.named.name);
+
+    // Generic type strips angle brackets: "List<String>" -> "List"
+    const list_t = try graph.resolveTypeName("List<String>");
+    try std.testing.expect(list_t.* == .named);
+    try std.testing.expectEqualStrings("List", list_t.named.name);
 }
