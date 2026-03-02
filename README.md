@@ -22,26 +22,55 @@ The system spans 14 languages, composes constraints across 5 domains with formal
 ## Architecture
 
 ```
-Source Code ──→ Clew (14 langs, tree-sitter + patterns)
-                  │
-                  ├─ Constraints
-                  ├─ Rich Context (types, imports, scope graph, call graph)
-                  ├─ Homer Context (salience, temporal, conventions)
-                  ↓
-              Braid (CLaSH Constraint Algebra)
-                  │
-                  ├─ Hard Domains ─→ Syntax │ Types │ Imports
-                  │   (binary pass/fail, compose by intersection)
-                  │
-                  ├─ Soft Domains ─→ ControlFlow │ Semantics
-                  │   (graded 0.0–1.0, additive logit reweighting)
-                  │
-                  ├─ Domain Fusion (ASAp + CRANE)
-                  ├─ Type Inhabitation
-                  ├─ FIM (fill-in-the-middle)
-                  ↓
-              Maze ──→ sglang/vLLM + llguidance ──→ Generated Code
-                       (constraint-validated, token by token)
+                        Homer (Rust)
+                        ├ Scope graphs (13 langs)
+                        ├ Centrality / Salience
+                        ├ Temporal / Stability
+                        └ Communities / Conventions
+                              │
+                          MCP or Rust FFI
+                              │
+                              v
+Source code ──> Clew (tree-sitter) + Repository Context
+                 │                        │
+                 ├ SyntaxStructure         ├ ScopeContext (cross-file bindings)
+                 │ (local AST data)        ├ Salience (per-entity importance)
+                 │                         ├ Stability (temporal confidence)
+                 └ Constraints             └ Conventions (empirical patterns)
+                              │
+                              v
+                           Braid
+                 ┌─────────────────────────┐
+                 │ Feasibility   (community-aware satisfiability)
+                 │ Priority      (salience-weighted)
+                 │ Confidence    (stability-informed)
+                 │ Morphisms     (cross-domain propagation)
+                 └─────────────────────────┘
+                              │
+                  ConstraintIR + RichContext
+                              │
+                      ConstraintSpec JSON
+                              │
+                              v
+                 ┌─────────────────────────┐
+                 │ sglang + Ananke Backend  │
+                 └─────────────────────────┘
+                              │
+                              v
+                 ┌─────────────────────────┐
+                 │ Per-Token Mask Fusion     │
+                 │                           │
+                 │ Syntax  ∩  Earley/PDA        (hard, exact)
+                 │ Types   ∩  prefix automata   (hard, exact)
+                 │ Imports ∩  vocab subset       (hard, exact)
+                 │ ─────────────────────────│
+                 │ CtrlFlow ⊕  score reweighting (soft)
+                 │ Semantic ⊕  score reweighting (soft)
+                 └─────────────────────────┘
+                              │
+                       Shaped generation
+                              │
+                       Verified output
 ```
 
 ## Quick Start
