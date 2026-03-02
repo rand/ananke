@@ -40,33 +40,33 @@ Source code ──> Clew (tree-sitter) + Repository Context
                               │
                               v
                            Braid
-                 ┌─────────────────────────┐
-                 │ Feasibility   (community-aware satisfiability)
-                 │ Priority      (salience-weighted)
-                 │ Confidence    (stability-informed)
-                 │ Morphisms     (cross-domain propagation)
-                 └─────────────────────────┘
+                 ┌─────────────────────────────────────────────────┐
+                 │ Feasibility   (community-aware satisfiability)  │
+                 │ Priority      (salience-weighted)               │
+                 │ Confidence    (stability-informed)              │
+                 │ Morphisms     (cross-domain propagation)        │
+                 └─────────────────────────────────────────────────┘
                               │
                   ConstraintIR + RichContext
                               │
                       ConstraintSpec JSON
                               │
                               v
-                 ┌─────────────────────────┐
-                 │ sglang + Ananke Backend  │
-                 └─────────────────────────┘
+                 ┌─────────────────────────────────────────────────┐
+                 │ sglang + Ananke Backend                         │
+                 └─────────────────────────────────────────────────┘
                               │
                               v
-                 ┌─────────────────────────┐
-                 │ Per-Token Mask Fusion     │
-                 │                           │
-                 │ Syntax  ∩  Earley/PDA        (hard, exact)
-                 │ Types   ∩  prefix automata   (hard, exact)
-                 │ Imports ∩  vocab subset       (hard, exact)
-                 │ ─────────────────────────│
-                 │ CtrlFlow ⊕  score reweighting (soft)
-                 │ Semantic ⊕  score reweighting (soft)
-                 └─────────────────────────┘
+                 ┌─────────────────────────────────────────────────┐
+                 │ Per-Token Mask Fusion                           │
+                 │                                                 │
+                 │ Syntax   ∩  Earley/PDA        (hard, exact)     │
+                 │ Types    ∩  prefix automata   (hard, exact)     │
+                 │ Imports  ∩  vocab subset      (hard, exact)     │
+                 │ ─────────────────────────────────────────────── │
+                 │ CtrlFlow ⊕  score reweighting (soft)            │
+                 │ Semantic ⊕  score reweighting (soft)            │
+                 └─────────────────────────────────────────────────┘
                               │
                        Shaped generation
                               │
