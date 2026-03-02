@@ -583,10 +583,9 @@ zig build run
 
 **Solution**:
 ```bash
-# Check supported languages (v0.2.0)
-# - TypeScript/JavaScript ✓
-# - Python ✓
-# - Rust, Go, Zig (planned for v0.2)
+# Check supported languages
+# Tier 1: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java
+# Tier 2: Kotlin, C#, Ruby, PHP, Swift
 
 # Verify file has actual code
 cat sample.ts  # Should contain real code, not just comments

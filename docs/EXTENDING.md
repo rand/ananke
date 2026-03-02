@@ -691,5 +691,5 @@ See complete examples in `/Users/rand/src/ananke/examples/`:
 
 ---
 
-**Guide Version**: 0.2.0
+**Guide Version**: 0.2.0  
 **Last Updated**: March 2026
