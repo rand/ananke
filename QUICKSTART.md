@@ -73,7 +73,7 @@ zig build
 
 # Verify the build
 ./zig-out/bin/ananke --version
-# Expected: ananke 0.2.0
+# Expected: ananke 0.2.1
 ```
 
 **What just happened?**
@@ -337,7 +337,7 @@ You've just learned the foundation of Ananke! Here's what to explore next:
    # Use as a library
    # Add to your build.zig.zon:
    .ananke = .{
-       .url = "https://github.com/ananke-ai/ananke/archive/refs/tags/v0.2.0.tar.gz",
+       .url = "https://github.com/ananke-ai/ananke/archive/refs/tags/v0.2.1.tar.gz",
        .hash = "...",
    },
    ```

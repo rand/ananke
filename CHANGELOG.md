@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-02
+
+### Added
+- Comment/string-aware pattern matching: extractors now skip patterns inside comments, strings, and doc comments across all 14 languages
+- Type system coverage: C, Ruby, PHP, Swift added to Language enum with type parsers, primitives, and inhabitation edges
+- Tier 2 language promotion: Swift (extensions), Kotlin (value classes, typealias), C# (delegates, IAsyncEnumerable), Ruby (visibility tracking, attr_accessor), PHP (union return types)
+- Dynamic scope inhabitation: when Homer scope data is available, user-defined types generate inhabitation edges automatically
+- Multi-line extractor state machines: Go grouped imports, Rust where clauses, Java annotation handling, Python multi-line signatures
+- Property-based tests: parser crash safety, primitive round-trips, optional wrapping, BFS reflexivity, edge monotonicity, builtin edge validity, comment filtering, pattern determinism
+- Inline tests for all 9 Tier 1 extractors (previously had zero)
+
+### Changed
+- Per-language precision: Go multi-line imports, Rust Box/Arc/Rc/HashMap/dyn Trait, Java wildcard generics, TypeScript N-ary unions + utility types, C++ smart pointers
+- Test count: 473 -> 512 Zig tests (+39), 144 Rust tests unchanged
+
 ## [0.2.0] - 2026-03-02
 
 ### Added
@@ -327,6 +342,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+[0.2.1]: https://github.com/ananke-ai/ananke/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ananke-ai/ananke/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ananke-ai/ananke/releases/tag/v0.1.0
 

@@ -3,7 +3,7 @@
 > Transform AI code generation from probabilistic guessing into controlled search through valid program spaces.
 
 **Status**: Production-ready
-**Version**: 0.2.0
+**Version**: 0.2.1
 **Last Updated**: March 2026
 
 ---

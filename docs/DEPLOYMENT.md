@@ -70,7 +70,7 @@ curl -fsSL https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/insta
 
 **Specific version:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.sh | ANANKE_VERSION=v0.2.0 bash
+curl -fsSL https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.sh | ANANKE_VERSION=v0.2.1 bash
 ```
 
 **Local installation (if you've cloned the repo):**
@@ -93,7 +93,7 @@ irm https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.ps1 
 
 **Specific version:**
 ```powershell
-& { irm https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.ps1 } | iex -Version "v0.2.0"
+& { irm https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.ps1 } | iex -Version "v0.2.1"
 ```
 
 **Local installation:**
@@ -143,7 +143,7 @@ Perfect for containerized environments, CI/CD pipelines, or isolated testing.
 docker pull ghcr.io/ananke-ai/ananke:latest
 
 # Pull specific version
-docker pull ghcr.io/ananke-ai/ananke:v0.2.0
+docker pull ghcr.io/ananke-ai/ananke:v0.2.1
 ```
 
 #### Build Locally
@@ -278,8 +278,8 @@ Download platform-specific binaries from GitHub releases.
 **Linux/macOS:**
 ```bash
 # Extract
-tar -xzf ananke-v0.2.0-linux-x86_64.tar.gz
-cd ananke-v0.2.0-linux-x86_64
+tar -xzf ananke-v0.2.1-linux-x86_64.tar.gz
+cd ananke-v0.2.1-linux-x86_64
 
 # Install (uses installation script)
 ./install.sh
@@ -292,10 +292,10 @@ sudo cp lib/* /usr/local/lib/
 **Windows:**
 ```powershell
 # Extract ZIP file
-Expand-Archive ananke-v0.2.0-windows-x86_64.zip
+Expand-Archive ananke-v0.2.1-windows-x86_64.zip
 
 # Add to PATH or copy to system directory
-Copy-Item .\ananke-v0.2.0-windows-x86_64\bin\ananke.exe C:\Windows\System32\
+Copy-Item .\ananke-v0.2.1-windows-x86_64\bin\ananke.exe C:\Windows\System32\
 ```
 
 #### Verify Checksums
@@ -304,13 +304,13 @@ Always verify checksums for security:
 
 ```bash
 # Download checksum file
-curl -LO https://github.com/ananke-ai/ananke/releases/download/v0.2.0/ananke-v0.2.0-checksums.txt
+curl -LO https://github.com/ananke-ai/ananke/releases/download/v0.2.1/ananke-v0.2.1-checksums.txt
 
 # Verify (Linux/macOS)
-sha256sum -c ananke-v0.2.0-checksums.txt --ignore-missing
+sha256sum -c ananke-v0.2.1-checksums.txt --ignore-missing
 
 # Verify (macOS with shasum)
-shasum -a 256 -c ananke-v0.2.0-checksums.txt --ignore-missing
+shasum -a 256 -c ananke-v0.2.1-checksums.txt --ignore-missing
 ```
 
 ---
@@ -435,7 +435,7 @@ ananke generate "implement user authentication" --constraints compiled.cir
 curl -fsSL https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.sh | bash
 
 # Update to specific version
-curl -fsSL https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.sh | ANANKE_VERSION=v0.2.0 bash
+curl -fsSL https://raw.githubusercontent.com/ananke-ai/ananke/main/scripts/install.sh | ANANKE_VERSION=v0.2.1 bash
 ```
 
 ### Homebrew
