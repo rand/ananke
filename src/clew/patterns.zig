@@ -2915,3 +2915,194 @@ test "findPatternMatches: python hash comments" {
     }
     try std.testing.expectEqual(@as(usize, 1), def_count);
 }
+
+// ============================================================================
+// Property-based tests
+// ============================================================================
+
+test "property: comment-wrapped code produces fewer matches" {
+    // For any code snippet and any language, wrapping it in that language's
+    // comment syntax should produce fewer or equal pattern matches.
+    const allocator = std.testing.allocator;
+
+    const Case = struct {
+        lang: []const u8,
+        snippet: []const u8,
+        commented: []const u8,
+    };
+
+    const cases = [_]Case{
+        // Rust: line comment
+        .{
+            .lang = "rust",
+            .snippet = "fn main() {}\nfn helper() {}",
+            .commented = "// fn main() {}\n// fn helper() {}",
+        },
+        // Python: hash comment
+        .{
+            .lang = "python",
+            .snippet = "def foo():\ndef bar():",
+            .commented = "# def foo():\n# def bar():",
+        },
+        // TypeScript: block comment
+        .{
+            .lang = "typescript",
+            .snippet = "function foo() {}\nasync function bar() {}",
+            .commented = "/* function foo() {}\nasync function bar() {} */",
+        },
+        // Go: line comment
+        .{
+            .lang = "go",
+            .snippet = "func main() {}\nfunc helper() {}",
+            .commented = "// func main() {}\n// func helper() {}",
+        },
+        // Java: block comment
+        .{
+            .lang = "java",
+            .snippet = "class Foo extends Bar {}",
+            .commented = "/* class Foo extends Bar {} */",
+        },
+        // C: line comment
+        .{
+            .lang = "c",
+            .snippet = "void main() {}",
+            .commented = "// void main() {}",
+        },
+        // Kotlin: line comment
+        .{
+            .lang = "kotlin",
+            .snippet = "fun main() {}\nclass Widget {}",
+            .commented = "// fun main() {}\n// class Widget {}",
+        },
+        // Swift: line comment
+        .{
+            .lang = "swift",
+            .snippet = "func doThing() {}\nclass AppDelegate {}",
+            .commented = "// func doThing() {}\n// class AppDelegate {}",
+        },
+        // Ruby: hash comment
+        .{
+            .lang = "ruby",
+            .snippet = "def initialize\nclass User",
+            .commented = "# def initialize\n# class User",
+        },
+        // PHP: line comment
+        .{
+            .lang = "php",
+            .snippet = "function getUser() {}\nclass Controller {}",
+            .commented = "// function getUser() {}\n// class Controller {}",
+        },
+        // C++: block comment
+        .{
+            .lang = "cpp",
+            .snippet = "class Widget {};\nvoid render() {}",
+            .commented = "/* class Widget {};\nvoid render() {} */",
+        },
+        // C#: line comment
+        .{
+            .lang = "csharp",
+            .snippet = "class Service {}\nvoid Execute() {}",
+            .commented = "// class Service {}\n// void Execute() {}",
+        },
+        // Zig: line comment
+        .{
+            .lang = "zig",
+            .snippet = "fn init() void {}\nconst x: u32 = 0;",
+            .commented = "// fn init() void {}\n// const x: u32 = 0;",
+        },
+        // Python: string wrapping
+        .{
+            .lang = "python",
+            .snippet = "import os\ndef compute():",
+            .commented = "\"import os\"\n\"def compute():\"",
+        },
+        // Rust: block comment
+        .{
+            .lang = "rust",
+            .snippet = "fn process() {}\nstruct Data {}",
+            .commented = "/* fn process() {}\nstruct Data {} */",
+        },
+    };
+
+    for (cases) |case| {
+        const lang_patterns = getPatternsForLanguage(case.lang) orelse continue;
+
+        // Count matches on bare code
+        const bare_matches = try findPatternMatches(allocator, case.snippet, lang_patterns, case.lang);
+        defer allocator.free(bare_matches);
+
+        // Count matches on commented code
+        const commented_matches = try findPatternMatches(allocator, case.commented, lang_patterns, case.lang);
+        defer allocator.free(commented_matches);
+
+        // Commented version should produce fewer or equal matches
+        try std.testing.expect(commented_matches.len <= bare_matches.len);
+    }
+}
+
+test "property: pattern matching is deterministic" {
+    // Running the same input twice produces identical results.
+    const allocator = std.testing.allocator;
+    var prng = std.Random.DefaultPrng.init(0xDEADBEEF);
+    const random = prng.random();
+
+    const lang_names = [_][]const u8{
+        "typescript", "python", "rust", "go", "java",
+        "cpp",        "csharp", "kotlin", "zig", "c",
+        "ruby",       "php",    "swift",
+    };
+
+    // Code fragments that contain real-ish patterns
+    const fragments = [_][]const u8{
+        "fn main() {}\n",
+        "def process(x: int) -> str:\n",
+        "async function fetch() {}\n",
+        "class Widget extends Base {}\n",
+        "import os\nfrom sys import path\n",
+        "try {\n  await doWork();\n} catch (e) {}\n",
+        "struct Config {\n  value: u32,\n}\n",
+        "func handleRequest() error {}\n",
+        "public void execute() {}\n",
+        "let x: number = 42;\n",
+        "raise ValueError()\n",
+        "export const API_KEY = '';\n",
+        "fun calculate(): Int {}\n",
+        "guard let x = y else { return }\n",
+        "@dataclass\nclass Point:\n  x: int\n  y: int\n",
+    };
+
+    for (0..50) |_| {
+        const lang_idx = random.uintLessThan(usize, lang_names.len);
+        const lang = lang_names[lang_idx];
+        const lang_patterns = getPatternsForLanguage(lang) orelse continue;
+
+        // Build a random source by concatenating 1-4 fragments
+        var source_buf: [512]u8 = undefined;
+        var source_len: usize = 0;
+        const num_fragments = random.uintLessThan(usize, 4) + 1;
+        for (0..num_fragments) |_| {
+            const frag = fragments[random.uintLessThan(usize, fragments.len)];
+            const copy_len = @min(frag.len, source_buf.len - source_len);
+            @memcpy(source_buf[source_len .. source_len + copy_len], frag[0..copy_len]);
+            source_len += copy_len;
+        }
+        const source = source_buf[0..source_len];
+
+        // Run twice
+        const matches1 = try findPatternMatches(allocator, source, lang_patterns, lang);
+        defer allocator.free(matches1);
+
+        const matches2 = try findPatternMatches(allocator, source, lang_patterns, lang);
+        defer allocator.free(matches2);
+
+        // Must produce identical count
+        try std.testing.expectEqual(matches1.len, matches2.len);
+
+        // Must produce identical matches (same pattern, line, column)
+        for (matches1, matches2) |m1, m2| {
+            try std.testing.expectEqualStrings(m1.rule.pattern, m2.rule.pattern);
+            try std.testing.expectEqual(m1.line, m2.line);
+            try std.testing.expectEqual(m1.column, m2.column);
+        }
+    }
+}

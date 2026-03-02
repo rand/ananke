@@ -1639,3 +1639,154 @@ test "scope edges: resolveTypeName primitives" {
     try std.testing.expect(list_t.* == .named);
     try std.testing.expectEqualStrings("List", list_t.named.name);
 }
+
+// ============================================================================
+// Property-based tests
+// ============================================================================
+
+test "property: BFS reachability is reflexive" {
+    // Any type should be reachable from itself (distance 0).
+    var prng = std.Random.DefaultPrng.init(0xDEADBEEF);
+    const random = prng.random();
+
+    const languages = [_]Language{
+        .typescript, .python, .rust, .go, .java,
+        .cpp,        .csharp, .kotlin, .zig_lang, .c,
+        .ruby,       .php,    .swift,
+    };
+
+    const primitive_kinds = [_]PrimitiveKind{
+        .void_type, .boolean, .i8,  .i16,     .i32,
+        .i64,       .u8,      .u16, .u32,     .u64,
+        .f32,       .f64,     .number, .string, .char,
+        .null_type, .any,     .unknown, .never,
+    };
+
+    for (0..100) |_| {
+        const lang = languages[random.uintLessThan(usize, languages.len)];
+
+        var arena = TypeArena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var graph = InhabitationGraph.init(std.testing.allocator, &arena, lang);
+        defer graph.deinit();
+
+        try graph.addBuiltinEdges();
+
+        // Pick a random type creation strategy
+        const strategy = random.uintLessThan(u8, 4);
+        const t = switch (strategy) {
+            0 => blk: {
+                // Primitive
+                const kind = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+                break :blk try arena.primitive(kind);
+            },
+            1 => blk: {
+                // Named type
+                const names = [_][]const u8{ "Foo", "Bar", "Widget", "UserService", "Config" };
+                break :blk try arena.named(names[random.uintLessThan(usize, names.len)], lang);
+            },
+            2 => blk: {
+                // Array of primitive
+                const kind = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+                const inner = try arena.primitive(kind);
+                break :blk try arena.array(inner);
+            },
+            3 => blk: {
+                // Optional of primitive
+                const kind = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+                const inner = try arena.primitive(kind);
+                break :blk try arena.optional(inner);
+            },
+            else => unreachable,
+        };
+
+        // Reflexivity: every type is reachable from itself
+        try std.testing.expect(graph.isReachable(t, t));
+    }
+}
+
+test "property: edge addition is monotonic" {
+    // Adding edges never removes existing reachability paths. If type A
+    // can reach type B before an edge is added, it can still reach B after.
+    var prng = std.Random.DefaultPrng.init(0xDEADBEEF);
+    const random = prng.random();
+
+    const primitive_kinds = [_]PrimitiveKind{
+        .boolean, .i32, .i64, .f32, .f64, .string, .number, .any,
+    };
+
+    for (0..50) |_| {
+        var arena = TypeArena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var graph = InhabitationGraph.init(std.testing.allocator, &arena, .typescript);
+        defer graph.deinit();
+
+        try graph.addBuiltinEdges();
+
+        // Pick two types and check initial reachability
+        const kind_a = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+        const kind_b = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+        const type_a = try arena.primitive(kind_a);
+        const type_b = try arena.primitive(kind_b);
+
+        const reachable_before = graph.isReachable(type_a, type_b);
+
+        // Add a random new edge between two other types
+        const kind_src = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+        const kind_dst = primitive_kinds[random.uintLessThan(usize, primitive_kinds.len)];
+        const edge_src = try arena.primitive(kind_src);
+        const edge_dst = try arena.primitive(kind_dst);
+
+        try graph.addEdge(edge_src, .{
+            .kind = .coercion,
+            .target_type = edge_dst,
+            .token_pattern = "test_edge",
+            .description = "property test edge",
+        });
+
+        const reachable_after = graph.isReachable(type_a, type_b);
+
+        // Monotonicity: if reachable before, must still be reachable after
+        if (reachable_before) {
+            try std.testing.expect(reachable_after);
+        }
+    }
+}
+
+test "property: all builtin edges produce valid types" {
+    // For each language, calling addBuiltinEdges should not fail and all
+    // edge endpoints should be resolvable within the graph.
+    const languages = [_]Language{
+        .typescript, .javascript, .python, .rust, .go, .java,
+        .cpp,        .csharp,     .kotlin, .zig_lang, .c,
+        .ruby,       .php,        .swift,
+    };
+
+    for (languages) |lang| {
+        var arena = TypeArena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var graph = InhabitationGraph.init(std.testing.allocator, &arena, lang);
+        defer graph.deinit();
+
+        // addBuiltinEdges must succeed without error for every language
+        try graph.addBuiltinEdges();
+
+        // Verify all edge endpoints are valid types by iterating the graph
+        var edge_iter = graph.edges.valueIterator();
+        while (edge_iter.next()) |edge_list| {
+            for (edge_list.items) |edge| {
+                // Each target_type must be a valid Type variant
+                switch (edge.target_type.*) {
+                    .primitive, .array, .tuple, .optional, .named,
+                    .union_type, .function, .generic, .reference, .error_union,
+                    => {},
+                }
+                // Each target must be self-reachable (reflexivity)
+                try std.testing.expect(graph.isReachable(edge.target_type, edge.target_type));
+            }
+        }
+    }
+}

@@ -988,3 +988,194 @@ test "TypeParser - named type with generics" {
     try std.testing.expect(promise_type.* == .generic);
     try std.testing.expect(promise_type.generic.params.len == 1);
 }
+
+// ============================================================================
+// Property-based tests
+// ============================================================================
+
+test "property: parser never crashes on arbitrary input" {
+    // Feed random byte strings to the parser; it should return a valid type
+    // or a clean ParseError, never panic or crash.
+    var prng = std.Random.DefaultPrng.init(0xDEADBEEF);
+    const random = prng.random();
+
+    const languages = [_]Language{
+        .typescript, .python, .rust, .go, .java,
+        .cpp,        .csharp, .kotlin, .zig_lang, .c,
+        .ruby,       .php,    .swift,
+    };
+
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>[](),?|&*:;{} \t_.-+!@#$%^";
+
+    for (0..100) |_| {
+        const lang = languages[random.uintLessThan(usize, languages.len)];
+
+        var arena = TypeArena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var parser = TypeParser.init(&arena, lang);
+
+        // Generate a random string of length 0-64
+        const len = random.uintLessThan(usize, 65);
+        var buf: [64]u8 = undefined;
+        for (0..len) |j| {
+            buf[j] = charset[random.uintLessThan(usize, charset.len)];
+        }
+        const input = buf[0..len];
+
+        // Must either succeed or return a ParseError. Must not panic.
+        const result = parser.parse(input);
+        if (result) |t| {
+            // Valid type returned; verify it is a real variant
+            switch (t.*) {
+                .primitive, .array, .tuple, .optional, .named,
+                .union_type, .function, .generic, .reference, .error_union,
+                => {},
+            }
+        } else |err| {
+            // Must be one of the defined ParseError values
+            switch (err) {
+                error.UnexpectedToken,
+                error.UnexpectedEndOfInput,
+                error.InvalidTypeSyntax,
+                error.UnsupportedType,
+                error.OutOfMemory,
+                => {},
+            }
+        }
+    }
+}
+
+test "property: all primitives round-trip through parse" {
+    // For each language, parse every primitive type name; result should
+    // be a .primitive variant.
+    const PrimEntry = struct { name: []const u8, kind: PrimitiveKind };
+
+    const lang_primitives = .{
+        .{ Language.typescript, &[_]PrimEntry{
+            .{ .name = "string", .kind = .string },
+            .{ .name = "number", .kind = .number },
+            .{ .name = "boolean", .kind = .boolean },
+            .{ .name = "void", .kind = .void_type },
+            .{ .name = "null", .kind = .null_type },
+            .{ .name = "undefined", .kind = .undefined },
+            .{ .name = "any", .kind = .any },
+            .{ .name = "unknown", .kind = .unknown },
+            .{ .name = "never", .kind = .never },
+        } },
+        .{ Language.python, &[_]PrimEntry{
+            .{ .name = "str", .kind = .string },
+            .{ .name = "int", .kind = .i64 },
+            .{ .name = "float", .kind = .f64 },
+            .{ .name = "bool", .kind = .boolean },
+            .{ .name = "None", .kind = .null_type },
+            .{ .name = "Any", .kind = .any },
+        } },
+        .{ Language.rust, &[_]PrimEntry{
+            .{ .name = "String", .kind = .string },
+            .{ .name = "i32", .kind = .i32 },
+            .{ .name = "i64", .kind = .i64 },
+            .{ .name = "u8", .kind = .u8 },
+            .{ .name = "u32", .kind = .u32 },
+            .{ .name = "f32", .kind = .f32 },
+            .{ .name = "f64", .kind = .f64 },
+            .{ .name = "bool", .kind = .boolean },
+        } },
+        .{ Language.go, &[_]PrimEntry{
+            .{ .name = "string", .kind = .string },
+            .{ .name = "int", .kind = .i64 },
+            .{ .name = "int32", .kind = .i32 },
+            .{ .name = "float64", .kind = .f64 },
+            .{ .name = "bool", .kind = .boolean },
+            .{ .name = "byte", .kind = .u8 },
+        } },
+        .{ Language.java, &[_]PrimEntry{
+            .{ .name = "String", .kind = .string },
+            .{ .name = "int", .kind = .i32 },
+            .{ .name = "long", .kind = .i64 },
+            .{ .name = "float", .kind = .f32 },
+            .{ .name = "double", .kind = .f64 },
+            .{ .name = "boolean", .kind = .boolean },
+            .{ .name = "void", .kind = .void_type },
+        } },
+        .{ Language.kotlin, &[_]PrimEntry{
+            .{ .name = "String", .kind = .string },
+            .{ .name = "Int", .kind = .i32 },
+            .{ .name = "Long", .kind = .i64 },
+            .{ .name = "Boolean", .kind = .boolean },
+            .{ .name = "Unit", .kind = .void_type },
+        } },
+        .{ Language.swift, &[_]PrimEntry{
+            .{ .name = "String", .kind = .string },
+            .{ .name = "Int", .kind = .i64 },
+            .{ .name = "Double", .kind = .f64 },
+            .{ .name = "Bool", .kind = .boolean },
+            .{ .name = "Void", .kind = .void_type },
+        } },
+    };
+
+    inline for (lang_primitives) |entry| {
+        const lang = entry[0];
+        const prims = entry[1];
+
+        for (prims) |prim| {
+            var arena = TypeArena.init(std.testing.allocator);
+            defer arena.deinit();
+
+            var parser = TypeParser.init(&arena, lang);
+            const result = try parser.parse(prim.name);
+            try std.testing.expect(result.* == .primitive);
+            try std.testing.expectEqual(prim.kind, result.primitive);
+        }
+    }
+}
+
+test "property: optional wrapping produces optional variant" {
+    // For any parseable type T, wrapping it as Optional<T> (or language
+    // equivalent) should produce an .optional variant.
+    var prng = std.Random.DefaultPrng.init(0xDEADBEEF);
+    const random = prng.random();
+
+    const Case = struct { lang: Language, base: []const u8, wrapped: []const u8 };
+    const cases = [_]Case{
+        .{ .lang = .typescript, .base = "string", .wrapped = "string?" },
+        .{ .lang = .typescript, .base = "number", .wrapped = "number?" },
+        .{ .lang = .rust, .base = "i32", .wrapped = "Option<i32>" },
+        .{ .lang = .rust, .base = "String", .wrapped = "Option<String>" },
+        .{ .lang = .kotlin, .base = "Int", .wrapped = "Int?" },
+        .{ .lang = .kotlin, .base = "String", .wrapped = "String?" },
+        .{ .lang = .csharp, .base = "int", .wrapped = "int?" },
+        .{ .lang = .csharp, .base = "string", .wrapped = "string?" },
+        .{ .lang = .swift, .base = "Int", .wrapped = "Int?" },
+        .{ .lang = .swift, .base = "String", .wrapped = "String?" },
+    };
+
+    // Test all defined cases
+    for (cases) |case| {
+        var arena = TypeArena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var parser = TypeParser.init(&arena, case.lang);
+
+        // Parse the base type to verify it is valid
+        const base_result = try parser.parse(case.base);
+        try std.testing.expect(base_result.* == .primitive);
+
+        // Parse the wrapped type and verify it is optional
+        const opt_result = try parser.parse(case.wrapped);
+        try std.testing.expect(opt_result.* == .optional);
+    }
+
+    // Additionally, test random selections from the case list (50 iterations)
+    for (0..50) |_| {
+        const idx = random.uintLessThan(usize, cases.len);
+        const case = cases[idx];
+
+        var arena = TypeArena.init(std.testing.allocator);
+        defer arena.deinit();
+
+        var parser = TypeParser.init(&arena, case.lang);
+        const opt_result = try parser.parse(case.wrapped);
+        try std.testing.expect(opt_result.* == .optional);
+    }
+}
