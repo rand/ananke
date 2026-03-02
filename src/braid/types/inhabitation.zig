@@ -605,6 +605,54 @@ pub const InhabitationGraph = struct {
             .description = "string interpolation",
         });
 
+        // double -> string
+        try self.addEdge(double_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".ToString()",
+            .description = "double.ToString()",
+        });
+
+        // string -> double
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = double_type,
+            .token_pattern = "double.Parse(",
+            .description = "double.Parse",
+        });
+
+        // bool -> string
+        try self.addEdge(bool_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".ToString()",
+            .description = "bool.ToString()",
+        });
+
+        // LINQ: .Select()
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".Select(",
+            .description = "LINQ Select",
+        });
+
+        // LINQ: .Where()
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".Where(",
+            .description = "LINQ Where",
+        });
+
+        // LINQ: .OrderBy()
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".OrderBy(",
+            .description = "LINQ OrderBy",
+        });
+
         // Literals
         try self.addConstructionEdges(string_type, "\"");
         try self.addConstructionEdges(int_type, "0123456789");
@@ -649,6 +697,38 @@ pub const InhabitationGraph = struct {
             .target_type = string_type,
             .token_pattern = "\"$",
             .description = "string template",
+        });
+
+        // Double -> String
+        try self.addEdge(double_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".toString()",
+            .description = "Double.toString()",
+        });
+
+        // String -> Double
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = double_type,
+            .token_pattern = ".toDouble()",
+            .description = "String.toDouble()",
+        });
+
+        // Bool -> String
+        try self.addEdge(bool_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".toString()",
+            .description = "Boolean.toString()",
+        });
+
+        // listOf construction
+        try self.addEdge(int_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "listOf(",
+            .description = "listOf()",
         });
 
         // Literals
@@ -795,6 +875,36 @@ pub const InhabitationGraph = struct {
             .description = "string interpolation",
         });
 
+        // Float -> String
+        try self.addEdge(float_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".to_s",
+            .description = "Float#to_s",
+        });
+
+        // Array methods
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".map",
+            .description = "Array#map",
+        });
+
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".select",
+            .description = "Array#select",
+        });
+
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".each",
+            .description = "Array#each",
+        });
+
         // Literals
         try self.addConstructionEdges(string_type, "\"");
         try self.addConstructionEdges(string_type, "'");
@@ -858,6 +968,46 @@ pub const InhabitationGraph = struct {
             .description = "strlen()",
         });
 
+        // bool -> string
+        try self.addEdge(bool_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "strval(",
+            .description = "strval(bool)",
+        });
+
+        // array_map
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "array_map(",
+            .description = "array_map()",
+        });
+
+        // array_filter
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "array_filter(",
+            .description = "array_filter()",
+        });
+
+        // implode (array -> string)
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "implode(",
+            .description = "implode()",
+        });
+
+        // explode (string -> array)
+        try self.addEdge(string_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "explode(",
+            .description = "explode()",
+        });
+
         // Literals
         try self.addConstructionEdges(string_type, "\"");
         try self.addConstructionEdges(string_type, "'");
@@ -919,6 +1069,44 @@ pub const InhabitationGraph = struct {
             .target_type = string_type,
             .token_pattern = "\"\\(",
             .description = "string interpolation",
+        });
+
+        // Double -> String
+        try self.addEdge(double_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "String(",
+            .description = "String(Double)",
+        });
+
+        // Bool -> String
+        try self.addEdge(bool_type, .{
+            .kind = .application,
+            .target_type = string_type,
+            .token_pattern = "String(",
+            .description = "String(Bool)",
+        });
+
+        // Array methods
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".map(",
+            .description = "Array.map",
+        });
+
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".filter(",
+            .description = "Array.filter",
+        });
+
+        try self.addEdge(string_type, .{
+            .kind = .method,
+            .target_type = string_type,
+            .token_pattern = ".compactMap(",
+            .description = "Array.compactMap",
         });
 
         // Literals

@@ -49,6 +49,12 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
                 try structure.types.append(allocator, type_decl);
             }
         }
+        // Parse extension definitions
+        else if (std.mem.startsWith(u8, trimmed, "extension ")) {
+            if (try parseTypeByKeyword(allocator, trimmed, "extension ", line_num, .class_type)) |type_decl| {
+                try structure.types.append(allocator, type_decl);
+            }
+        }
         // Parse function definitions
         else if (std.mem.indexOf(u8, trimmed, "func ") != null) {
             if (try parseFunction(allocator, trimmed, line_num)) |func_decl| {
@@ -241,4 +247,47 @@ test "swift: parse actor" {
     defer s.deinit();
     try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
     try std.testing.expectEqualStrings("ImageDownloader", s.types.items[0].name);
+}
+
+test "swift: parse extension" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "extension String {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("String", s.types.items[0].name);
+    try std.testing.expectEqual(base.TypeDecl.TypeKind.class_type, s.types.items[0].kind);
+}
+
+test "swift: parse public func" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public func doSomething() -> String {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("doSomething", s.functions.items[0].name);
+    try std.testing.expect(s.functions.items[0].is_public);
+}
+
+test "swift: parse private func" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "private func helper() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("helper", s.functions.items[0].name);
+    try std.testing.expect(!s.functions.items[0].is_public);
+}
+
+test "swift: parse func with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "func getName() -> String {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("getName", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("String", s.functions.items[0].return_type.?);
+}
+
+test "swift: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// func notReal() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
 }

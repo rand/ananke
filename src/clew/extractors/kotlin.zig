@@ -49,6 +49,12 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
                 try structure.types.append(allocator, type_decl);
             }
         }
+        // Parse typealias
+        else if (std.mem.startsWith(u8, trimmed, "typealias ")) {
+            if (try parseTypealias(allocator, trimmed, line_num)) |type_decl| {
+                try structure.types.append(allocator, type_decl);
+            }
+        }
         // Parse functions
         else if (std.mem.indexOf(u8, trimmed, "fun ") != null) {
             if (try parseFunction(allocator, trimmed, line_num)) |func_decl| {
@@ -97,6 +103,10 @@ fn parsePackage(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !
 }
 
 fn parseClass(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.TypeDecl {
+    // Check for value class
+    if (std.mem.indexOf(u8, line, "value class ")) |pos| {
+        return try extractClassName(allocator, line, pos + 12, line_num, .class_type);
+    }
     // Check for data class
     if (std.mem.indexOf(u8, line, "data class ")) |pos| {
         return try extractClassName(allocator, line, pos + 11, line_num, .class_type);
@@ -144,6 +154,23 @@ fn parseObject(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
         return null;
 
     return try extractClassName(allocator, line, pos, line_num, .class_type);
+}
+
+fn parseTypealias(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.TypeDecl {
+    if (!std.mem.startsWith(u8, line, "typealias ")) return null;
+    var name_start: usize = 10;
+    while (name_start < line.len and line[name_start] == ' ') name_start += 1;
+    var name_end = name_start;
+    while (name_end < line.len and (std.ascii.isAlphanumeric(line[name_end]) or line[name_end] == '_')) {
+        name_end += 1;
+    }
+    if (name_end <= name_start) return null;
+
+    return base.TypeDecl{
+        .name = try allocator.dupe(u8, line[name_start..name_end]),
+        .line = line_num,
+        .kind = .class_type,
+    };
 }
 
 fn extractClassName(allocator: std.mem.Allocator, line: []const u8, start: usize, line_num: u32, kind: base.TypeDecl.TypeKind) !?base.TypeDecl {
@@ -296,4 +323,54 @@ test "kotlin: parse object declaration" {
     defer s.deinit();
     try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
     try std.testing.expectEqualStrings("Singleton", s.types.items[0].name);
+}
+
+test "kotlin: parse value class" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "value class Password(val value: String)");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Password", s.types.items[0].name);
+    try std.testing.expectEqual(base.TypeDecl.TypeKind.class_type, s.types.items[0].kind);
+}
+
+test "kotlin: parse typealias" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "typealias StringList = List<String>");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("StringList", s.types.items[0].name);
+}
+
+test "kotlin: parse interface" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "interface Repository {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Repository", s.types.items[0].name);
+    try std.testing.expectEqual(base.TypeDecl.TypeKind.interface_type, s.types.items[0].kind);
+}
+
+test "kotlin: parse extension fun" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "fun String.addExclamation(): String {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("addExclamation", s.functions.items[0].name);
+}
+
+test "kotlin: parse fun with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "fun calculate(): Int {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("calculate", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("Int", s.functions.items[0].return_type.?);
+}
+
+test "kotlin: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// fun notReal() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
 }

@@ -55,6 +55,12 @@ pub fn parse(allocator: std.mem.Allocator, source: []const u8) !base.SyntaxStruc
                 try structure.types.append(allocator, type_decl);
             }
         }
+        // Parse delegate declarations
+        else if (std.mem.indexOf(u8, trimmed, "delegate ") != null) {
+            if (try parseDelegate(allocator, trimmed, line_num)) |type_decl| {
+                try structure.types.append(allocator, type_decl);
+            }
+        }
         // Parse methods
         else if (try parseMethod(allocator, trimmed, line_num)) |func_decl| {
             try structure.functions.append(allocator, func_decl);
@@ -193,7 +199,8 @@ fn parseMethod(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
     const is_async = std.mem.indexOf(u8, line, "async ") != null or
         std.mem.indexOf(u8, line, "Task<") != null or
         std.mem.indexOf(u8, line, "Task ") != null or
-        std.mem.indexOf(u8, line, "ValueTask") != null;
+        std.mem.indexOf(u8, line, "ValueTask") != null or
+        std.mem.indexOf(u8, line, "IAsyncEnumerable<") != null;
 
     // Extract return type
     var return_type: ?[]const u8 = null;
@@ -241,6 +248,28 @@ fn parseMethod(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?
         .is_public = is_public,
         .return_type = return_type,
         .has_error_handling = has_error_handling,
+    };
+}
+
+fn parseDelegate(allocator: std.mem.Allocator, line: []const u8, line_num: u32) !?base.TypeDecl {
+    const pos = std.mem.indexOf(u8, line, "delegate ") orelse return null;
+    // Find the name after the return type: "delegate ReturnType Name("
+    const after_delegate = pos + 9;
+    // Find the opening paren which marks end of name
+    const paren_pos = std.mem.indexOfScalarPos(u8, line, after_delegate, '(') orelse return null;
+    // Work backwards from paren to find name
+    var name_end = paren_pos;
+    while (name_end > after_delegate and line[name_end - 1] == ' ') name_end -= 1;
+    var name_start = name_end;
+    while (name_start > after_delegate and (std.ascii.isAlphanumeric(line[name_start - 1]) or line[name_start - 1] == '_')) {
+        name_start -= 1;
+    }
+    if (name_end <= name_start) return null;
+
+    return base.TypeDecl{
+        .name = try allocator.dupe(u8, line[name_start..name_end]),
+        .line = line_num,
+        .kind = .class_type,
     };
 }
 
@@ -292,4 +321,54 @@ test "csharp: parse struct" {
     try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
     try std.testing.expectEqualStrings("Point", s.types.items[0].name);
     try std.testing.expectEqual(base.TypeDecl.TypeKind.struct_type, s.types.items[0].kind);
+}
+
+test "csharp: parse enum" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public enum Status {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("Status", s.types.items[0].name);
+    try std.testing.expectEqual(base.TypeDecl.TypeKind.enum_type, s.types.items[0].kind);
+}
+
+test "csharp: parse namespace" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "namespace MyApp.Services;");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.imports.items.len);
+    try std.testing.expectEqualStrings("MyApp.Services", s.imports.items[0].module);
+}
+
+test "csharp: parse delegate" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public delegate void EventHandler(object sender);");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.types.items.len);
+    try std.testing.expectEqualStrings("EventHandler", s.types.items[0].name);
+}
+
+test "csharp: parse method with return type" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public string GetName(int id) {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("GetName", s.functions.items[0].name);
+    try std.testing.expectEqualStrings("string", s.functions.items[0].return_type.?);
+}
+
+test "csharp: parse async IAsyncEnumerable" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "public async IAsyncEnumerable<int> StreamData() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 1), s.functions.items.len);
+    try std.testing.expectEqualStrings("StreamData", s.functions.items[0].name);
+    try std.testing.expect(s.functions.items[0].is_async);
+}
+
+test "csharp: skip comment" {
+    const allocator = std.testing.allocator;
+    var s = try parse(allocator, "// public void NotReal() {");
+    defer s.deinit();
+    try std.testing.expectEqual(@as(usize, 0), s.functions.items.len);
 }
