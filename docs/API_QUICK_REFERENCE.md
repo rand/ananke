@@ -2,7 +2,7 @@
 
 One-page cheat sheet for common operations.
 
-**Version**: 0.1.0 | **Updated**: November 24, 2025
+**Version**: 0.2.0 | **Updated**: March 2, 2026
 
 ---
 
@@ -359,4 +359,4 @@ cargo flamegraph
 
 ---
 
-**Cheat Sheet Version**: 0.1.0 | **Generated**: November 24, 2025
+**Cheat Sheet Version**: 0.2.0 | **Generated**: March 2, 2026

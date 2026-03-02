@@ -4,8 +4,8 @@ const args_mod = @import("cli_args");
 const config_mod = @import("cli_config");
 const output = @import("cli_output");
 
-pub const VERSION = "0.1.0";
-pub const BUILD_DATE = "November 24, 2025";
+pub const VERSION = "0.2.0";
+pub const BUILD_DATE = "March 2, 2026";
 pub const ZIG_VERSION = "0.15.2";
 
 pub const usage =

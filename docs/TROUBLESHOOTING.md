@@ -2,7 +2,7 @@
 
 **Version**: 2.0
 **Last Updated**: 2025-11-26
-**Status**: Comprehensive guide covering v0.1.0
+**Status**: Comprehensive guide covering v0.2.0
 
 ## Table of Contents
 
@@ -663,8 +663,7 @@ python -m py_compile your_file.py  # For Python
 
 1. **Verify language support**:
 ```bash
-# Supported in v0.1.0: TypeScript, JavaScript, Python
-# Not supported: Java, C++, Swift, Kotlin
+# Supported in v0.2.0: TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java, Kotlin, C#, Ruby, PHP, Swift
 
 # Check file extension
 ls -la *.{ts,js,py}  # Look for supported extensions
@@ -1211,4 +1210,4 @@ env | grep -E 'ANTHROPIC|MODAL|ANANKE'
 **Document Version**: 2.0
 **Maintained By**: Claude Code (docs-writer subagent)
 **Last Updated**: 2025-11-26
-**Coverage**: v0.1.0 - Beta (Core Ready)
+**Coverage**: v0.2.0

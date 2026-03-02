@@ -106,7 +106,7 @@ zig build
 ```bash
 # Check the CLI
 ./zig-out/bin/ananke --version
-# Expected: ananke 0.1.0
+# Expected: ananke 0.2.0
 
 # See available commands
 ./zig-out/bin/ananke --help
@@ -353,7 +353,7 @@ constraint secure_api {
 **When to use DSL**: Complex constraint hierarchies, inheritance, macros
 **When to use JSON**: Simple constraints, CI/CD integration, programmatic generation
 
-**Note**: Ariadne is experimental in v0.1.0. Use JSON for production systems.
+**Note**: Ariadne is experimental in v0.2.0. Use JSON for production systems.
 
 **See**: `examples/03-ariadne-dsl/README.md` for DSL syntax guide
 
@@ -583,7 +583,7 @@ zig build run
 
 **Solution**:
 ```bash
-# Check supported languages (v0.1.0)
+# Check supported languages (v0.2.0)
 # - TypeScript/JavaScript ✓
 # - Python ✓
 # - Rust, Go, Zig (planned for v0.2)

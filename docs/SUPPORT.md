@@ -195,5 +195,5 @@ Found a security vulnerability? Please email security@ananke-ai.dev instead of u
 
 ---
 
-**Last updated**: November 2024
-**Ananke version**: v0.1.0
+**Last updated**: March 2026
+**Ananke version**: v0.2.0

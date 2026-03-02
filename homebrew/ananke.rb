@@ -4,22 +4,22 @@
 class Ananke < Formula
   desc "Constraint-driven code generation system"
   homepage "https://github.com/ananke-project/ananke"
-  version "0.1.0"
+  version "0.2.0"
   license "MIT OR Apache-2.0"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/ananke-project/ananke/releases/download/v0.1.0/ananke-v0.1.0-macos-x86_64.tar.gz"
+      url "https://github.com/ananke-project/ananke/releases/download/v0.2.0/ananke-v0.2.0-macos-x86_64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_X86_64"
     elsif Hardware::CPU.arm?
-      url "https://github.com/ananke-project/ananke/releases/download/v0.1.0/ananke-v0.1.0-macos-aarch64.tar.gz"
+      url "https://github.com/ananke-project/ananke/releases/download/v0.2.0/ananke-v0.2.0-macos-aarch64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_AARCH64"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/ananke-project/ananke/releases/download/v0.1.0/ananke-v0.1.0-linux-x86_64.tar.gz"
+      url "https://github.com/ananke-project/ananke/releases/download/v0.2.0/ananke-v0.2.0-linux-x86_64.tar.gz"
       sha256 "PLACEHOLDER_SHA256_LINUX"
     end
   end

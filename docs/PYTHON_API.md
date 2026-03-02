@@ -2,7 +2,7 @@
 
 Complete API documentation for Ananke's Python bindings. Ananke is a constrained code generation system that uses Modal's vLLM + llguidance for GPU-accelerated token-level constraint enforcement.
 
-**Version**: 0.1.0 (Phase 7b) | **Updated**: November 26, 2025
+**Version**: 0.2.0 | **Updated**: March 2, 2026
 
 ---
 

@@ -83,7 +83,7 @@ This installs:
 ananke --version
 ```
 
-Expected output: `ananke 0.1.0` (or later)
+Expected output: `ananke 0.2.0` (or later)
 
 If not installed, follow the main Ananke installation guide.
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-02
+
 ### Added
 
 #### CLaSH 5-Domain Constraint Algebra
@@ -325,6 +327,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+[0.2.0]: https://github.com/ananke-ai/ananke/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ananke-ai/ananke/releases/tag/v0.1.0
 
 ## Release Template

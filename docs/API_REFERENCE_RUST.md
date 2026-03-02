@@ -2,8 +2,8 @@
 
 Complete API reference for Ananke's Rust components (Maze orchestration layer).
 
-**Version**: 0.1.0  
-**Generated**: November 24, 2025  
+**Version**: 0.2.0
+**Generated**: March 2, 2026
 **Rust Version**: 1.80+
 
 ---
@@ -1418,6 +1418,6 @@ let result = timeout(
 
 ---
 
-**API Version**: 0.1.0  
-**Last Updated**: November 24, 2025  
+**API Version**: 0.2.0
+**Last Updated**: March 2, 2026
 **Rust Version**: 1.80+

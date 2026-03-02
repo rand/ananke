@@ -171,7 +171,7 @@ Total constraint overhead per token is well under GPU forward pass time — zero
 | [docs/API_REFERENCE_ZIG.md](docs/API_REFERENCE_ZIG.md) | Zig library API |
 | [docs/INTERNALS.md](docs/INTERNALS.md) | Implementation deep dive |
 
-## What's New (Since v0.1.0)
+## What's New in v0.2.0
 
 Everything important. The short version:
 
