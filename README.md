@@ -4,22 +4,13 @@ Constraint-driven code generation: define what valid code looks like, enforce it
 
 ## What is Ananke?
 
-AI code generation is probabilistic. You prompt a model, hope it follows your patterns, and review what comes back. When it doesn't (wrong types, missing error handling, violated conventions), you iterate. Ananke eliminates the iteration.
+Code generation is fast and fluent. The hard part is that it's wrong in the ways that matter: violated invariants, ignored conventions, misused APIs. The patterns your team has learned the hard way, encoded nowhere but everywhere in practice.
 
-Ananke extracts constraints from your codebase (types, imports, conventions, control flow), compiles them into a constraint algebra called **CLaSH** (Coordinated Logical and Semantic Holes), and enforces them during generation. Tokens that violate hard constraints cannot be generated. Soft constraints bias the model toward your conventions without blocking alternatives. The result is code that satisfies your requirements by construction.
+The standard fix is more context. Longer prompts. Better retrieval. But the constraints that matter are often implicit: organizational standards nobody documented, architectural patterns spread across dozens of files, lessons from production incidents living in postmortems and Slack threads. You can't retrieve what was never written down.
 
-The system spans 14 languages, composes constraints across 5 domains with formal lattice properties, and adds less than 50us per token to inference. Negligible against GPU forward pass time.
+Ananke takes a different approach: treat code generation as constrained search, not token prediction with post-hoc repair. Extract constraints from the codebase. Compile them into a constraint algebra. Enforce them at the token level during generation. Hard constraints are exact: tokens that violate syntax, type, or import rules cannot be generated. Soft constraints bias the model toward your conventions without blocking alternatives. Code satisfies your requirements by construction, not by luck.
 
-## Core Components
-
-| Component | Language | Purpose |
-|-----------|----------|---------|
-| **Clew** | Zig | Extract constraints from code via tree-sitter AST across 14 languages |
-| **Braid** | Zig | Compile constraints into CLaSH domains, fuse into per-token decisions |
-| **Ariadne** | Zig | Constraint DSL for declarative specifications |
-| **Maze** | Rust | Orchestrate constrained generation via sglang/vLLM + llguidance |
-
-## Architecture
+## How It Works
 
 ```
                         Homer (Rust)
@@ -73,6 +64,14 @@ Source code ──> Clew (tree-sitter) + Repository Context
                        Verified output
 ```
 
+**Clew** (Zig) extracts constraints from source code via tree-sitter AST parsing across 14 languages (9 Tier 1 with full AST coverage, 5 Tier 2 with pattern-assisted extraction). It produces syntax structure, type bindings, import graphs, and control flow patterns. When Homer is available, Clew integrates cross-file context: scope graphs for name resolution, salience scores for prioritization, stability metrics from change history, and conventions mined from the codebase.
+
+**Braid** (Zig) compiles extracted constraints into per-token decisions. Feasibility analysis detects constraint conflicts before they reach the model. Salience scoring prioritizes high-importance constraints. Temporal analysis adjusts confidence based on code stability. Cross-domain morphisms propagate information between constraint domains: type annotations imply imports; return types imply error handling patterns. The output is a ConstraintIR that downstream components consume.
+
+**Maze** (Rust) orchestrates constrained generation via sglang/vLLM + llguidance. At decode time, five CLaSH domains fuse into a single per-token decision: three hard domains (Syntax, Types, Imports) compose by intersection; two soft domains (ControlFlow, Semantics) reweight the distribution within the feasible set. Constraint overhead adds less than 50us per token. Negligible against GPU forward pass time.
+
+**Ariadne** (Zig) provides a declarative DSL for specifying constraints directly, compiling to the same ConstraintIR that Braid produces.
+
 ## Quick Start
 
 ```bash
@@ -106,20 +105,6 @@ cd maze && cargo test && cd ..
 - **Modal**: for GPU inference (`modal deploy maze/modal_inference/inference.py`)
 - **Homer**: for repository intelligence (scope graphs, salience, temporal analysis)
 
-## Typed Holes
-
-Typed holes are explicit markers for incomplete code that carry type information, constraints, and metadata. Ananke detects them, compiles their constraints, and fills them progressively:
-
-```python
-def authenticate(user: User) -> AuthResult:
-    # HOLE: validate credentials
-    # Scale: function
-    # Constraints: must check password hash, return AuthResult
-    pass
-```
-
-Hole scale (`expression`, `statement`, `block`, `function`, `module`) maps to constraint intensity. Smaller holes get tighter constraints because the surrounding context provides more signal.
-
 ## CLaSH: The Constraint Algebra
 
 Five constraint domains in two tiers:
@@ -135,70 +120,6 @@ Five constraint domains in two tiers:
 Hard constraints compose by intersection: if any hard domain rejects a token, it cannot be generated. Soft constraints compose additively within the feasible set, biasing the distribution without blocking alternatives. This separation is the key architectural invariant: adding soft constraints can never make a satisfiable constraint set unsatisfiable.
 
 See [docs/CLASH_ALGEBRA.md](docs/CLASH_ALGEBRA.md) for the full algebra, and [docs/DOMAIN_FUSION.md](docs/DOMAIN_FUSION.md) for how five domains fuse into one per-token decision.
-
-## Project Status
-
-**617 tests** (473 Zig + 144 Rust), zero memory leaks, zero failures.
-
-### Complete
-
-- Constraint extraction across **14 languages** (tree-sitter AST + pattern fallback)
-- CLaSH 5-domain constraint algebra with formal lattice properties
-- Domain fusion (ASAp distribution-preserving + CRANE adaptive switching)
-- Type inhabitation system (TypeArena, TypeParser, InhabitationGraph, MaskGenerator)
-- Fill-in-the-middle (FIM) constrained decoding for IDE completions
-- Homer integration (scope graphs, salience scoring, temporal analysis, conventions, call graph context)
-- sglang backend with OpenAI-compatible endpoint
-- Evaluation framework (multi-sample pass@k, statistical significance tests, batch evaluation)
-- CLI with 8 commands (extract, compile, generate, validate, export-spec, init, version, help)
-- Ariadne constraint DSL (parsing complete)
-- Modal GPU inference (Qwen2.5-Coder-32B-Instruct on A100-80GB)
-
-### Planned
-
-- Ariadne DSL type checking
-- Bidirectional streaming generation
-- Multi-model orchestration
-- Web UI
-
-## Language Support
-
-| Tier | Languages | Method | Confidence |
-|------|-----------|--------|------------|
-| **Tier 1** | TypeScript, JavaScript, Python, Rust, Go, Zig, C, C++, Java | tree-sitter AST | 0.95 |
-| **Tier 2** | Kotlin, C#, Ruby, PHP, Swift | tree-sitter + patterns | 0.85 |
-
-All 14 languages support constraint extraction, type analysis, and CLaSH domain compilation. See [docs/LANGUAGE_SUPPORT.md](docs/LANGUAGE_SUPPORT.md) for details.
-
-## Performance
-
-| Operation | Achieved |
-|-----------|----------|
-| Constraint extraction | ~10ms per file |
-| Constraint compilation | ~1ms |
-| Token-level enforcement | ~50μs/token |
-| Cache hit latency | ~5–15μs |
-| Hard domain fusion | ~10μs/token |
-| Homer queries (amortized) | <5% of inference time |
-
-Total constraint overhead per token is well under GPU forward pass time. Zero throughput impact.
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [QUICKSTART.md](QUICKSTART.md) | 10-minute getting started guide |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and data flow |
-| [docs/CLASH_ALGEBRA.md](docs/CLASH_ALGEBRA.md) | CLaSH constraint algebra (5 domains, 2 tiers) |
-| [docs/DOMAIN_FUSION.md](docs/DOMAIN_FUSION.md) | How 5 domains fuse into 1 per-token decision |
-| [docs/TYPE_INHABITATION.md](docs/TYPE_INHABITATION.md) | Type-directed token mask generation |
-| [docs/FIM_GUIDE.md](docs/FIM_GUIDE.md) | Fill-in-the-middle for IDE completions |
-| [docs/HOMER_INTEGRATION.md](docs/HOMER_INTEGRATION.md) | Repository intelligence via Homer |
-| [docs/LANGUAGE_SUPPORT.md](docs/LANGUAGE_SUPPORT.md) | 14-language support matrix |
-| [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) | Command-line reference |
-| [docs/EVAL_GUIDE.md](docs/EVAL_GUIDE.md) | Evaluation framework guide |
-| [docs/API_REFERENCE_ZIG.md](docs/API_REFERENCE_ZIG.md) | Zig library API |
-| [docs/INTERNALS.md](docs/INTERNALS.md) | Implementation deep dive |
 
 ## What's New in v0.2.0
 
@@ -219,6 +140,23 @@ v0.1.0 extracted constraints and compiled them. v0.2.0 makes them compose.
 **sglang backend** with OpenAI-compatible endpoint and `constraint_spec` extension field. Tests went from 301 to 617 (473 Zig + 144 Rust), zero failures.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [QUICKSTART.md](QUICKSTART.md) | 10-minute getting started guide |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and data flow |
+| [docs/CLASH_ALGEBRA.md](docs/CLASH_ALGEBRA.md) | CLaSH constraint algebra (5 domains, 2 tiers) |
+| [docs/DOMAIN_FUSION.md](docs/DOMAIN_FUSION.md) | How 5 domains fuse into 1 per-token decision |
+| [docs/TYPE_INHABITATION.md](docs/TYPE_INHABITATION.md) | Type-directed token mask generation |
+| [docs/FIM_GUIDE.md](docs/FIM_GUIDE.md) | Fill-in-the-middle for IDE completions |
+| [docs/HOMER_INTEGRATION.md](docs/HOMER_INTEGRATION.md) | Repository intelligence via Homer |
+| [docs/LANGUAGE_SUPPORT.md](docs/LANGUAGE_SUPPORT.md) | 14-language support matrix |
+| [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) | Command-line reference |
+| [docs/EVAL_GUIDE.md](docs/EVAL_GUIDE.md) | Evaluation framework guide |
+| [docs/API_REFERENCE_ZIG.md](docs/API_REFERENCE_ZIG.md) | Zig library API |
+| [docs/INTERNALS.md](docs/INTERNALS.md) | Implementation deep dive |
 
 ## Examples
 
