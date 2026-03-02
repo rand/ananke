@@ -2,7 +2,7 @@
 
 ## Rationale
 
-CLaSH (Constraint Lattice for Shaped Holefilling) is the algebraic foundation for constraint-shaped code synthesis. It defines five constraint domains in two tiers, their composition properties, cross-domain information flow, and compilation targets. This algebra is shared with the RFLX architecture (io-rflx) -- the same lattice structure governs both constraint extraction (Ananke) and constraint enforcement (ananke-sglang). All downstream specs depend on these definitions.
+CLaSH (Coordinated Logical and Semantic Holes) is the algebraic foundation for constraint-shaped code synthesis. It defines five constraint domains in two tiers, their composition properties, cross-domain information flow, and compilation targets. This algebra is shared with the RFLX architecture (io-rflx) -- the same lattice structure governs both constraint extraction (Ananke) and constraint enforcement (ananke-sglang). All downstream specs depend on these definitions.
 
 ---
 

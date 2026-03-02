@@ -9,7 +9,7 @@
 
 ## Overview
 
-CLaSH -- Constraint Lattice for Shaped Holefilling -- is how Ananke decides which tokens a language model is allowed to generate and which tokens it should prefer. Five constraint domains, organized into two tiers, compose into a single per-token decision at decode time.
+CLaSH (Coordinated Logical and Semantic Holes) is how Ananke decides which tokens a language model is allowed to generate and which tokens it should prefer. Five constraint domains, organized into two tiers, compose into a single per-token decision at decode time.
 
 This tutorial walks through the five domains on a concrete Rust file, shows what happens when hard and soft constraints disagree, traces a cross-domain morphism, and demonstrates how intensity levels adapt to the scale of the hole being filled.
 

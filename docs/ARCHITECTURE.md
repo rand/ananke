@@ -22,7 +22,7 @@ Constraint-driven code generation treats AI output as search through valid progr
 
 ## CLaSH Domain Architecture
 
-CLaSH (Constraint Lattice for Syntax and Hints) organizes constraints into five domains across two tiers. The key insight: constraints compose algebraically via a formal lattice. Hard constraints guarantee; soft constraints guide. This is not a metaphor -- the composition rules have lattice properties, and the system enforces them structurally.
+CLaSH (Coordinated Logical and Semantic Holes) organizes constraints into five domains across two tiers. The key insight: constraints compose algebraically via a formal lattice. Hard constraints guarantee; soft constraints guide. This is not a metaphor -- the composition rules have lattice properties, and the system enforces them structurally.
 
 ### Hard Tier (binary, compose by intersection)
 

@@ -6,7 +6,7 @@ Constraint-driven code generation: define what valid code looks like, enforce it
 
 AI code generation is probabilistic. You prompt a model, hope it follows your patterns, and review what comes back. When it doesn't (wrong types, missing error handling, violated conventions), you iterate. Ananke eliminates the iteration.
 
-Ananke extracts constraints from your codebase (types, imports, conventions, control flow), compiles them into a constraint algebra called **CLaSH** (Constraint Lattice for Shaped Holefilling), and enforces them during generation. Tokens that violate hard constraints cannot be generated. Soft constraints bias the model toward your conventions without blocking alternatives. The result is code that satisfies your requirements by construction.
+Ananke extracts constraints from your codebase (types, imports, conventions, control flow), compiles them into a constraint algebra called **CLaSH** (Coordinated Logical and Semantic Holes), and enforces them during generation. Tokens that violate hard constraints cannot be generated. Soft constraints bias the model toward your conventions without blocking alternatives. The result is code that satisfies your requirements by construction.
 
 The system spans 14 languages, composes constraints across 5 domains with formal lattice properties, and adds less than 50us per token to inference. Negligible against GPU forward pass time.
 

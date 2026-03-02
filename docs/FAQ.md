@@ -189,7 +189,7 @@ unset ANTHROPIC_API_KEY
 - **Medium** (5-25 constraints): 10-50ms
 - **Large** (25+ constraints): 50-200ms
 
-Braid uses LRU caching — repeated compilations of the same constraint set are near-instant (~5-15μs cache hit). First compilation is ~1ms for typical constraint sets.
+Braid uses LRU caching. Repeated compilations of the same constraint set are near-instant (~5-15us cache hit). First compilation is ~1ms for typical constraint sets.
 
 ### How fast is code generation?
 
@@ -258,7 +258,7 @@ Yes! Check `CONTRIBUTING.md` for:
 
 ### What is CLaSH?
 
-CLaSH (Constraint Lattice for Shaped Holefilling) is the algebraic foundation. Five constraint domains in two tiers: hard (Syntax, Types, Imports — binary pass/fail) and soft (ControlFlow, Semantics — graded preferences). Hard constraints compose by intersection; soft constraints never block generation. See [CLASH_ALGEBRA.md](CLASH_ALGEBRA.md).
+CLaSH (Coordinated Logical and Semantic Holes) is the algebraic foundation. Five constraint domains in two tiers: hard (Syntax, Types, Imports: binary pass/fail) and soft (ControlFlow, Semantics: graded preferences). Hard constraints compose by intersection; soft constraints never block generation. See [CLASH_ALGEBRA.md](CLASH_ALGEBRA.md).
 
 ### What is FIM?
 

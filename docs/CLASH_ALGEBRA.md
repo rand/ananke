@@ -1,6 +1,6 @@
 # CLaSH Constraint Algebra
 
-CLaSH -- Constraint Lattice for Shaped Holefilling -- is the algebraic foundation for composing multiple constraint sources into per-token generation decisions. It defines five constraint domains in two tiers, their composition semantics, cross-domain information flow, and adaptive intensity selection. The algebra is shared between Ananke (constraint extraction and compilation) and the sglang backend (constraint enforcement at decode time). If a constraint exists in Ananke, it exists in CLaSH. If it shapes a token probability, CLaSH defines how.
+CLaSH (Coordinated Logical and Semantic Holes) is the algebraic foundation for composing multiple constraint sources into per-token generation decisions. It defines five constraint domains in two tiers, their composition semantics, cross-domain information flow, and adaptive intensity selection. The algebra is shared between Ananke (constraint extraction and compilation) and the sglang backend (constraint enforcement at decode time). If a constraint exists in Ananke, it exists in CLaSH. If it shapes a token probability, CLaSH defines how.
 
 ---
 
